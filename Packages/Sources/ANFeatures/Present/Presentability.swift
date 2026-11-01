@@ -8,7 +8,8 @@ public enum Presentability: Equatable, Sendable {
         case suspended
         case revoked
         case pendingApproval
-        /// Sertifikat lokal sudah lewat masa berlaku dan belum diperbarui (ADR-0010).
+        /// Sertifikat lewat masa berlaku dan kartu tidak bisa diperpanjang (tanpa backend
+        /// penerbit). Kartu yang bisa diperpanjang tetap bisa di-tap (ADR-0023).
         case expired
         case bluetoothOff
         case bluetoothUnauthorized
@@ -23,7 +24,9 @@ public enum Presentability: Equatable, Sendable {
         if case .available = self { true } else { false }
     }
 
-    public static func evaluate(_ card: Card, availability: [ChannelKind: ChannelAvailability], now: Date = .now) -> Presentability {
+    /// `renewable`: record kartu punya backend penerbit, jadi sertifikat yang kedaluwarsa
+    /// diperpanjang setelah autentikasi tap (ADR-0023, TC-DEV-11).
+    public static func evaluate(_ card: Card, availability: [ChannelKind: ChannelAvailability], renewable: Bool = false, now: Date = .now) -> Presentability {
         switch card.status {
         case .needsTransfer: return .unavailable(.needsTransfer)
         case .suspended: return .unavailable(.suspended)
@@ -31,7 +34,7 @@ public enum Presentability: Equatable, Sendable {
         case .pendingApproval: return .unavailable(.pendingApproval)
         case .active, .needsRenewal: break  // sertifikat yang perlu diperbarui masih berlaku
         }
-        if let notAfter = card.notAfter, notAfter < now { return .unavailable(.expired) }
+        if let notAfter = card.notAfter, notAfter < now, !renewable { return .unavailable(.expired) }
         // R1 hanya mempresentasikan dari app lewat N-HCE dan B; W dipakai lewat Wallet sistem.
         let inApp = Set(card.credentials.keys).intersection([.nfcHCE, .ble])
         guard let channel = ChannelSelector.preferred(allowedBySite: inApp, availability: availability) else {
@@ -46,5 +49,14 @@ public enum Presentability: Equatable, Sendable {
             return .unavailable(.noChannel)
         }
         return .available(channel)
+    }
+}
+
+extension Card {
+    /// Status yang ditampilkan (FR-38): kartu aktif dengan sisa masa berlaku < 24 jam atau yang
+    /// sudah lewat tampil "Perlu diperbarui" (TC-DEV-10). Status lain ditampilkan apa adanya.
+    func displayStatus(now: Date = .now) -> CardStatus {
+        guard status == .active, let notAfter, notAfter.timeIntervalSince(now) < 24 * 3_600 else { return status }
+        return .needsRenewal
     }
 }

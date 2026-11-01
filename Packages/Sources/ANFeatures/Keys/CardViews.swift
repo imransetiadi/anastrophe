@@ -66,7 +66,7 @@ struct CardRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(card.name).font(.headline).foregroundStyle(ANColor.foreground)
                 Text(card.siteName).font(.subheadline).foregroundStyle(ANColor.mutedForeground)
-                StatusBadge(status: card.status)
+                StatusBadge(status: card.displayStatus())
             }
             Spacer(minLength: 8)
             if presentability.canPresent {
@@ -96,7 +96,7 @@ struct CardDetailView: View {
                 HStack {
                     Text(localized("detail.status"))
                     Spacer(minLength: 8)
-                    StatusBadge(status: card.status)
+                    StatusBadge(status: card.displayStatus())
                 }
                 // Tanpa ini separator mengikuti teks badge, bukan tepi baris seperti baris lain.
                 .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
@@ -112,6 +112,14 @@ struct CardDetailView: View {
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
+                if presentability.canPresent, card.displayStatus() == .needsRenewal {
+                    // TC-DEV-10: perpanjangan butuh internet saat kartu dipakai berikutnya.
+                    Text(localized("card.renewal_hint"))
+                        .font(.footnote)
+                        .foregroundStyle(ANColor.mutedForeground)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                }
                 if case .unavailable(let reason) = presentability {
                     Text(Self.text(for: reason))
                         .font(.footnote)

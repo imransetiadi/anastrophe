@@ -365,10 +365,13 @@ extension AppServices {
     public static func demo(screen: String? = nil) async -> AppServices {
         let services = inMemory(events: screen == "bluetooth-denied" ? [.waitingForReader, .unavailable(.bluetoothUnauthorized)] : [.waitingForReader])
         services.demoScreen = screen
-        let lobbyID = Data(repeating: 0x01, count: 16)
+        let lobbyID = Data(repeating: 0x01, count: 16), meetingID = Data(repeating: 0x04, count: 16)
         _ = try? services.keys.createKey(for: lobbyID)
+        _ = try? services.keys.createKey(for: meetingID)
         let samples = [
             Card(id: UUID(), name: "Lobi Utama", siteName: "Menara Anastrophe", zones: ["Lobi", "Lift A"], status: .active, credentials: [.ble: lobbyID], notAfter: .now.addingTimeInterval(6 * 86_400)),
+            // Sisa < 24 jam: tampil "Perlu diperbarui" (FR-38, TC-DEV-10).
+            Card(id: UUID(), name: "Ruang Rapat 7", siteName: "Menara Anastrophe", zones: ["Lantai 7"], status: .active, credentials: [.ble: meetingID], notAfter: .now.addingTimeInterval(12 * 3_600)),
             Card(id: UUID(), name: "Parkir B2", siteName: "Menara Anastrophe", zones: ["Parkir"], status: .active, credentials: [.ble: Data(repeating: 0x02, count: 16)], notAfter: nil),
             Card(id: UUID(), name: "Kantor Lt. 12", siteName: "Graha Mitra", zones: ["Lantai 12"], status: .suspended, credentials: [.ble: Data(repeating: 0x03, count: 16)], notAfter: nil),
         ]

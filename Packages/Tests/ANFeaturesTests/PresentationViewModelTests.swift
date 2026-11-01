@@ -75,6 +75,28 @@ struct PresentationViewModelTests {
         #expect(Presentability.evaluate(expired, availability: [.ble: .available], now: Date(timeIntervalSince1970: 500)) == .available(.ble))
     }
 
+    @Test func kedaluwarsaYangBisaDiperpanjangTetapBisaDipakai() {
+        // ADR-0023, TC-DEV-11: kartu kedaluwarsa tetap bisa di-tap; perpanjangan berjalan setelah
+        // autentikasi, dan tap gagal tertutup bila perpanjangan gagal (mis. offline).
+        var expired = card(status: .active)
+        expired.notAfter = Date(timeIntervalSince1970: 1_000)
+        #expect(Presentability.evaluate(expired, availability: [.ble: .available], renewable: true, now: Date(timeIntervalSince1970: 2_000)) == .available(.ble))
+    }
+
+    @Test(arguments: [
+        (23.0, CardStatus.active, CardStatus.needsRenewal),
+        (25.0, .active, .active),
+        (-1.0, .active, .needsRenewal),
+        (1.0, .suspended, .suspended),
+    ])
+    func statusTampilanPerluDiperbarui(hoursLeft: Double, stored: CardStatus, shown: CardStatus) {
+        // FR-38, TC-DEV-10: sisa < 24 jam atau sudah lewat → "Perlu diperbarui".
+        let now = Date(timeIntervalSince1970: 1_794_000_000)
+        var subject = card(status: stored)
+        subject.notAfter = now.addingTimeInterval(hoursLeft * 3_600)
+        #expect(subject.displayStatus(now: now) == shown)
+    }
+
     @Test func readerDiLuarJangkauanMenjadiFaseAkhir() async {
         let model = PresentationViewModel(events: stream([.waitingForReader, .readerOutOfRange]))
         await model.start()

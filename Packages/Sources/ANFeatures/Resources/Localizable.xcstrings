@@ -129,6 +129,22 @@
         }
       }
     },
+    "card.renewal_hint": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This card renews automatically the next time you use it. Make sure your iPhone is connected to the internet."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu ini diperbarui otomatis saat dipakai berikutnya. Pastikan iPhone terhubung ke internet."
+          }
+        }
+      }
+    },
     "card.status.active": {
       "localizations": {
         "en": {

@@ -10,6 +10,8 @@ public final class KeysViewModel {
     public private(set) var cards: [Card] = []
     public private(set) var availability: [ChannelKind: ChannelAvailability] = [:]
     public private(set) var isLoading = true
+    /// Kartu yang record-nya punya backend penerbit (dibaca sekali saat dimuat, bukan per render).
+    private var renewable: Set<Card.ID> = []
     private let services: AppServices
 
     public init(services: AppServices) {
@@ -25,6 +27,9 @@ public final class KeysViewModel {
             try? await services.cards.update(new)
         }
         cards = reconciled
+        renewable = Set(reconciled.filter { card in
+            card.credentials.values.contains { (try? services.records.record(for: $0))?.renewalURL != nil }
+        }.map(\.id))
         availability = await services.availability()
         isLoading = false
     }
@@ -35,6 +40,6 @@ public final class KeysViewModel {
     }
 
     public func presentability(of card: Card) -> Presentability {
-        .evaluate(card, availability: availability)
+        .evaluate(card, availability: availability, renewable: renewable.contains(card.id))
     }
 }
