@@ -64,13 +64,47 @@ struct CredentialKeyStoreTests {
 
     @Test func kunciDipindahKeCredIDServer() throws {
         // cred_id ditetapkan server setelah kunci dibuat; kunci tetap bisa menandatangani.
-        let keys = DeviceKeyStore(store: InMemorySecretStore(), factory: SoftwareKeyFactory())
+        let secrets = InMemorySecretStore()
+        let keys = DeviceKeyStore(store: secrets, factory: SoftwareKeyFactory())
         let local = Data(repeating: 0x0A, count: 16), server = Data(repeating: 0x0B, count: 16)
         let publicKey = try P256.Signing.PublicKey(x963Representation: keys.createKey(for: local))
         try keys.moveKey(from: local, to: server)
         #expect(try !keys.hasKey(for: local))
+        // Review lab M2: kelas proteksi ikut dipindah (CLAUDE.md aturan 5).
+        #expect(secrets.accessibility(for: DeviceKeyStore.storageKey(for: server)) == .whenPasscodeSetThisDeviceOnly)
         let signature = try P256.Signing.ECDSASignature(rawRepresentation: keys.signer(for: server, context: AuthorizedContext(laContext: LAContext())).sign(Data("m".utf8)))
         #expect(publicKey.isValidSignature(signature, for: Data("m".utf8)))
+    }
+
+    @Test func moveKeyKeIDSamaTidakMenghapusKunci() throws {
+        let keys = DeviceKeyStore(store: InMemorySecretStore(), factory: SoftwareKeyFactory())
+        let id = Data(repeating: 0x0C, count: 16)
+        _ = try keys.createKey(for: id)
+        try keys.moveKey(from: id, to: id)
+        #expect(try keys.hasKey(for: id))
+    }
+
+    @Test func moveKeyTidakMenimpaKunciLain() throws {
+        // Review lab M1: cred_id dari server yang bentrok tidak boleh menghapus kunci kartu lain.
+        let keys = DeviceKeyStore(store: InMemorySecretStore(), factory: SoftwareKeyFactory())
+        let local = Data(repeating: 0x0A, count: 16), other = Data(repeating: 0x0B, count: 16)
+        _ = try keys.createKey(for: local)
+        let otherKey = try P256.Signing.PublicKey(x963Representation: keys.createKey(for: other))
+        #expect(throws: ANError.invalidData) { try keys.moveKey(from: local, to: other) }
+        #expect(try keys.hasKey(for: local))
+        let signature = try P256.Signing.ECDSASignature(rawRepresentation: keys.signer(for: other, context: AuthorizedContext(laContext: LAContext())).sign(Data("m".utf8)))
+        #expect(otherKey.isValidSignature(signature, for: Data("m".utf8)))
+    }
+
+    @Test func moveKeyGagalHapusSumberMengembalikanTujuan() throws {
+        // Review lab M1: tulis tujuan sukses tetapi hapus sumber gagal → tidak ada salinan yatim.
+        let local = Data(repeating: 0x0A, count: 16), server = Data(repeating: 0x0B, count: 16)
+        let secrets = DeleteFailingSecretStore(failingKey: DeviceKeyStore.storageKey(for: local))
+        let keys = DeviceKeyStore(store: secrets, factory: SoftwareKeyFactory())
+        _ = try keys.createKey(for: local)
+        #expect(throws: (any Error).self) { try keys.moveKey(from: local, to: server) }
+        #expect(try keys.hasKey(for: local))
+        #expect(try !keys.hasKey(for: server))
     }
 
     @Test func recordMenjadiMaterial() throws {
@@ -118,5 +152,24 @@ struct CredentialKeyStoreTests {
         let blob = try #require(try secrets.get(DeviceKeyStore.storageKey(for: credentialID)))
         #expect(throws: (any Error).self) { try P256.Signing.PrivateKey(rawRepresentation: blob) }
         #expect(secrets.accessibility(for: DeviceKeyStore.storageKey(for: credentialID)) == .whenPasscodeSetThisDeviceOnly)
+    }
+}
+
+/// Store yang gagal menghapus satu kunci tertentu (uji pemulihan `moveKey`).
+private final class DeleteFailingSecretStore: SecretStore, @unchecked Sendable {
+    private let base = InMemorySecretStore()
+    private let failingKey: String
+
+    init(failingKey: String) { self.failingKey = failingKey }
+
+    func set(_ data: Data, for key: String, accessibility: SecretAccessibility) throws {
+        try base.set(data, for: key, accessibility: accessibility)
+    }
+
+    func get(_ key: String) throws -> Data? { try base.get(key) }
+
+    func delete(_ key: String) throws {
+        if key == failingKey { throw ANError.internalError }
+        try base.delete(key)
     }
 }

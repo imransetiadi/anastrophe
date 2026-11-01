@@ -5,6 +5,9 @@
 //
 // Kunci publik reader group diambil dari site.json milik scripts/anp1/lab_ca.py (di-ignore
 // git) agar reader lab memakai kunci yang sama; tanpa -lab-dir dibuat kunci baru.
+//
+// Slot kartu perangkat lab habis (8, termasuk percobaan yang gagal)? Buat perangkat baru
+// untuk gedung yang sama: `-site-code <hex> -new-device`.
 package main
 
 import (
@@ -37,6 +40,7 @@ func run() error {
 	siteName := flag.String("site-name", "Gedung Lab", "nama gedung")
 	zone := flag.String("zone", "Pintu Lab", "nama zona")
 	labDir := flag.String("lab-dir", "", "direktori site.json lab_ca.py (opsional)")
+	newDevice := flag.Bool("new-device", false, "hanya buat perangkat baru untuk -site-code yang sudah ada (mis. slot kartu perangkat lama habis)")
 	flag.Parse()
 
 	dsn := os.Getenv("ANASTROPHE_DATABASE_URL")
@@ -47,10 +51,6 @@ func run() error {
 	if err != nil || len(code) != 8 {
 		return errors.New("-site-code harus 8 byte hex")
 	}
-	groupID, groupKey, err := readerGroup(*labDir)
-	if err != nil {
-		return err
-	}
 	ctx := context.Background()
 	db, err := store.Open(ctx, dsn)
 	if err != nil {
@@ -58,6 +58,20 @@ func run() error {
 	}
 	defer db.Close()
 	if err := db.Migrate(ctx); err != nil {
+		return err
+	}
+	if *newDevice {
+		out, err := db.AddLabDevice(ctx, code)
+		if errors.Is(err, store.ErrNotFound) {
+			return errors.New("-site-code belum di-seed; jalankan tanpa -new-device dulu")
+		}
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(out)
+	}
+	groupID, groupKey, err := readerGroup(*labDir)
+	if err != nil {
 		return err
 	}
 	out, err := db.SeedLab(ctx, store.SeedInput{

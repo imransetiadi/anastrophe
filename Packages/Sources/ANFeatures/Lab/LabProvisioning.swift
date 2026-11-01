@@ -39,6 +39,11 @@ enum LabProvisioning {
         // Batas 8 kartu juga di app (CLAUDE.md aturan 8): jangan buat enrolment server yang
         // kartunya pasti ditolak penyimpanan lokal.
         try CardLimit.ensureCanAdd(currentCount: try await cards.all().count)
+        // Kanal yang dimatikan backend ditolak sebelum enrolment: setiap enrolment memakai satu
+        // dari 8 slot kartu perangkat di server, juga bila langkah berikutnya gagal.
+        guard try await api.fetchConfig().enabledChannels.contains(channel) else {
+            throw ANError.channelUnavailable(.regionBlocked)
+        }
         let (localID, publicKey) = try begin(keys: keys)
         var movedTo: Data?
         do {

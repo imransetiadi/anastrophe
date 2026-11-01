@@ -46,8 +46,13 @@ final class SequenceTransport: HTTPTransport, @unchecked Sendable {
     }
 }
 
-func provisionedBody(credentialID: Data) -> String {
-    let groupKey = P256.Signing.PrivateKey().publicKey.x963Representation.base64EncodedString()
+/// `GET /v1/config` backend dev (kill switch kanal).
+func configBody(_ channels: [String] = ["ble"]) -> (status: Int, body: String, contentType: String) {
+    (200, #"{"enabled_channels":[\#(channels.map { "\"\($0)\"" }.joined(separator: ",")) ],"wallet_program_enabled":false}"#, "application/json")
+}
+
+func provisionedBody(credentialID: Data, groupKey: String? = nil) -> String {
+    let groupKey = groupKey ?? P256.Signing.PrivateKey().publicKey.x963Representation.base64EncodedString()
     return #"{"credential_id":"\#(credentialID.base64EncodedString())","channel":"ble","certificate":"\#(Data(repeating: 0xCE, count: 188).base64EncodedString())","not_after":"2026-11-08T00:00:00Z","site_name":"Gedung Lab","zones":["Pintu Lab"],"group_keys":{"a1a2a3a4a5a6a7a8":["\#(groupKey)"]}}"#
 }
 
@@ -61,6 +66,7 @@ struct LabBackendProvisioningTests {
         let cards = try SwiftDataCardStore(directory: temporaryDirectory())
         let serverCredID = Data(repeating: 0x5E, count: 16)
         let transport = SequenceTransport([
+            configBody(),
             (201, #"{"enrollment_id":"6f1c2a9e-0000-4000-8000-000000000001"}"#, "application/json"),
             (200, provisionedBody(credentialID: serverCredID), "application/json"),
         ])
@@ -69,12 +75,17 @@ struct LabBackendProvisioningTests {
         #expect(card.credentials[.ble] == serverCredID)
         #expect(try keys.hasKey(for: serverCredID))
         #expect(try records.record(for: serverCredID) != nil)
-        #expect(transport.paths == ["/v1/enrollments", "/v1/enrollments/6f1c2a9e-0000-4000-8000-000000000001/credentials"])
+        #expect(transport.paths == ["/v1/config", "/v1/enrollments", "/v1/enrollments/6f1c2a9e-0000-4000-8000-000000000001/credentials"])
     }
 
     @Test(arguments: [
-        [(409, #"{"type":"ENR-LIMIT","status":409}"#, "application/problem+json")],
-        [(201, #"{"enrollment_id":"e1"}"#, "application/json"), (400, #"{"type":"ENR-INVALID-KEY","status":400}"#, "application/problem+json")],
+        [configBody(), (409, #"{"type":"ENR-LIMIT","status":409}"#, "application/problem+json")],
+        [configBody(), (201, #"{"enrollment_id":"e1"}"#, "application/json"), (400, #"{"type":"ENR-INVALID-KEY","status":400}"#, "application/problem+json")],
+        // Review lab M2: jaringan putus setelah enrolment (transport habis → URLError).
+        [configBody(), (201, #"{"enrollment_id":"e1"}"#, "application/json")],
+        // Review lab M2: gagal setelah kunci dipindah (kunci reader group tidak valid).
+        [configBody(), (201, #"{"enrollment_id":"e1"}"#, "application/json"),
+         (200, provisionedBody(credentialID: Data(repeating: 0x5E, count: 16), groupKey: Data([0x04] + [UInt8](repeating: 0x04, count: 64)).base64EncodedString()), "application/json")],
     ])
     func provisionViaBackendGagalTidakMenyisakanKunci(replies: [(Int, String, String)]) async throws {
         // Review Focus 1: FR-19 — tidak ada kunci, record, atau kartu yatim.
@@ -87,6 +98,20 @@ struct LabBackendProvisioningTests {
         }
         #expect(secrets.storedKeyCount == 0)
         #expect(try await cards.all().isEmpty)
+    }
+
+    @Test func provisionViaBackendKanalTidakAktifTidakMendaftar() async throws {
+        // Review lab I1: kanal yang dimatikan backend ditolak sebelum enrolment, jadi slot
+        // kartu server tidak terpakai.
+        let secrets = InMemorySecretStore()
+        let keys = DeviceKeyStore(store: secrets, factory: SoftwareKeyFactory())
+        let cards = try SwiftDataCardStore(directory: temporaryDirectory())
+        let transport = SequenceTransport([configBody(["ble"])])
+        await #expect(throws: ANError.channelUnavailable(.regionBlocked)) {
+            try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", channel: .nfcHCE, keys: keys, records: records, cards: cards)
+        }
+        #expect(transport.paths == ["/v1/config"])
+        #expect(secrets.storedKeyCount == 0)
     }
 
     @Test func provisionViaBackendDitolakLokalSaatDelapanKartu() async throws {

@@ -90,7 +90,12 @@ xcrun simctl launch booted app.anastrophe -ANLabBackend http://127.0.0.1:8080 \
   -ANLabDevice <device_id> -ANLabSite <site_id>
 ```
 
-`-lab-dir` memakai kunci reader group dari `lab_ca.py init` agar reader uji mengenali kartu; tanpa flag itu devseed membuat group baru yang kunci privatnya dibuang. Argumen `-ANLab*` hanya memprovisikan bila perangkat belum punya kartu; kartu berikutnya lewat layar Lab → "Backend dev". Kode lab tidak ikut build Release. Alur ini baru diverifikasi di simulator; di iPhone fisik URL harus menunjuk alamat Mac di jaringan lokal.
+Catatan alur lab:
+
+- **Reader uji.** `-lab-dir` memakai kunci reader group dari `lab_ca.py init`, sehingga ponsel menerima tanda tangan reader uji. Reader juga memverifikasi sertifikat terhadap Site CA (SDD §7.5). CA dev `anastrophe-api` dibuat ulang setiap start (kunci publiknya dicetak di log), dan `site_id` di sertifikat = `-site-code` devseed, jadi reader uji harus memakai keduanya. Tanpa `-lab-dir`, devseed membuat group baru yang kunci privatnya dibuang.
+- **Batas 8 kartu.** Setiap enrolment memakai satu dari 8 slot kartu perangkat di server, termasuk percobaan yang gagal setelah enrolment. Bila app menampilkan "Batas 8 kartu" padahal tidak ada kartu, buat perangkat baru untuk gedung yang sama dengan `go -C backend run ./cmd/anastrophe-devseed -site-code <hex> -new-device`.
+- **Provisioning otomatis.** Argumen `-ANLab*` hanya memprovisikan bila perangkat belum punya kartu dan penyimpanan berfungsi; kartu berikutnya lewat layar Lab → "Backend dev". Kode lab tidak ikut build Release.
+- **iPhone fisik.** Alur ini baru diverifikasi di simulator (`http://127.0.0.1`). Mulai iOS 17, ATS tidak lagi mengizinkan HTTP ke alamat IP secara default (O-B07), jadi di iPhone fisik pakai nama `.local` Mac, mis. `http://nama-mac.local:8080`. API dev tanpa autentikasi, jadi jalankan hanya di jaringan tepercaya. Belum diverifikasi di perangkat.
 
 Kanal N (`CardSession`/`CredentialSession`) butuh entitlement Apple yang belum dimiliki (PRD D1/D7). Sampai entitlement itu ada, kanal N selalu tertahan di gating dan app tidak crash. Kanal B dan seluruh logika protokol bisa dikembangkan dan diuji sekarang. Rencana kerja berikutnya: [`docs/superpowers/plans/2026-11-01-r1-tracer-bullet.md`](docs/superpowers/plans/2026-11-01-r1-tracer-bullet.md).
 

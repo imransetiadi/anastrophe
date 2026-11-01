@@ -102,8 +102,16 @@ public struct DeviceKeyStore: CredentialKeyStore {
     }
 
     public func moveKey(from: Data, to: Data) throws {
+        guard from != to else { return }
+        // cred_id dari server tidak boleh menimpa kunci kartu lain.
+        guard try store.get(Self.storageKey(for: to)) == nil else { throw ANError.invalidData }
         guard let blob = try store.get(Self.storageKey(for: from)) else { throw ANError.keyUnavailable }
         try store.set(blob, for: Self.storageKey(for: to), accessibility: .whenPasscodeSetThisDeviceOnly)
-        try store.delete(Self.storageKey(for: from))
+        do {
+            try store.delete(Self.storageKey(for: from))
+        } catch {
+            try? store.delete(Self.storageKey(for: to))  // tanpa salinan yatim
+            throw error
+        }
     }
 }

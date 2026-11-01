@@ -481,6 +481,22 @@
         }
       }
     },
+    "lab.backend.channel_disabled": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The backend has not enabled this access method."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backend belum mengaktifkan cara akses ini."
+          }
+        }
+      }
+    },
     "lab.backend.device": {
       "localizations": {
         "en": {

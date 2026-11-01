@@ -43,13 +43,14 @@ struct LabBackendLaunchTests {
         let services = AppServices.inMemory()
         services.configureLabBackend(arguments: arguments)
         let transport = SequenceTransport([
+            configBody(),
             (201, #"{"enrollment_id":"e1"}"#, "application/json"),
             (200, provisionedBody(credentialID: Data(repeating: 0x5E, count: 16)), "application/json"),
         ])
         #expect(await services.runPendingLabBackendProvisioning(transport: transport) == localized("lab.imported"))
         #expect(try await services.cards.all().map(\.siteName) == ["Gedung Lab"])
         #expect(await services.runPendingLabBackendProvisioning(transport: transport) == nil)
-        #expect(transport.paths.count == 2)  // tidak ada enrolment kedua
+        #expect(transport.paths.count == 3)  // tidak ada enrolment kedua
     }
 
     @Test func provisioningPeluncuranDilewatiBilaSudahAdaKartu() async throws {
@@ -73,7 +74,7 @@ struct LabBackendLaunchTests {
 
     @Test func batasKartuDariServerMenjadiPesanBatas() async throws {
         let services = AppServices.inMemory()
-        let transport = SequenceTransport([(409, #"{"type":"ENR-LIMIT","status":409}"#, "application/problem+json")])
+        let transport = SequenceTransport([configBody(), (409, #"{"type":"ENR-LIMIT","status":409}"#, "application/problem+json")])
         #expect(await services.provisionFromLabBackend(target, channel: .ble, transport: transport) == localized("lab.limit"))
         #expect(try await services.cards.all().isEmpty)
     }
@@ -81,11 +82,27 @@ struct LabBackendLaunchTests {
     @Test func kodeProblemDitampilkanUntukDiagnosis() async {
         let services = AppServices.inMemory()
         let transport = SequenceTransport([
+            configBody(),
             (201, #"{"enrollment_id":"e1"}"#, "application/json"),
-            (400, #"{"type":"ENR-INVALID-CHANNEL","status":400}"#, "application/problem+json"),
+            (400, #"{"type":"ENR-INVALID-KEY","status":400}"#, "application/problem+json"),
         ])
-        let message = await services.provisionFromLabBackend(target, channel: .nfcHCE, transport: transport)
-        #expect(message == "\(localized("lab.backend.failed")) (ENR-INVALID-CHANNEL)")
+        let message = await services.provisionFromLabBackend(target, channel: .ble, transport: transport)
+        #expect(message == "\(localized("lab.backend.failed")) (ENR-INVALID-KEY)")
+    }
+
+    @Test func kanalTidakAktifDiBackendMemberiPesan() async {
+        let services = AppServices.inMemory()
+        let message = await services.provisionFromLabBackend(target, channel: .nfcHCE, transport: SequenceTransport([configBody(["ble"])]))
+        #expect(message == localized("lab.backend.channel_disabled"))
+    }
+
+    @Test func provisioningPeluncuranDilewatiBilaPenyimpananGagal() async {
+        // Review lab I1: tanpa penyimpanan, kartu dari server pasti ditolak lokal.
+        let services = AppServices.storageUnavailable()
+        services.configureLabBackend(arguments: arguments)
+        let transport = SequenceTransport([])
+        #expect(await services.runPendingLabBackendProvisioning(transport: transport) == nil)
+        #expect(transport.paths.isEmpty)
     }
 
     @Test func backendTidakTerjangkauMemberiPesanGagal() async {

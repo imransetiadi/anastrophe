@@ -12,6 +12,10 @@ import (
 // ErrSiteExists: site_code sudah dipakai gedung lain.
 var ErrSiteExists = errors.New("store: site_code sudah ada")
 
+// ErrReaderGroupExists: group_id reader sudah dipakai gedung lain (mis. -lab-dir yang sama
+// dengan -site-code baru).
+var ErrReaderGroupExists = errors.New("store: group_id reader sudah dipakai")
+
 // SeedInput adalah data lab untuk cmd/anastrophe-devseed (dev saja).
 type SeedInput struct {
 	OrgName     string
@@ -53,7 +57,33 @@ func (s *Store) SeedLab(ctx context.Context, in SeedInput) (SeedOutput, error) {
 	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-		return SeedOutput{}, ErrSiteExists
+		switch pgErr.ConstraintName {
+		case "sites_site_code_key":
+			return SeedOutput{}, ErrSiteExists
+		case "reader_groups_pkey":
+			return SeedOutput{}, ErrReaderGroupExists
+		}
 	}
-	return out, err
+	if err != nil {
+		return SeedOutput{}, err
+	}
+	return out, nil
+}
+
+// AddLabDevice membuat perangkat baru untuk gedung lab yang sudah ada, misalnya setelah
+// slot kartu perangkat lama habis oleh percobaan yang gagal.
+func (s *Store) AddLabDevice(ctx context.Context, siteCode []byte) (SeedOutput, error) {
+	var out SeedOutput
+	err := s.pool.QueryRow(ctx, `SELECT id FROM sites WHERE site_code = $1`, siteCode).Scan(&out.SiteID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return SeedOutput{}, ErrNotFound
+	}
+	if err != nil {
+		return SeedOutput{}, err
+	}
+	out.DeviceID, err = s.CreateDevice(ctx)
+	if err != nil {
+		return SeedOutput{}, err
+	}
+	return out, nil
 }

@@ -45,6 +45,8 @@ extension AppServices {
     func runPendingLabBackendProvisioning(transport: any HTTPTransport = URLSession.shared) async -> String? {
         guard let target = pendingLabBackend else { return nil }
         pendingLabBackend = nil
+        // Tanpa penyimpanan, kartu dari server pasti ditolak lokal dan slot server terbuang.
+        guard !storageFailed else { return nil }
         // Argumen skema Xcode bertahan antar-Run: hanya perangkat tanpa kartu yang diprovisikan
         // otomatis. Kartu berikutnya lewat layar Lab.
         if let existing = try? await cards.all(), !existing.isEmpty { return localized("lab.backend.skipped") }
@@ -62,6 +64,8 @@ extension AppServices {
             return localized("lab.imported")
         } catch ANError.cardLimitReached {
             return localized("lab.limit")
+        } catch ANError.channelUnavailable {
+            return localized("lab.backend.channel_disabled")
         } catch let problem as ProblemDetails {
             return "\(localized("lab.backend.failed")) (\(problem.type))"
         } catch {

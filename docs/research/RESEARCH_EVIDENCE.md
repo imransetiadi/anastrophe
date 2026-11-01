@@ -15,7 +15,7 @@
 |---|---|---|
 | 1.0 | 2026-11-01 | Ledger awal: Samsung FAQ, HCE `CardSession`, NFC & SE Platform, Apple Wallet employee badge (E01–E10). |
 | 2.0 | 2026-11-01 | Menambahkan E11–E30: `CredentialSession` (SecureElementCredential), Apple Wallet Access Program Guide, Aliro 1.0, OSDP Transparent Mode, HID Mobile Access (BLE), Core Bluetooth background, daftar perangkat iOS 26/27, App Review 5.1.1(v), ketersediaan Apple Pay. Cek ulang live: Indonesia **masih** tidak eligible. Q9–Q14 baru; I-08–I-14; U07–U13. |
-| 2.1 | 2026-11-01 | E31 + O-A24 (artefak SDK iOS 27.2); E32 + O-B05–O-B06: batas iklan peripheral CoreBluetooth untuk reader uji BLE (ADR-0022); E33 + O-A25–O-A27 + I-15: autentikasi untuk perpanjangan sertifikat. |
+| 2.1 | 2026-11-01 | E31 + O-A24 (artefak SDK iOS 27.2); E32 + O-B05–O-B06: batas iklan peripheral CoreBluetooth untuk reader uji BLE (ADR-0022); E33 + O-A25–O-A27 + I-15: autentikasi untuk perpanjangan sertifikat; E34 + O-B07: ATS dan alamat IP (lab di iPhone fisik). |
 
 ---
 
@@ -96,6 +96,7 @@ Skill REA dibuat untuk menjawab pertanyaan "fitur ini bekerja bagaimana?" dan me
 | E31 | Apple — iOS SDK 27.2 (Xcode 27.2, build 27B52): `CoreNFC.swiftinterface` dan `SecureElementCredential.swiftinterface` | `iPhoneOS27.2.sdk/System/Library/Frameworks/{CoreNFC,SecureElementCredential}.framework` | 2026-11-01 | Resmi Apple (artefak SDK) / tinggi |
 | E32 | Apple — Core Bluetooth: `CBPeripheralManager` (ketersediaan platform) dan `startAdvertising(_:)` | https://developer.apple.com/documentation/corebluetooth/cbperipheralmanager | 2026-11-01 (metadata JSON dokumentasi) | Resmi Apple / tinggi |
 | E33 | Apple — Security, LocalAuthentication, BackgroundTasks: `kSecUseAuthenticationContext`, `LAContext.interactionNotAllowed`, `LAError.Code.notInteractive`, `BGAppRefreshTask` | https://developer.apple.com/documentation/security/ksecuseauthenticationcontext | 2026-11-01 (metadata JSON dokumentasi) | Resmi Apple / tinggi |
+| E34 | Apple — Information Property List: `NSAllowsLocalNetworking` (App Transport Security) | https://developer.apple.com/documentation/bundleresources/information-property-list/nsapptransportsecurity/nsallowslocalnetworking | 2026-11-01 (metadata JSON dokumentasi) | Resmi Apple / tinggi |
 
 ---
 
@@ -202,6 +203,7 @@ Skill REA dibuat untuk menjawab pertanyaan "fitur ini bekerja bagaimana?" dan me
 | O-B04 | (E26) Pemindaian BLE di background **wajib memfilter service UUID** (yang juga dideklarasikan di mode `bluetooth-central`), berjalan lebih jarang, dan tidak otomatis lanjut setelah Bluetooth reset. State preservation & restoration memungkinkan app diluncurkan ulang di background. |
 | O-B05 | (E32) `CBPeripheralManager` tersedia di macOS 10.9+ (juga iOS/iPadOS 6.0+, Mac Catalyst 13.1+, tvOS 9.0+, watchOS 2.0+, visionOS 1.0+). |
 | O-B06 | (E32) `startAdvertising(_:)` hanya mendukung dua kunci data iklan: `CBAdvertisementDataLocalNameKey` dan `CBAdvertisementDataServiceUUIDsKey`. Iklan bersifat *best effort*; saat foreground tersedia hingga 28 B di iklan awal, ditambah 10 B di *scan response* khusus nama lokal. Akibatnya peripheral berbasis CoreBluetooth (iOS/macOS) **tidak dapat** mengiklankan *service data* seperti `group_id` (SDD §6.3). |
+| O-B07 | (E34) Di iOS 10–16, ATS mengizinkan koneksi ke domain tanpa kualifikasi, domain `.local`, dan alamat IP secara default. **Mulai iOS 17, iPadOS 17, dan macOS 14, ATS tidak lagi mengizinkan koneksi ke alamat IP secara default**; alamat IP/CIDR harus ditambahkan di `NSExceptionDomains`. |
 | O-R01 | (E25) SIA menyatakan (18 Mar 2026) **OSDP Transparent Mode terbuka untuk semua**. Paten HID terkait tidak akan membatasi implementasi yang patuh OSDP. Mode ini memungkinkan data aplikasi spesifik melewati kanal aman OSDP. OSDP v2.2.2 rilis Okt 2024; standar IEC 60839-11-5. |
 
 ### 4.6 Perangkat, OS, dan kebijakan
