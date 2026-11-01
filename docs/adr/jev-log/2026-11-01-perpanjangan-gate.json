@@ -1,0 +1,41 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "label": "perpanjangan-sertifikat-completion",
+  "date": "2026-11-01",
+  "request": "Plan 2026-11-01-perpanjangan-sertifikat (Task 1-5) + final-review fixes (C1 in 7f59abb/a5c2cd4, I1-I3 in a5c2cd4)",
+  "claims": [
+    [
+      "backend nonce/signature/suspended/kill switch",
+      "verified",
+      0.97
+    ],
+    [
+      "renew only after tap auth; expired bounded; soon after tap, never background",
+      "verified",
+      0.34
+    ],
+    [
+      "expired renewable cards tappable; renewal reaches list",
+      "verified",
+      0.98
+    ],
+    [
+      "simulator e2e 1d->7d same row, Release clean",
+      "verified",
+      0.8
+    ],
+    [
+      "suites green 198/197/1, Go 6 ok, docs 0",
+      "verified",
+      0.88
+    ]
+  ],
+  "review": {
+    "safe_to_apply": 0.44,
+    "composite": 0.6045,
+    "limiting": "correctness"
+  },
+  "action": "escalate",
+  "status": "Eskalasi ke pengguna: semua klaim verified tanpa contradicted/unsupported; klaim background 0,34 dan review patch di bawah ambang. Tidak diulang tanpa bukti baru (ADR-0018); batch minor M1-M9 menyusul."
+}
