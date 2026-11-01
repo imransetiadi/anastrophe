@@ -39,10 +39,19 @@ func TestEnrolmentKartuMenjawabStatus(t *testing.T) {
 	other, _ := f.store.CreateDevice(context.Background())
 	body["device_id"] = other
 	rec = f.do(t, http.MethodPost, "/v1/enrollments", "", body)
-	if _, status := enrolResult(t, rec.Body); rec.Code != http.StatusCreated || status != "PENDING_APPROVAL" {
+	pendingID, status := enrolResult(t, rec.Body)
+	if rec.Code != http.StatusCreated || status != "PENDING_APPROVAL" {
 		t.Fatalf("perangkat lain: %d %s", rec.Code, rec.Body)
 	}
-	// Perangkat yang sama dengan kartu yang sama → duplikat.
+	// ADR-0034: perangkat yang sama dengan kartu yang sama melanjutkan instance-nya (200, id sama).
+	rec = f.do(t, http.MethodPost, "/v1/enrollments", "", body)
+	if resumedID, resumedStatus := enrolResult(t, rec.Body); rec.Code != http.StatusOK || resumedID != pendingID || resumedStatus != "PENDING_APPROVAL" {
+		t.Fatalf("lanjut: %d %s", rec.Code, rec.Body)
+	}
+	// Setelah aktif, kartu yang sama di perangkat yang sama menjadi duplikat.
+	if err := f.store.SetCardInstanceStatus(context.Background(), pendingID, "ACTIVE"); err != nil {
+		t.Fatal(err)
+	}
 	rec = f.do(t, http.MethodPost, "/v1/enrollments", "", body)
 	if rec.Code != http.StatusConflict || problemType(t, rec) != "ENR-DUPLICATE" {
 		t.Fatalf("duplikat: %d %s", rec.Code, rec.Body)

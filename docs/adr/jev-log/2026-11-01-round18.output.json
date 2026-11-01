@@ -1,0 +1,88 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "resume_plus_expiry",
+    "escaped": false,
+    "confidence": 0.81,
+    "probabilities": {
+      "resume_unfinished": 0.16,
+      "resume_plus_expiry": 0.84,
+      "cancel_endpoint": 0,
+      "expiry_only": 0,
+      "ask_user": 0,
+      "investigate": 0,
+      "none": 0
+    },
+    "contradicted_requirements": []
+  },
+  "requirements_checked": 3,
+  "checks": [
+    {
+      "candidate": "resume_unfinished",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "resume_unfinished",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "resume_unfinished",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "resume_plus_expiry",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "resume_plus_expiry",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "resume_plus_expiry",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "cancel_endpoint",
+      "requirement": 0,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "cancel_endpoint",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "cancel_endpoint",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "expiry_only",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "expiry_only",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "expiry_only",
+      "requirement": 2,
+      "answer": "supported"
+    }
+  ],
+  "warnings": [],
+  "usage": {
+    "input_tokens": 3076,
+    "output_tokens": 590
+  }
+}

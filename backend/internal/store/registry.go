@@ -85,33 +85,59 @@ func (s *Store) UpsertPhysicalCards(ctx context.Context, siteID, operator string
 	return added, updated, nil
 }
 
-// StartCardEnrollment memulai enrolment untuk kartu fisik yang cocok dengan registri gedung
-// (SDD §8.4.1), dalam transaksi sendiri.
+// AbandonedEnrollmentTTL: PROVISIONING tanpa kredensial yang melewati batas ini (sejak masuk
+// PROVISIONING atau terakhir dilanjutkan) menjadi ABANDONED (ADR-0034).
+const AbandonedEnrollmentTTL = 15 * time.Minute
+
+// CardEnrollment adalah hasil enrolment kartu. Resumed = instance perangkat yang belum selesai
+// dilanjutkan, bukan dibuat baru (ADR-0034).
+type CardEnrollment struct {
+	ID      string
+	Status  string
+	Resumed bool
+}
+
+// StartCardEnrollment memulai atau melanjutkan enrolment untuk kartu fisik yang cocok dengan
+// registri gedung (SDD §8.4.1), dalam transaksi sendiri.
 func (s *Store) StartCardEnrollment(ctx context.Context, deviceID, siteID string, cardHMAC []byte, at time.Time) (id, status string, err error) {
-	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+	r, err := s.EnrollCard(ctx, deviceID, siteID, cardHMAC, at)
+	return r.ID, r.Status, err
+}
+
+// EnrollCard seperti StartCardEnrollment, dan melaporkan apakah instance yang ada dilanjutkan.
+func (s *Store) EnrollCard(ctx context.Context, deviceID, siteID string, cardHMAC []byte, at time.Time) (CardEnrollment, error) {
+	var r CardEnrollment
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		var err error
-		id, status, err = (&Tx{tx: tx}).StartCardEnrollment(ctx, deviceID, siteID, cardHMAC, at)
+		r, err = (&Tx{tx: tx}).EnrollCard(ctx, deviceID, siteID, cardHMAC, at)
 		return err
 	})
 	if err != nil {
-		return "", "", err
+		return CardEnrollment{}, err
 	}
-	return id, status, nil
+	return r, nil
 }
 
-// StartCardEnrollment: perangkat pertama mendapat PROVISIONING; perangkat lain untuk kartu yang sama
-// mendapat PENDING_APPROVAL sampai akun dan keanggotaan ada (ADR-0032). Kunci diambil berurutan
-// (perangkat, lalu kartu) sehingga enrolment bersamaan tersusun tanpa deadlock.
+// StartCardEnrollment adalah EnrollCard tanpa penanda Resumed.
 func (t *Tx) StartCardEnrollment(ctx context.Context, deviceID, siteID string, cardHMAC []byte, at time.Time) (string, string, error) {
+	r, err := t.EnrollCard(ctx, deviceID, siteID, cardHMAC, at)
+	return r.ID, r.Status, err
+}
+
+// EnrollCard: perangkat pertama mendapat PROVISIONING; perangkat lain untuk kartu yang sama mendapat
+// PENDING_APPROVAL sampai akun dan keanggotaan ada (ADR-0032). Instance PROVISIONING/PENDING_APPROVAL
+// milik perangkat yang sama dilanjutkan, sedangkan ACTIVE/SUSPENDED menjadi duplikat (ADR-0034). Kunci
+// diambil berurutan (perangkat, lalu kartu) sehingga enrolment bersamaan tersusun tanpa deadlock.
+func (t *Tx) EnrollCard(ctx context.Context, deviceID, siteID string, cardHMAC []byte, at time.Time) (CardEnrollment, error) {
 	if !looksLikeUUID(deviceID) || !looksLikeUUID(siteID) {
-		return "", "", ErrNotFound
+		return CardEnrollment{}, ErrNotFound
 	}
 	if len(cardHMAC) != 32 {
-		return "", "", errInvalidHMAC
+		return CardEnrollment{}, errInvalidHMAC
 	}
-	device, active, err := lockDevice(ctx, t.tx, deviceID)
+	device, _, err := lockDevice(ctx, t.tx, deviceID)
 	if err != nil {
-		return "", "", err
+		return CardEnrollment{}, err
 	}
 	var site string
 	var hasCards bool
@@ -119,53 +145,135 @@ func (t *Tx) StartCardEnrollment(ctx context.Context, deviceID, siteID string, c
 		SELECT s.id::text, EXISTS (SELECT 1 FROM physical_cards pc WHERE pc.site_id = s.id AND pc.status = 'ACTIVE')
 		FROM sites s WHERE s.id = $1`, siteID).Scan(&site, &hasCards)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", "", ErrNotFound
+		return CardEnrollment{}, ErrNotFound
 	}
 	if err != nil {
-		return "", "", err
-	}
-	if !hasCards {
-		return "", "", ErrSiteUnsupported
+		return CardEnrollment{}, err
 	}
 	var card string
 	err = t.tx.QueryRow(ctx, `SELECT id::text FROM physical_cards WHERE site_id = $1 AND card_id_hmac = $2 AND status = 'ACTIVE' FOR UPDATE`, site, cardHMAC).Scan(&card)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", "", ErrNotRegistered
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return CardEnrollment{}, err
 	}
-	if err != nil {
-		return "", "", err
+	if _, err := t.abandonStale(ctx, at, device, card); err != nil {
+		return CardEnrollment{}, err
 	}
-	rows, err := t.tx.Query(ctx, `SELECT device_id::text FROM card_instances WHERE physical_card_id = $1 AND status = ANY($2)`, card, activeStatuses)
-	if err != nil {
-		return "", "", err
+	var active int
+	if err := t.tx.QueryRow(ctx, `SELECT count(*) FROM card_instances WHERE device_id = $1 AND status = ANY($2)`, device, activeStatuses).Scan(&active); err != nil {
+		return CardEnrollment{}, err
 	}
-	holders, err := pgx.CollectRows(rows, pgx.RowTo[string])
-	if err != nil {
-		return "", "", err
+	others := false
+	if card != "" {
+		rows, err := t.tx.Query(ctx, `SELECT id::text, device_id::text, status FROM card_instances WHERE physical_card_id = $1 AND status = ANY($2)`, card, activeStatuses)
+		if err != nil {
+			return CardEnrollment{}, err
+		}
+		type holder struct{ id, device, status string }
+		holders, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (holder, error) {
+			var h holder
+			err := row.Scan(&h.id, &h.device, &h.status)
+			return h, err
+		})
+		if err != nil {
+			return CardEnrollment{}, err
+		}
+		for _, h := range holders {
+			if h.device != device {
+				others = true
+				continue
+			}
+			if h.status != "PROVISIONING" && h.status != "PENDING_APPROVAL" {
+				return CardEnrollment{}, ErrDuplicateEnrollment
+			}
+			if h.status == "PROVISIONING" {
+				// Melanjutkan memperpanjang batas waktu terbengkalai.
+				if _, err := t.tx.Exec(ctx, `UPDATE card_instances SET status_changed_at = $2 WHERE id = $1`, h.id, at); err != nil {
+					return CardEnrollment{}, err
+				}
+			}
+			return CardEnrollment{ID: h.id, Status: h.status, Resumed: true}, nil
+		}
+	}
+	// Review minor 1: perangkat penuh tidak membedakan kartu terdaftar dan tidak dikenal.
+	if active >= MaxActiveCardsPerDevice {
+		return CardEnrollment{}, ErrCardLimit
+	}
+	if !hasCards {
+		return CardEnrollment{}, ErrSiteUnsupported
+	}
+	if card == "" {
+		return CardEnrollment{}, ErrNotRegistered
 	}
 	status := "PROVISIONING"
-	for _, holder := range holders {
-		if holder == device {
-			return "", "", ErrDuplicateEnrollment
-		}
+	if others {
 		status = "PENDING_APPROVAL"
 	}
-	if active >= MaxActiveCardsPerDevice {
-		return "", "", ErrCardLimit
-	}
 	id := newUUID()
-	if _, err := t.tx.Exec(ctx, `INSERT INTO card_instances (id, device_id, site_id, physical_card_id, status) VALUES ($1, $2, $3, $4, $5)`,
-		id, device, site, card, status); err != nil {
-		return "", "", err
+	if _, err := t.tx.Exec(ctx, `INSERT INTO card_instances (id, device_id, site_id, physical_card_id, status, status_changed_at) VALUES ($1, $2, $3, $4, $5, $6)`,
+		id, device, site, card, status, at); err != nil {
+		return CardEnrollment{}, err
 	}
 	err = t.AppendAudit(ctx, AuditEvent{
 		SiteID: site, Actor: "device:" + device, Action: "enrollment.started", Subject: "card_instance:" + id,
 		Data: map[string]any{"status": status}, At: at,
 	})
 	if err != nil {
-		return "", "", err
+		return CardEnrollment{}, err
 	}
-	return id, status, nil
+	return CardEnrollment{ID: id, Status: status}, nil
+}
+
+// AbandonStaleEnrollments menandai semua PROVISIONING tanpa kredensial yang terbengkalai sebagai
+// ABANDONED (sapuan berkala API, ADR-0034).
+func (s *Store) AbandonStaleEnrollments(ctx context.Context, at time.Time) (int, error) {
+	var n int
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		var err error
+		n, err = (&Tx{tx: tx}).abandonStale(ctx, at, "", "")
+		return err
+	})
+	return n, err
+}
+
+// abandonStale menandai PROVISIONING tanpa kredensial yang melewati AbandonedEnrollmentTTL sebagai
+// ABANDONED, untuk perangkat atau kartu tertentu (keduanya kosong = semua), dengan audit per instance.
+// Baris yang sedang dikunci transaksi lain (mis. penerbitan kredensial) dilewati agar tidak deadlock.
+func (t *Tx) abandonStale(ctx context.Context, at time.Time, device, card string) (int, error) {
+	var deviceParam, cardParam any
+	if device != "" {
+		deviceParam = device
+	}
+	if card != "" {
+		cardParam = card
+	}
+	rows, err := t.tx.Query(ctx, `
+		UPDATE card_instances ci SET status = 'ABANDONED', status_changed_at = $1
+		WHERE ci.id IN (
+			SELECT x.id FROM card_instances x
+			WHERE x.status = 'PROVISIONING' AND x.status_changed_at < $2
+			  AND (($3::uuid IS NULL AND $4::uuid IS NULL) OR x.device_id = $3::uuid OR x.physical_card_id = $4::uuid)
+			  AND NOT EXISTS (SELECT 1 FROM credentials c WHERE c.card_instance_id = x.id)
+			ORDER BY x.id
+			FOR UPDATE OF x SKIP LOCKED)
+		RETURNING ci.id::text, ci.site_id::text`, at, at.Add(-AbandonedEnrollmentTTL), deviceParam, cardParam)
+	if err != nil {
+		return 0, err
+	}
+	type abandoned struct{ id, site string }
+	list, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (abandoned, error) {
+		var a abandoned
+		err := row.Scan(&a.id, &a.site)
+		return a, err
+	})
+	if err != nil {
+		return 0, err
+	}
+	for _, a := range list {
+		if err := t.AppendAudit(ctx, AuditEvent{SiteID: a.site, Actor: "system", Action: "enrollment.abandoned", Subject: "card_instance:" + a.id, At: at}); err != nil {
+			return 0, err
+		}
+	}
+	return len(list), nil
 }
 
 // DecideEnrollment: operator menyetujui (PROVISIONING) atau menolak (REJECTED) card instance
@@ -193,7 +301,7 @@ func (s *Store) DecideEnrollment(ctx context.Context, cardInstanceID string, app
 		if approve {
 			next, action = "PROVISIONING", "enrollment.approved"
 		}
-		if _, err := tx.Exec(ctx, `UPDATE card_instances SET status = $2 WHERE id = $1`, id, next); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE card_instances SET status = $2, status_changed_at = $3 WHERE id = $1`, id, next, at); err != nil {
 			return err
 		}
 		return (&Tx{tx: tx}).AppendAudit(ctx, AuditEvent{

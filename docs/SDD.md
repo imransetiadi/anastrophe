@@ -25,6 +25,7 @@
 | 2.9 | 2026-11-01 | Registri kartu fisik (ADR-0031): `physical_cards` berisi HMAC per gedung, `card_instances.physical_card_id`, status `REJECTED`, dan aturan perangkat tambahan sebelum akun (ADR-0032) (§8.1). |
 | 2.10 | 2026-11-01 | `POST /enrollments` mewajibkan identitas kartu dan menjawab `{enrollment_id, status}`; galat `ENR-NOT-REGISTERED`, `ENR-SITE-UNSUPPORTED`, `ENR-DUPLICATE`, `ENR-PENDING-APPROVAL` (§8.5, §15). |
 | 2.11 | 2026-11-01 | Perpanjangan memakai zona kartu terdaftar seperti penerbitan pertama (review registri C1, §8.4.2). |
+| 2.12 | 2026-11-01 | Enrolment yang belum selesai dilanjutkan dan `PROVISIONING` terbengkalai menjadi `ABANDONED` (ADR-0034); batas 8 kartu diperiksa sebelum membedakan kartu terdaftar (§8.1). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -573,6 +574,7 @@ audit_events(id bigserial pk, chain text /* site:<uuid> | platform (ADR-0024) */
 - Satu PRIMARY per kepemilikan.
 - Registri (ADR-0031): `physical_cards` hanya menyimpan HMAC per gedung (`card_id_hmac`, `holder_contact_hmac` opsional), unik per (gedung, HMAC); kartu `REMOVED` dijawab sama dengan kartu tak dikenal. `acs_card_number` belum disimpan sampai integrasi ACS. Zona sertifikat diambil dari `physical_cards.zones_bitmap` bila card instance tertaut.
 - Sebelum ada akun (ADR-0032, provisional): perangkat pertama untuk sebuah kartu mendapat `PROVISIONING`, perangkat lain `PENDING_APPROVAL` yang disetujui (`PROVISIONING`) atau ditolak (`REJECTED`) operator; kunci diambil berurutan (perangkat, lalu baris kartu).
+- Enrolment yang belum selesai (ADR-0034): perangkat yang sama dengan instance `PROVISIONING`/`PENDING_APPROVAL` untuk kartu itu melanjutkan instance tersebut (200, `enrollment_id` sama); `ENR-DUPLICATE` hanya untuk `ACTIVE`/`SUSPENDED`. `PROVISIONING` tanpa kredensial yang melewati 15 menit sejak masuk `PROVISIONING` atau terakhir dilanjutkan menjadi `ABANDONED` (tidak aktif; audit `enrollment.abandoned`), lewat pemeriksaan di transaksi enrolment dan sapuan per jam. Perangkat penuh (8 kartu) mendapat `ENR-LIMIT` untuk kartu terdaftar maupun tidak dikenal.
 - `credentials.not_after ≤ issued_at + policy.cert_validity_days`.
 - `denylist_entries.expires_at = not_after` sertifikat terakhir, sehingga denylist tidak tumbuh tanpa batas.
 - `sites.policy` (JSON) memuat `zones` (nama zona), `zones_bitmap` (bilangan 64-bit) dan `cert_validity_days` (1–30, default 7 sesuai ADR-0010). Tanpa `zones_bitmap`, sertifikat diterbitkan dengan bitmap 0 (*fail-closed*: tidak membuka zona mana pun).

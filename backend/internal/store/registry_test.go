@@ -98,11 +98,15 @@ func TestPerangkatKeduaMenungguPersetujuan(t *testing.T) {
 }
 
 func TestPerangkatSamaDuplikat(t *testing.T) {
+	// ADR-0034: hanya instance ACTIVE/SUSPENDED milik perangkat yang sama yang menjadi duplikat.
 	s := freshStore(t)
 	ctx := context.Background()
 	siteID, deviceID := registrySite(t, s, PhysicalCard{CardHMAC: cardHMAC("A")})
 	id, _, err := s.StartCardEnrollment(ctx, deviceID, siteID, cardHMAC("A"), time.Now())
 	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetCardInstanceStatus(ctx, id, "ACTIVE"); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := s.StartCardEnrollment(ctx, deviceID, siteID, cardHMAC("A"), time.Now()); !errors.Is(err, ErrDuplicateEnrollment) {
@@ -112,8 +116,140 @@ func TestPerangkatSamaDuplikat(t *testing.T) {
 	if err := s.SetCardInstanceStatus(ctx, id, "DELETED"); err != nil {
 		t.Fatal(err)
 	}
-	if _, st, err := s.StartCardEnrollment(ctx, deviceID, siteID, cardHMAC("A"), time.Now()); err != nil || st != "PROVISIONING" {
-		t.Fatalf("daftar ulang: %q %v", st, err)
+	if again, st, err := s.StartCardEnrollment(ctx, deviceID, siteID, cardHMAC("A"), time.Now()); err != nil || st != "PROVISIONING" || again == id {
+		t.Fatalf("daftar ulang: %q %q %v", again, st, err)
+	}
+}
+
+func TestPerangkatSamaMelanjutkanEnrolment(t *testing.T) {
+	// ADR-0034: percobaan ulang perangkat yang sama melanjutkan instance yang belum selesai.
+	s := freshStore(t)
+	ctx := context.Background()
+	siteID, deviceID := registrySite(t, s, PhysicalCard{CardHMAC: cardHMAC("A")})
+	first, err := s.EnrollCard(ctx, deviceID, siteID, cardHMAC("A"), time.Now())
+	if err != nil || first.Resumed || first.Status != "PROVISIONING" {
+		t.Fatalf("pertama: %+v %v", first, err)
+	}
+	again, err := s.EnrollCard(ctx, deviceID, siteID, cardHMAC("A"), time.Now())
+	if err != nil || !again.Resumed || again.ID != first.ID || again.Status != "PROVISIONING" {
+		t.Fatalf("ulang: %+v %v", again, err)
+	}
+	var n int
+	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM card_instances`).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("card instance = %d (%v), ingin 1", n, err)
+	}
+}
+
+func TestDisetujuiLaluDilanjutkan(t *testing.T) {
+	// ADR-0034: perangkat tambahan yang disetujui operator bisa melanjutkan ke kredensial.
+	s := freshStore(t)
+	ctx := context.Background()
+	siteID, a := registrySite(t, s, PhysicalCard{CardHMAC: cardHMAC("A")})
+	b := newDevice(t, s)
+	if _, err := s.EnrollCard(ctx, a, siteID, cardHMAC("A"), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	pending, err := s.EnrollCard(ctx, b, siteID, cardHMAC("A"), time.Now())
+	if err != nil || pending.Status != "PENDING_APPROVAL" {
+		t.Fatalf("tambahan: %+v %v", pending, err)
+	}
+	if again, err := s.EnrollCard(ctx, b, siteID, cardHMAC("A"), time.Now()); err != nil || !again.Resumed || again.ID != pending.ID || again.Status != "PENDING_APPROVAL" {
+		t.Fatalf("ulang sebelum disetujui: %+v %v", again, err)
+	}
+	if err := s.DecideEnrollment(ctx, pending.ID, true, "budi", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if approved, err := s.EnrollCard(ctx, b, siteID, cardHMAC("A"), time.Now()); err != nil || !approved.Resumed || approved.ID != pending.ID || approved.Status != "PROVISIONING" {
+		t.Fatalf("setelah disetujui: %+v %v", approved, err)
+	}
+}
+
+func TestProvisioningTerbengkalaiKedaluwarsa(t *testing.T) {
+	// ADR-0034: PROVISIONING tanpa kredensial lewat 15 menit menjadi ABANDONED dan tidak lagi memblokir.
+	s := freshStore(t)
+	ctx := context.Background()
+	siteID, a := registrySite(t, s, PhysicalCard{CardHMAC: cardHMAC("A")})
+	b := newDevice(t, s)
+	t0 := time.Unix(1_794_000_000, 0)
+	stale, err := s.EnrollCard(ctx, a, siteID, cardHMAC("A"), t0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := s.EnrollCard(ctx, b, siteID, cardHMAC("A"), t0.Add(AbandonedEnrollmentTTL+time.Minute))
+	if err != nil || fresh.Status != "PROVISIONING" {
+		t.Fatalf("perangkat lain setelah kedaluwarsa: %+v %v", fresh, err)
+	}
+	var status, actor string
+	_ = s.pool.QueryRow(ctx, `SELECT status FROM card_instances WHERE id = $1`, stale.ID).Scan(&status)
+	_ = s.pool.QueryRow(ctx, `SELECT actor FROM audit_events WHERE action = 'enrollment.abandoned' AND subject = $1`, "card_instance:"+stale.ID).Scan(&actor)
+	if status != "ABANDONED" || actor != "system" {
+		t.Fatalf("instance terbengkalai: status %q, audit actor %q", status, actor)
+	}
+}
+
+func TestMelanjutkanMemperbaruiWaktuKedaluwarsa(t *testing.T) {
+	s := freshStore(t)
+	ctx := context.Background()
+	siteID, a := registrySite(t, s, PhysicalCard{CardHMAC: cardHMAC("A")})
+	b := newDevice(t, s)
+	t0 := time.Unix(1_794_000_000, 0)
+	if _, err := s.EnrollCard(ctx, a, siteID, cardHMAC("A"), t0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.EnrollCard(ctx, a, siteID, cardHMAC("A"), t0.Add(10*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	// 20 menit setelah dibuat tetapi baru 10 menit sejak dilanjutkan: belum terbengkalai.
+	if other, err := s.EnrollCard(ctx, b, siteID, cardHMAC("A"), t0.Add(20*time.Minute)); err != nil || other.Status != "PENDING_APPROVAL" {
+		t.Fatalf("perangkat lain: %+v %v", other, err)
+	}
+}
+
+func TestSapuanEnrolmentTerbengkalai(t *testing.T) {
+	s := freshStore(t)
+	ctx := context.Background()
+	siteID, a := registrySite(t, s, PhysicalCard{CardHMAC: cardHMAC("A")})
+	b := newDevice(t, s)
+	t0 := time.Unix(1_794_000_000, 0)
+	stale, _ := s.EnrollCard(ctx, a, siteID, cardHMAC("A"), t0)
+	pending, _ := s.EnrollCard(ctx, b, siteID, cardHMAC("A"), t0)
+	if n, err := s.AbandonStaleEnrollments(ctx, t0.Add(AbandonedEnrollmentTTL+time.Second)); err != nil || n != 1 {
+		t.Fatalf("sapuan = %d %v, ingin 1", n, err)
+	}
+	if n, err := s.AbandonStaleEnrollments(ctx, t0.Add(AbandonedEnrollmentTTL+time.Second)); err != nil || n != 0 {
+		t.Fatalf("sapuan kedua = %d %v, ingin 0", n, err)
+	}
+	for id, want := range map[string]string{stale.ID: "ABANDONED", pending.ID: "PENDING_APPROVAL"} {
+		var got string
+		_ = s.pool.QueryRow(ctx, `SELECT status FROM card_instances WHERE id = $1`, id).Scan(&got)
+		if got != want {
+			t.Errorf("status %s = %q, ingin %q", id, got, want)
+		}
+	}
+}
+
+func TestPerangkatPenuhTanpaOracle(t *testing.T) {
+	// Review minor 1: perangkat penuh mendapat ENR-LIMIT untuk kartu terdaftar maupun tidak dikenal,
+	// tetapi tetap bisa melanjutkan enrolment miliknya.
+	s := freshStore(t)
+	ctx := context.Background()
+	siteID, device := registrySite(t, s, PhysicalCard{CardHMAC: cardHMAC("X")}, PhysicalCard{CardHMAC: cardHMAC("Y")})
+	own, err := s.EnrollCard(ctx, device, siteID, cardHMAC("X"), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range MaxActiveCardsPerDevice - 1 {
+		if _, err := s.StartEnrollment(ctx, device, siteID, time.Now()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, _, unknown := s.StartCardEnrollment(ctx, device, siteID, cardHMAC("Z"), time.Now())
+	_, _, registered := s.StartCardEnrollment(ctx, device, siteID, cardHMAC("Y"), time.Now())
+	if !errors.Is(unknown, ErrCardLimit) || !errors.Is(registered, ErrCardLimit) {
+		t.Fatalf("tak dikenal=%v terdaftar=%v, keduanya ingin ErrCardLimit", unknown, registered)
+	}
+	if resumed, err := s.EnrollCard(ctx, device, siteID, cardHMAC("X"), time.Now()); err != nil || !resumed.Resumed || resumed.ID != own.ID {
+		t.Fatalf("melanjutkan saat penuh: %+v %v", resumed, err)
 	}
 }
 

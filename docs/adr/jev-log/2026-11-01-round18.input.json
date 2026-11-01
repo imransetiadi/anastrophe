@@ -1,0 +1,37 @@
+{
+  "tool": "jev_decide",
+  "label": "D34-lanjutkan-enrolment-belum-selesai",
+  "decision": "When a device calls POST /v1/enrollments for a registered card while it already holds an unfinished card instance for that same card (PROVISIONING without a credential, or PENDING_APPROVAL), what should the server do, so that a failed provisioning step or an operator approval does not leave a permanent dead end?",
+  "candidates": [
+    {
+      "id": "resume_unfinished",
+      "description": "If the same device already holds a PROVISIONING or PENDING_APPROVAL instance for the card, return that instance's {enrollment_id, status} (resume) instead of creating a new one; ENR-DUPLICATE stays for ACTIVE or SUSPENDED instances. The app continues provisioning with the returned ID."
+    },
+    {
+      "id": "resume_plus_expiry",
+      "description": "Resume as above, and additionally expire PROVISIONING instances that never received a credential after a fixed time (for example 15 minutes) so they stop counting toward the limit and stop pushing other devices to PENDING_APPROVAL."
+    },
+    {
+      "id": "cancel_endpoint",
+      "description": "Add DELETE /v1/enrollments/{id} for unfinished instances without a credential, called by the app on failure; the server keeps returning ENR-DUPLICATE otherwise."
+    },
+    {
+      "id": "expiry_only",
+      "description": "Keep ENR-DUPLICATE, but expire unfinished PROVISIONING and PENDING_APPROVAL instances after a fixed time so a later retry creates a fresh instance."
+    }
+  ],
+  "evidence_refs": [
+    "review akhir registri I1",
+    "FR-15",
+    "FR-19",
+    "ADR-0032",
+    "SDD §8.5"
+  ],
+  "priorities": "1) No dead end: a device can always continue to a credential after a failed provisioning step or after operator approval. 2) No permanent residue that blocks the card or a slot (FR-19, FR-15). 3) Never weaken ADR-0032: another device must not skip approval. 4) Minimal new API surface and code.",
+  "requirements": [
+    "After a failed credential call, the same device can obtain a credential for the card with a later request without operator help.",
+    "After an operator approves a PENDING_APPROVAL instance, the approved device can obtain a credential.",
+    "A different device enrolling the same card still gets PENDING_APPROVAL while the first holder's instance is active."
+  ],
+  "escalate_on_contradiction": true
+}

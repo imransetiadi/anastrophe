@@ -86,6 +86,11 @@ func run() error {
 			} else if n > 0 {
 				slog.Info("purged idempotency keys", "count", n)
 			}
+			if n, err := db.AbandonStaleEnrollments(ctx, time.Now()); err != nil {
+				slog.Error("abandon stale enrollments failed")
+			} else if n > 0 {
+				slog.Info("abandoned stale enrollments", "count", n) // ADR-0034
+			}
 			if n, err := db.PurgeRenewalChallenges(ctx, time.Now()); err != nil {
 				slog.Error("purge renewal challenges failed")
 			} else if n > 0 {

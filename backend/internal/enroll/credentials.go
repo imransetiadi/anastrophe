@@ -116,8 +116,8 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 		h.writeResult(w, 0, nil, err, "registry mac failed")
 		return
 	}
-	enroll := func(add func() (string, string, error)) (int, []byte, error) {
-		id, status, err := add()
+	enroll := func(add func() (store.CardEnrollment, error)) (int, []byte, error) {
+		result, err := add()
 		var pgErr *pgconn.PgError
 		switch {
 		case errors.Is(err, store.ErrCardLimit):
@@ -133,7 +133,10 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 		case err != nil:
 			return 0, nil, err
 		}
-		out, err := json.Marshal(map[string]string{"enrollment_id": id, "status": status})
+		out, err := json.Marshal(map[string]string{"enrollment_id": result.ID, "status": result.Status})
+		if result.Resumed {
+			return http.StatusOK, out, err // ADR-0034: instance yang belum selesai dilanjutkan
+		}
 		return http.StatusCreated, out, err
 	}
 	// SDD §8.5: POST mutasi menerima Idempotency-Key; dengan key, ketuk ganda tidak memakan
@@ -149,13 +152,13 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 		// ditebak, sedangkan baris idempotency tersimpan di database (aturan 6).
 		hash := sha256.Sum256([]byte(r.URL.Path + "\n" + req.DeviceID + "\n" + req.SiteID + "\n" + hex.EncodeToString(cardHMAC)))
 		status, resp, err = h.Store.Idempotent(r.Context(), key, hash[:], func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
-			return enroll(func() (string, string, error) {
-				return tx.StartCardEnrollment(ctx, req.DeviceID, req.SiteID, cardHMAC, h.Now())
+			return enroll(func() (store.CardEnrollment, error) {
+				return tx.EnrollCard(ctx, req.DeviceID, req.SiteID, cardHMAC, h.Now())
 			})
 		})
 	} else {
-		status, resp, err = enroll(func() (string, string, error) {
-			return h.Store.StartCardEnrollment(r.Context(), req.DeviceID, req.SiteID, cardHMAC, h.Now())
+		status, resp, err = enroll(func() (store.CardEnrollment, error) {
+			return h.Store.EnrollCard(r.Context(), req.DeviceID, req.SiteID, cardHMAC, h.Now())
 		})
 	}
 	h.writeResult(w, status, resp, err, "create enrollment failed")

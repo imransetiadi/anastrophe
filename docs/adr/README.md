@@ -36,3 +36,5 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0030](0030-tampilan-riwayat-tap.md) | Detail kartu: lima tap terbaru + riwayat 30 hari | Diterima | `inline_recent_plus_all` | 0.95 |
 | [ADR-0031](0031-fokus-registri-enrolment-server.md) | Iterasi berikutnya: registri kartu fisik dan pencocokan enrolment di server | Diterima | `registry_enrolment_server` | 0.88 |
 | [ADR-0032](0032-perangkat-tambahan-menunggu-persetujuan.md) | Sebelum ada akun: perangkat pertama diprovisikan, perangkat tambahan menunggu persetujuan | Diterima (provisional — tinjau ulang saat fondasi akun dibangun) | `pending_for_additional` | 0.71 |
+| [ADR-0033](0033-fokus-enrolment-undangan.md) | Iterasi berikutnya: enrolment via undangan | Diterima | `invitation_enrolment` | 0.89 |
+| [ADR-0034](0034-lanjutkan-enrolment-belum-selesai.md) | Enrolment yang belum selesai dilanjutkan; PROVISIONING tanpa kredensial kedaluwarsa 15 menit | Diterima | `resume_plus_expiry` | 0.81 |
