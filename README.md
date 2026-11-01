@@ -11,7 +11,7 @@ Anastrophe adalah aplikasi iOS untuk menyimpan **hingga 8 kartu akses gedung** (
 
 ## Status
 
-Dokumen v2 (2026-11-01). Keputusan desain diambil lewat lapisan keputusan **JEV** ([ADR](docs/adr/README.md)). **Satu keputusan menunggu Anda:** [ADR-0017](docs/adr/0017-entitas-hukum-entitlement.md), entitas hukum di wilayah eligible untuk entitlement NFC & SE. ADR-0014 (topologi backend) dan ADR-0019 (strategi pindai BLE) sudah diterima.
+Dokumen v2 (2026-11-01). Keputusan desain diambil lewat lapisan keputusan **JEV** ([ADR](docs/adr/README.md)). **Dua keputusan menunggu Anda:** [ADR-0017](docs/adr/0017-entitas-hukum-entitlement.md), entitas hukum di wilayah eligible untuk entitlement NFC & SE; dan [ADR-0022](docs/adr/0022-reader-uji-ble-tanpa-service-data.md), bentuk reader uji BLE untuk M1 (peripheral CoreBluetooth tidak bisa mengiklankan `group_id`). ADR-0014 (topologi backend) dan ADR-0019 (strategi pindai BLE) sudah diterima.
 
 ## Dokumen
 
@@ -104,5 +104,6 @@ python3 scripts/docs/check_mermaid.py . /tmp/mmd <path-mmdc> <puppeteer.json>   
 ## Langkah berikutnya
 
 1. Putuskan ADR-0017 (entitas); ini tidak menghalangi rencana [R1 tracer bullet](docs/superpowers/plans/2026-11-01-r1-tracer-bullet.md) sisi app, tetapi menghalangi entitlement NFC.
+1. Putuskan ADR-0022 (reader uji BLE): menentukan cara menjalankan TC-PRSB-01 sebelum reader referensi R2 tersedia.
 2. M0: survei reader gedung pilot, kontrak 2 operator pilot, ajukan entitlement NFC & SE, kirim kuesioner Apple Wallet Access Program.
 3. Setelah restart: jalankan `/setup-matt-pocock-skills`, lalu `/to-tickets` untuk memecah PRD/SDD menjadi tiket *tracer-bullet* R1.

@@ -1,0 +1,40 @@
+{
+  "tool": "jev_decide",
+  "label": "D22-reader-uji-ble",
+  "decision": "How should Anastrophe obtain a BLE test reader for the M1 lab tap test (TC-PRSB-01, R1 plan Task 11 Step 2) now, given that CoreBluetooth peripherals cannot advertise the service-data group_id the app currently requires?",
+  "candidates": [
+    {
+      "id": "mac_reader_optional_group",
+      "description": "Build a macOS command-line test reader on CoreBluetooth (CBPeripheralManager) that reuses the existing Swift ANP/1 reader logic and advertises only the ANP service UUID. Change the app so the advertised group_id is optional in all builds: ANP-service advertisers without service data are accepted, RSSI selection is unchanged, and group_id stays as optional metadata for future use. Update SDD §6.3 to say real readers SHOULD advertise group_id but the phone must not require it."
+    },
+    {
+      "id": "mac_reader_debug_fallback",
+      "description": "Build the same macOS CoreBluetooth test reader, but accept advertisements without group_id only in DEBUG builds; Release builds keep requiring service data with an 8-byte group_id."
+    },
+    {
+      "id": "devboard_r7_firmware",
+      "description": "Write R7 firmware for a BLE dev board (e.g. nRF52 or ESP32) that advertises service data with group_id; keep the app's discovery strict. Requires buying a dev board and setting up a firmware toolchain; the ANP/1 reader logic must be reimplemented in C."
+    },
+    {
+      "id": "wait_for_r2",
+      "description": "Build no test reader now; wait for the Anastrophe reference reader R2 (ADR-0016) to run TC-PRSB-01."
+    }
+  ],
+  "evidence_refs": [
+    "O-B05",
+    "O-B06",
+    "Packages/Sources/ANChannelBLE/LiveBLECentral.swift:139-147",
+    "SDD §6.3",
+    "SDD §7 / ADR-0003",
+    "QA_SUITE rig R2/R7, TC-PRSB-01",
+    "R1 plan Task 11 Step 2",
+    "ADR-0016"
+  ],
+  "priorities": "1) Unblock the M1 BLE lab tap test (TC-PRSB-01) with hardware the team already has (a Mac and an iPhone). 2) Never weaken ANP/1 guarantees (CLAUDE.md rule 2). 3) The lab test should exercise the same discovery path that ships in Release. 4) Keep the path to R7/R2 hardware open and avoid throwaway work. The user approved autonomous iteration; decisions below 0.60 confidence go back to the user.",
+  "requirements": [
+    "Lets the team run a real-radio BLE tap test of the app now, using only a Mac and an iPhone.",
+    "Keeps ANP/1 guarantees: no identity before a valid reader-group signature, and unknown group and bad signature are answered identically.",
+    "The discovery path exercised in the lab test is the same one shipped in Release builds."
+  ],
+  "escalate_on_contradiction": true
+}

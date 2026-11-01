@@ -1,0 +1,87 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "label": "D23-perpanjangan-sertifikat",
+  "recommendation": {
+    "selected": "renew_on_user_auth",
+    "escaped": false,
+    "confidence": 0.98,
+    "probabilities": {
+      "renew_on_user_auth": 0.98,
+      "renew_attest_only": 0,
+      "renew_device_key": 0,
+      "renew_prompt_on_open": 0.01,
+      "ask_user": 0,
+      "investigate": 0,
+      "none": 0.01
+    },
+    "contradicted_requirements": []
+  },
+  "checks": [
+    {
+      "candidate": "renew_on_user_auth",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "renew_on_user_auth",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "renew_on_user_auth",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "renew_attest_only",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "renew_attest_only",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "renew_attest_only",
+      "requirement": 2,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "renew_device_key",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "renew_device_key",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "renew_device_key",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "renew_prompt_on_open",
+      "requirement": 0,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "renew_prompt_on_open",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "renew_prompt_on_open",
+      "requirement": 2,
+      "answer": "supported"
+    }
+  ],
+  "usage": {
+    "input_tokens": 3504,
+    "output_tokens": 593
+  },
+  "status": "≥ 0,80 → Diterima (ADR-0018)."
+}

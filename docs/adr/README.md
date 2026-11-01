@@ -25,3 +25,5 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0019](0019-strategi-pemindaian-ble.md) | Strategi pemindaian BLE Tap: pindai saat lembar dibuka + early exit | Diterima (keputusan pengguna setelah eskalasi) | `prescan_early_exit` | 0.51 |
 | [ADR-0020](0020-bahasa-backend-r1.md) | Bahasa backend R1: Go | Diterima (provisional — tinjau ulang di akhir M1) | `go` | 0.7 |
 | [ADR-0021](0021-cbor-cose-minimal.md) | CBOR/COSE minimal ditulis sendiri untuk CredentialCert | Diterima | `keep_minimal` | 0.98 |
+| [ADR-0022](0022-reader-uji-ble-tanpa-service-data.md) | Reader uji BLE untuk M1 tanpa service data (terbuka) | Diusulkan — butuh keputusan manusia (eskalasi) | — (escalate) | 0.18 |
+| [ADR-0023](0023-perpanjangan-sertifikat-autentikasi-tap.md) | Perpanjangan sertifikat memakai autentikasi tap | Diterima | `renew_on_user_auth` | 0.98 |

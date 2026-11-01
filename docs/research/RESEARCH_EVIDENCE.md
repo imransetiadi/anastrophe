@@ -15,6 +15,7 @@
 |---|---|---|
 | 1.0 | 2026-11-01 | Ledger awal: Samsung FAQ, HCE `CardSession`, NFC & SE Platform, Apple Wallet employee badge (E01–E10). |
 | 2.0 | 2026-11-01 | Menambahkan E11–E30: `CredentialSession` (SecureElementCredential), Apple Wallet Access Program Guide, Aliro 1.0, OSDP Transparent Mode, HID Mobile Access (BLE), Core Bluetooth background, daftar perangkat iOS 26/27, App Review 5.1.1(v), ketersediaan Apple Pay. Cek ulang live: Indonesia **masih** tidak eligible. Q9–Q14 baru; I-08–I-14; U07–U13. |
+| 2.1 | 2026-11-01 | E31 + O-A24 (artefak SDK iOS 27.2); E32 + O-B05–O-B06: batas iklan peripheral CoreBluetooth untuk reader uji BLE (ADR-0022); E33 + O-A25–O-A27 + I-15: autentikasi untuk perpanjangan sertifikat. |
 
 ---
 
@@ -93,6 +94,8 @@ Skill REA dibuat untuk menjawab pertanyaan "fitur ini bekerja bagaimana?" dan me
 | E29 | Apple — PassKit `PKSecureElementPass`, `PKAddSecureElementPassViewController` | https://developer.apple.com/documentation/passkit/pksecureelementpass | 2026-11-01 (cuplikan) | Resmi Apple / tinggi |
 | E30 | Android Developers — Host-based card emulation overview (UID acak pada HCE) | https://developer.android.com/develop/connectivity/nfc/hce | 2026-11-01 (cuplikan) | Resmi Google / sedang (lintas platform) |
 | E31 | Apple — iOS SDK 27.2 (Xcode 27.2, build 27B52): `CoreNFC.swiftinterface` dan `SecureElementCredential.swiftinterface` | `iPhoneOS27.2.sdk/System/Library/Frameworks/{CoreNFC,SecureElementCredential}.framework` | 2026-11-01 | Resmi Apple (artefak SDK) / tinggi |
+| E32 | Apple — Core Bluetooth: `CBPeripheralManager` (ketersediaan platform) dan `startAdvertising(_:)` | https://developer.apple.com/documentation/corebluetooth/cbperipheralmanager | 2026-11-01 (metadata JSON dokumentasi) | Resmi Apple / tinggi |
+| E33 | Apple — Security, LocalAuthentication, BackgroundTasks: `kSecUseAuthenticationContext`, `LAContext.interactionNotAllowed`, `LAError.Code.notInteractive`, `BGAppRefreshTask` | https://developer.apple.com/documentation/security/ksecuseauthenticationcontext | 2026-11-01 (metadata JSON dokumentasi) | Resmi Apple / tinggi |
 
 ---
 
@@ -149,6 +152,9 @@ Skill REA dibuat untuk menjawab pertanyaan "fitur ini bekerja bagaimana?" dan me
 | O-A22 | (E28) `CardSession.EmulationUIStatus` hanya punya `.success` dan `.failure`. |
 | O-A23 | (E23, E30) Perangkat Apple **mengacak UID pada setiap tap** (kecuali kasus khusus kartu transit China T-Union di Wallet). Dokumentasi Android juga menyatakan perangkat HCE "harus diasumsikan memiliki UID acak". |
 | O-A24 | (E31) `CredentialSession.isEligible` dideklarasikan `static var isEligible: Bool { get async throws }`, sedangkan `CardSession.isEligible` adalah `{ get async }`. `CardSession` dan `CardSession.EventStream` tidak `Sendable`; `CardSession.APDU` dan `NFCPresentmentIntentAssertion` `Sendable`. `NFCPresentmentIntentAssertion` tidak punya metode pelepasan, jadi assertion dilepas saat objeknya dilepas (`deinit`). |
+| O-A25 | (E33) `kSecUseAuthenticationContext`: bila diberi `LAContext` yang sudah diautentikasi, operasi keychain berhasil **tanpa meminta autentikasi lagi**. Tanpa kunci ini, konteks baru dibuat, dipakai sekali, lalu dibuang. |
+| O-A26 | (E33) `LAError.Code.notInteractive`: menampilkan UI autentikasi yang dibutuhkan dilarang. Ini terjadi bila `LAContext.interactionNotAllowed` bernilai `true`. |
+| O-A27 | (E33) `BGAppRefreshTask` adalah tugas singkat untuk memperbarui konten yang dijalankan **saat app di background**; butuh `UIBackgroundModes` `fetch`. |
 
 ### 4.3 Apple Wallet Access Program (E21 kecuali disebut lain)
 
@@ -194,6 +200,8 @@ Skill REA dibuat untuk menjawab pertanyaan "fitur ini bekerja bagaimana?" dan me
 | O-B02 | (E24) Saat iPhone didekatkan ke reader yang memancarkan NFC, lembar Apple Pay dapat muncul meski transaksi berjalan lewat BLE, dan tidak ada data kartu yang dipertukarkan. |
 | O-B03 | (E24) Mobile ID unik per perangkat dan tidak dapat disalin; ganti perangkat berarti Mobile ID baru diterbitkan. App hanya mengumpulkan push ID, model, dan versi OS; tanpa GPS. |
 | O-B04 | (E26) Pemindaian BLE di background **wajib memfilter service UUID** (yang juga dideklarasikan di mode `bluetooth-central`), berjalan lebih jarang, dan tidak otomatis lanjut setelah Bluetooth reset. State preservation & restoration memungkinkan app diluncurkan ulang di background. |
+| O-B05 | (E32) `CBPeripheralManager` tersedia di macOS 10.9+ (juga iOS/iPadOS 6.0+, Mac Catalyst 13.1+, tvOS 9.0+, watchOS 2.0+, visionOS 1.0+). |
+| O-B06 | (E32) `startAdvertising(_:)` hanya mendukung dua kunci data iklan: `CBAdvertisementDataLocalNameKey` dan `CBAdvertisementDataServiceUUIDsKey`. Iklan bersifat *best effort*; saat foreground tersedia hingga 28 B di iklan awal, ditambah 10 B di *scan response* khusus nama lokal. Akibatnya peripheral berbasis CoreBluetooth (iOS/macOS) **tidak dapat** mengiklankan *service data* seperti `group_id` (SDD §6.3). |
 | O-R01 | (E25) SIA menyatakan (18 Mar 2026) **OSDP Transparent Mode terbuka untuk semua**. Paten HID terkait tidak akan membatasi implementasi yang patuh OSDP. Mode ini memungkinkan data aplikasi spesifik melewati kanal aman OSDP. OSDP v2.2.2 rilis Okt 2024; standar IEC 60839-11-5. |
 
 ### 4.6 Perangkat, OS, dan kebijakan
@@ -225,6 +233,7 @@ Skill REA dibuat untuk menjawab pertanyaan "fitur ini bekerja bagaimana?" dan me
 | I-12 | Dengan OSDP Transparent Mode yang kini terbuka, **logika protokol Anastrophe dapat dijalankan di gateway/panel** melalui reader transparan yang sudah terpasang. Syaratnya reader mendukung pass-through ISO 14443-4 untuk AID kustom. Ini mengurangi kebutuhan mengganti reader. | O-R01, U03 | Sedang |
 | I-13 | **BLE adalah satu-satunya kanal in-app yang sudah terbukti untuk iPhone di wilayah non-eligible** (praktik HID). Keandalan background lebih rendah dan butuh reader ber-BLE. | O-B01, O-B04 | Tinggi |
 | I-14 | Ketiadaan Apple Pay di Indonesia (O-P02) **meningkatkan risiko** bahwa Apple Wallet Access juga belum tersedia di ID. Ini belum terbukti, karena Program Guide tidak mencantumkan batasan wilayah (U07). | O-P02, E21 | Rendah |
+| I-15 | `BGAppRefreshTask` berjalan tanpa UI foreground, sehingga operasi kunci `.userPresence` yang butuh UI autentikasi tidak bisa diselesaikan di sana. Jadi perpanjangan sertifikat di background **tidak dapat** membuat tanda tangan kunci kredensial (ADR-0009). Tanda tangan tetap bisa dibuat tanpa prompt kedua dengan memakai ulang `LAContext` yang baru diautentikasi untuk tap. | O-A25, O-A26, O-A27 | Sedang: belum diuji di perangkat |
 
 ---
 

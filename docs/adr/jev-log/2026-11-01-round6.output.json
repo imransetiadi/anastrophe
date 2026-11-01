@@ -1,0 +1,93 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "label": "D22-reader-uji-ble",
+  "recommendation": {
+    "selected": null,
+    "escaped": false,
+    "confidence": 0.18,
+    "probabilities": {
+      "mac_reader_optional_group": 0.27,
+      "mac_reader_debug_fallback": 0.3,
+      "devboard_r7_firmware": 0.03,
+      "wait_for_r2": 0.01,
+      "ask_user": 0.09,
+      "investigate": 0.1,
+      "none": 0.2
+    },
+    "contradicted_requirements": [
+      2
+    ],
+    "status": "escalate"
+  },
+  "checks": [
+    {
+      "candidate": "mac_reader_optional_group",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "mac_reader_optional_group",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "mac_reader_optional_group",
+      "requirement": 2,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "mac_reader_debug_fallback",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "mac_reader_debug_fallback",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "mac_reader_debug_fallback",
+      "requirement": 2,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "devboard_r7_firmware",
+      "requirement": 0,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "devboard_r7_firmware",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "devboard_r7_firmware",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "wait_for_r2",
+      "requirement": 0,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "wait_for_r2",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "wait_for_r2",
+      "requirement": 2,
+      "answer": "supported"
+    }
+  ],
+  "warnings": [
+    "Requirement 3 contradicted by the recommended candidate; inspect before acting"
+  ],
+  "usage": {
+    "input_tokens": 3583,
+    "output_tokens": 599
+  },
+  "status": "< 0,60 dan requirement contradicted → eskalasi ke pengguna (ADR-0018)."
+}

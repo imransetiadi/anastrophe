@@ -1,0 +1,41 @@
+{
+  "tool": "jev_decide",
+  "label": "D23-perpanjangan-sertifikat",
+  "decision": "How should Anastrophe authorize certificate renewal (FR-45), given that SDD §8.4.2 requires a credential-key signature over a server nonce, SDD §5.5 wants renewal from BGAppRefreshTask, and ADR-0009 protects credential keys with .userPresence?",
+  "candidates": [
+    {
+      "id": "renew_on_user_auth",
+      "description": "Renew only right after the user authenticates for a tap: the app reuses the same already-authenticated LAContext to sign the server nonce with the credential key (no second prompt). When remaining validity is under 50%, renewal runs in parallel with the tap; if the certificate is already expired, renewal runs first, after the same Face ID/passcode, then the tap continues. BGAppRefreshTask and app-open only check validity and refresh status, never sign. Update SDD §5.5 to match."
+    },
+    {
+      "id": "renew_attest_only",
+      "description": "Drop the credential-key signature: the server renews on an App Attest assertion plus the user session, so renewal can run in BGAppRefreshTask. Possession of the private key is still proven at every reader transaction, because a certificate is useless without the key. Update SDD §8.4.2."
+    },
+    {
+      "id": "renew_device_key",
+      "description": "Add a second per-device Secure Enclave key without .userPresence (AfterFirstUnlockThisDeviceOnly), registered at enrollment, and sign renewal nonces with it from BGAppRefreshTask. Credential keys keep ADR-0009 protection."
+    },
+    {
+      "id": "renew_prompt_on_open",
+      "description": "When remaining validity is under 50% and the user opens the app, show a renewal prompt that asks for Face ID/passcode only to sign the renewal nonce with the credential key."
+    }
+  ],
+  "evidence_refs": [
+    "SDD §8.4.2",
+    "SDD §5.5",
+    "ADR-0009",
+    "ADR-0010",
+    "O-W10",
+    "O-A25",
+    "O-A26",
+    "O-A27",
+    "I-15"
+  ],
+  "priorities": "Follow the SDD and accepted ADRs; change the spec only where it conflicts with itself. 1) Security: keep ADR-0009 key protection unchanged and never renew SUSPENDED/REVOKED credentials. 2) UX: no authentication prompt beyond the one per tap. 3) Must work now without App Attest (to be added later). 4) Minimal new key management. The user approved autonomous iteration; decisions under 0.60 go back to the user.",
+  "requirements": [
+    "Users who tap regularly keep valid certificates without any authentication prompt beyond the one for the tap itself.",
+    "Credential private keys keep the ADR-0009 protection ([.privateKeyUsage, .userPresence], WhenPasscodeSetThisDeviceOnly) unchanged.",
+    "Before re-issuing, the server gets a device-bound proof of possession signed by the credential key, as SDD §8.4.2 intends."
+  ],
+  "escalate_on_contradiction": true
+}
