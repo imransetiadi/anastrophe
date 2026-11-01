@@ -1,0 +1,58 @@
+{
+  "claims": [
+    "Indonesia is not an eligible territory for Apple's NFC & SE Platform.",
+    "Hong Kong, Malaysia, Singapore and Taiwan require iOS 18.4 or later for the NFC & SE Platform.",
+    "Vietnam requires iOS 26.0 or later for the NFC & SE Platform.",
+    "CardSession host card emulation is offered for apps in the European Economic Area.",
+    "A CardSession card emulation lasts at most 60 seconds from startEmulation().",
+    "A presentment intent assertion expires after 15 seconds, and the app must then wait 15 seconds before acquiring a new one.",
+    "CredentialSession allows at most two presentment intent assertions within an 80-second span.",
+    "In wired mode, a CredentialSession is invalidated after 15 seconds without a transceive call.",
+    "Apple Wallet access passes support MIFARE DESFire, HID Seos and Aliro credential technologies.",
+    "Readers for Apple Wallet access passes must support ECP version 2.3 or later.",
+    "The Apple Wallet Access Program requires 99.99% production uptime and p90 latency under 2.2 seconds.",
+    "Express Mode is turned on by default when an access pass is provisioned.",
+    "Aliro 1.0 was released by the Connectivity Standards Alliance on February 26, 2026.",
+    "iOS 26 dropped support for iPhone XS, XS Max and XR.",
+    "Apps that support account creation must let users initiate account deletion within the app.",
+    "Samsung Wallet allows up to 8 NFC Access Cards and does not support encrypted cards."
+  ],
+  "evidence": [
+    {
+      "id": "E13_nfcse_live",
+      "text": "Be established in one of the following eligible territories: Argentina, Armenia, Australia, Azerbaijan, Bahamas, Bahrain, Brazil, Canada, Chile, Colombia, Costa Rica, Dominican Republic, Ecuador, Egypt, El Salvador, Georgia, Guatemala, Honduras, Hong Kong, India, Israel, Japan, Jordan, Kazakhstan, Macau, Malaysia, Mexico, Moldova, Mongolia, Montenegro, Morocco, New Zealand, Oman, Palestine, Panama, Paraguay, Peru, Qatar, Saudi Arabia, Serbia, Singapore, South Africa, Switzerland, Taiwan, the United Arab Emirates, the United Kingdom, the United States (excluding Guam, American Samoa, US Virgin Islands, and Northern Mariana Island), Uruguay, Vietnam. Your app must be for distribution to users based in an eligible territory. iOS 18.1 or later in Australia, Brazil, Canada, Japan, New Zealand, the United Kingdom, and the United States. iOS 18.2 or later in Switzerland. iOS 18.4 or later in Argentina, Chile, Colombia, Dominican Republic, Hong Kong, Israel, Kazakhstan, Malaysia, Mexico, Peru, Saudi Arabia, Singapore, South Africa, Taiwan, and the United Arab Emirates. iOS 26.0 or later in Armenia, Azerbaijan, Bahamas, Bahrain, Costa Rica, Ecuador, Egypt, El Salvador, Georgia, Guatemala, Honduras, India, Jordan, Macau, Moldova, Mongolia, Montenegro, Morocco, Oman, Palestine, Panama, Paraguay, Qatar, Serbia, Uruguay, and Vietnam."
+    },
+    {
+      "id": "E03_assertion",
+      "text": "The intent assertion expires if any of the following occur: The intent assertion object de-initializes. Your app goes into the background. 15 seconds elapse. After the intent assertion expires, your app will need to wait 15 seconds before acquiring a new intent assertion."
+    },
+    {
+      "id": "E04_cardsession",
+      "text": "CardSession supports host card emulation (HCE) transactions for in-store payments, car keys, closed-loop transit, corporate badges, hotel keys, merchant loyalty/rewards and event tickets in the European Economic Area (EEA). Card emulation is valid for up to 60 seconds from the startEmulation() call. Once the session timeout occurs, the eventStream posts the event CardSession.Event.sessionInvalidated(reason:) with a reason of CardSession.Error.maxSessionDurationReached."
+    },
+    {
+      "id": "E11_E12_credentialsession",
+      "text": "In wired mode, the system invalidates the session if it goes 15 seconds without performing a transceive(_:) call. If your app goes into the background, the system automatically invalidates your session after a short delay. If you need to perform clean-up work after a transaction, acquire another assertion, subject to the limit of two assertions in an 80-second span."
+    },
+    {
+      "id": "E21_wallet",
+      "text": "The Apple Access platform supports the following credential technologies: MIFARE DESFire (NXP, EV0 (D40), EV1 and EV2), Seos (HID), Aliro (Connectivity Standards Alliance). The Express Mode pass setting is turned on by default during pass provisioning, and the user can adjust this pass setting at any time in Apple Wallet. Your access installation readers will need to support the latest version of the Enhanced Contactless Polling (ECP) protocol from Apple: ECP v2.3 or later. Server Connectivity SLAs: p90 Latency 2.2 seconds in production; Uptime 99.99% in production, 98% non-production, 95% QA. Disaster recovery configurations can failover without any downtime (preferred) or without exceeding 30 minutes of downtime."
+    },
+    {
+      "id": "E17_aliro",
+      "text": "DAVIS, Calif. – February 26, 2026 – The Connectivity Standards Alliance (Alliance) announced today the release of the Aliro 1.0 specification, a new communication protocol and credential standard."
+    },
+    {
+      "id": "E15_ios26",
+      "text": "Three iPhone models miss out on iOS 26 support: iPhone XS, iPhone XS Max, iPhone XR. These three models are supported by iOS 18, but Apple has dropped them this year in iOS 26."
+    },
+    {
+      "id": "E16_review",
+      "text": "Apps submitted to the App Store that support account creation must also let people initiate deletion of their account within the app."
+    },
+    {
+      "id": "E01_samsung",
+      "text": "Can I add multiple NFC Access Cards? Yes, you may add up to 8 NFC Access Cards to Samsung Wallet. Samsung Wallet NFC Access Card supports specific RFID NFC physical card series; however, Samsung Wallet does not support encrypted cards."
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-01",
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "purpose": "Gerbang Task 11 rencana R1 tracer bullet (ADR-0018)",
+  "output": {
+    "action": "escalate",
+    "reason_codes": ["confidence_below_review", "safe_to_apply_below_review", "review_escalated", "claims_unsupported", "claim_confidence_low", "claim_confidence_below_auto_accept"],
+    "review": {"composite": 0.658, "safe_to_apply": 0.27, "limiting": {"ANP1PhoneSession.swift": ["correctness", "spec_match", "test_gap"], "HCEPresentmentCoordinator.swift": ["spec_match"], "BLETapCoordinator.swift": ["spec_match"], "LabProvisioning.swift": ["spec_match", "test_gap", "blast_radius"]}},
+    "verification": {
+      "summary": {"verified": 6, "contradicted": 0, "unsupported": 1, "needs_review": 3},
+      "results": [
+        {"claim": "Semua 11 task terimplementasi di tingkat software; 114 test lulus", "verdict": "unsupported", "confidence": 0.43, "action": "escalate", "catatan": "benar tidak didukung: Task 11 berisi uji H yang tertunda; yang selesai Task 1–10"},
+        {"claim": "Cocok dengan test vector independen; mutasi terdeteksi", "verdict": "verified", "confidence": 0.77, "action": "review"},
+        {"claim": "6982 identik & jumlah verifikasi ECDSA sama", "verdict": "verified", "confidence": 0.67, "action": "review"},
+        {"claim": "Coordinator HCE: urutan assertion, gating, 60 dtk, cooldown 15 dtk, pelepasan assertion", "verdict": "verified", "confidence": 0.80, "action": "auto"},
+        {"claim": "Coordinator BLE: RSSI ≥ −55, tunda 3 dtk, foreground, link putus → cancelled", "verdict": "verified", "confidence": 0.85, "action": "auto"},
+        {"claim": "LabProvisioning tidak ada di Release (nm 0 vs kontrol 52)", "verdict": "verified", "confidence": 0.97, "action": "auto"},
+        {"claim": "Kriteria keluar M1 belum terpenuhi; tanpa commit", "verdict": "verified", "confidence": 0.83, "action": "auto"}
+      ]
+    },
+    "usage": {"input_tokens": 7268, "output_tokens": 647}
+  },
+  "status": "Eskalasi ke pengguna (ADR-0018). Review akhir oleh reviewer independen dijalankan sesudahnya."
+}

@@ -1,0 +1,243 @@
+{
+  "tool": "jev_verify",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "auto_accept": 0.8,
+  "subject_at": 0.5,
+  "summary": {
+    "verified": 16,
+    "contradicted": 0,
+    "unsupported": 0,
+    "needs_review": 0
+  },
+  "results": [
+    {
+      "id": "claim0",
+      "claim": "Indonesia is not an eligible territory for Apple's NFC & SE Platform.",
+      "verdict": "verified",
+      "probabilities": {
+        "supports": 0.88,
+        "contradicts": 0.03,
+        "says_nothing": 0.09
+      },
+      "confidence": 0.82,
+      "action": "auto",
+      "supporting_evidence": "E13_nfcse_live",
+      "same_subject": 0.64
+    },
+    {
+      "id": "claim1",
+      "claim": "Hong Kong, Malaysia, Singapore and Taiwan require iOS 18.4 or later for the NFC & SE Platform.",
+      "verdict": "verified",
+      "probabilities": {
+        "supports": 0.99,
+        "contradicts": 0.01,
+        "says_nothing": 0
+      },
+      "confidence": 0.98,
+      "action": "auto",
+      "supporting_evidence": "E13_nfcse_live",
+      "same_subject": 0.88
+    },
+    {
+      "id": "claim2",
+      "claim": "Vietnam requires iOS 26.0 or later for the NFC & SE Platform.",
+      "verdict": "verified",
+      "probabilities": {
+        "supports": 1,
+        "contradicts": 0,
+        "says_nothing": 0
+      },
+      "confidence": 1,
+      "action": "auto",
+      "supporting_evidence": "E13_nfcse_live",
+      "same_subject": 0.9
+    },
+    {
+      "id": "claim3",
+      "claim": "CardSession host card emulation is offered for apps in the European Economic Area.",
+      "verdict": "verified",
+      "probabilities": {
+        "supports": 1,
+        "contradicts": 0,
+        "says_nothing": 0
+      },
+      "confidence": 1,
+      "action": "auto",
+      "supporting_evidence": "E04_cardsession",
+      "same_subject": 0.83
+    },
+    {
+      "id": "claim4",
+      "claim": "A CardSession card emulation lasts at most 60 seconds from startEmulation().",
+      "verdict": "verified",
+      "probabilities": {
+        "supports": 1,
+        "contradicts": 0,
+        "says_nothing": 0
+      },
+      "confidence": 1,
+      "action": "auto",
+      "supporting_evidence": "E04_cardsession",
+      "same_subject": 0.78
+    },
+    {
+      "id": "claim5",
+      "claim": "A presentment intent assertion expires after 15 seconds, and the app must then wait 15 seconds before acquiring a new one.",
+      "verdict": "verified",
+      "probabilities": {
+        "supports": 1,
+        "contradicts": 0,
+        "says_nothing": 0
+      },
+      "confidence": 1,
+      "action": "auto",
+      "supporting_evidence": "E03_assertion",
+      "same_subject": 0.85
+    },
+    {
+      "id": "claim6",
+      "claim": "CredentialSession allows at most two presentment intent assertions within an 80-second span.",
+      "verdict": "verified",
+      "probabilities": {
+        "supports": 0.97,
+        "contradicts": 0.02,
+        "says_nothing": 0.01
+      },
+      "confidence": 0.96,
+      "action": "auto",
+      "supporting_evidence": "E11_E12_credentialsession",
+      "same_subject": 0.83
+    },
+    {
+      "id": "claim7",
+      "claim": "In wired mode, a CredentialSession is invalidated after 15 seconds without a transceive call.",
+      "verdict": "verified",
+      "probabilities": {
+        "supports": 1,
+        "contradicts": 0,
+        "says_nothing": 0
+      },
+      "confidence": 1,
+      "action": "auto",
+      "supporting_evidence": "E11_E12_credentialsession",
+      "same_subject": 0.87
+    },
+    {
+      "id": "claim8",
+      "claim": "Apple Wallet access passes support MIFARE DESFire, HID Seos and Aliro credential technologies.",
+      "verdict": "verified",
+      "probabilities": {
+        "supports": 0.98,
+        "contradicts": 0.01,
+        "says_nothing": 0.01
+      },
+      "confidence": 0.97,
+      "action": "auto",
+      "supporting_evidence": "E21_wallet",
+      "same_subject": 0.8
+    },
+    {
+      "id": "claim9",
+      "claim": "Readers for Apple Wallet access passes must support ECP version 2.3 or later.",
+      "verdict": "verified",
+      "probabilities": {
+        "supports": 1,
+        "contradicts": 0,
+        "says_nothing": 0
+      },
+      "confidence": 1,
+      "action": "auto",
+      "supporting_evidence": "E21_wallet",
+      "same_subject": 0.71
+    },
+    {
+      "id": "claim10",
+      "claim": "The Apple Wallet Access Program requires 99.99% production uptime and p90 latency under 2.2 seconds.",
+      "verdict": "verified",
+      "probabilities": {
+        "supports": 0.99,
+        "contradicts": 0.01,
+        "says_nothing": 0
+      },
+      "confidence": 0.98,
+      "action": "auto",
+      "supporting_evidence": "E21_wallet",
+      "same_subject": 0.63
+    },
+    {
+      "id": "claim11",
+      "claim": "Express Mode is turned on by default when an access pass is provisioned.",
+      "verdict": "verified",
+      "probabilities": {
+        "supports": 1,
+        "contradicts": 0,
+        "says_nothing": 0
+      },
+      "confidence": 1,
+      "action": "auto",
+      "supporting_evidence": "E21_wallet",
+      "same_subject": 0.64
+    },
+    {
+      "id": "claim12",
+      "claim": "Aliro 1.0 was released by the Connectivity Standards Alliance on February 26, 2026.",
+      "verdict": "verified",
+      "probabilities": {
+        "supports": 1,
+        "contradicts": 0,
+        "says_nothing": 0
+      },
+      "confidence": 1,
+      "action": "auto",
+      "supporting_evidence": "E17_aliro",
+      "same_subject": 0.93
+    },
+    {
+      "id": "claim13",
+      "claim": "iOS 26 dropped support for iPhone XS, XS Max and XR.",
+      "verdict": "verified",
+      "probabilities": {
+        "supports": 1,
+        "contradicts": 0,
+        "says_nothing": 0
+      },
+      "confidence": 1,
+      "action": "auto",
+      "supporting_evidence": "E15_ios26",
+      "same_subject": 0.85
+    },
+    {
+      "id": "claim14",
+      "claim": "Apps that support account creation must let users initiate account deletion within the app.",
+      "verdict": "verified",
+      "probabilities": {
+        "supports": 1,
+        "contradicts": 0,
+        "says_nothing": 0
+      },
+      "confidence": 1,
+      "action": "auto",
+      "supporting_evidence": "E16_review",
+      "same_subject": 0.7
+    },
+    {
+      "id": "claim15",
+      "claim": "Samsung Wallet allows up to 8 NFC Access Cards and does not support encrypted cards.",
+      "verdict": "verified",
+      "probabilities": {
+        "supports": 1,
+        "contradicts": 0,
+        "says_nothing": 0
+      },
+      "confidence": 1,
+      "action": "auto",
+      "supporting_evidence": "E01_samsung",
+      "same_subject": 0.79
+    }
+  ],
+  "usage": {
+    "input_tokens": 8780,
+    "output_tokens": 3226
+  }
+}

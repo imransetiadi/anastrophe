@@ -1,0 +1,115 @@
+{
+  "date": "2026-11-01",
+  "tool": "jev_verify",
+  "purpose": "completion gate for docs v2 (ADR-0018)",
+  "round1": {
+    "summary": {
+      "verified": 12,
+      "contradicted": 0,
+      "unsupported": 0,
+      "needs_review": 2
+    },
+    "results": [
+      {
+        "claim": "The PRD is at version 2.1 and the SDD and QA Suite are at version 2.0.",
+        "verdict": "verified",
+        "confidence": 1,
+        "action": "auto"
+      },
+      {
+        "claim": "Every functional and non-functional requirement in the PRD is mapped to at least one test case, with zero orphan test cases.",
+        "verdict": "verified",
+        "confidence": 0.38,
+        "action": "review"
+      },
+      {
+        "claim": "The cross-document consistency check reports zero problems.",
+        "verdict": "verified",
+        "confidence": 1,
+        "action": "auto"
+      },
+      {
+        "claim": "All Mermaid diagrams in the documentation render successfully.",
+        "verdict": "verified",
+        "confidence": 1,
+        "action": "auto"
+      },
+      {
+        "claim": "Sixteen key factual claims were verified against sources with no contradictions.",
+        "verdict": "verified",
+        "confidence": 1,
+        "action": "auto"
+      },
+      {
+        "claim": "Design decisions were recorded as 18 ADRs, most of them decided through the JEV decision layer.",
+        "verdict": "verified",
+        "confidence": 0.56,
+        "action": "review"
+      },
+      {
+        "claim": "Exactly two decisions remain escalated to a human: the legal entity (ADR-0017) and the backend topology (ADR-0014).",
+        "verdict": "verified",
+        "confidence": 0.98,
+        "action": "auto"
+      },
+      {
+        "claim": "The agentmemory and jev MCP servers both report Connected.",
+        "verdict": "verified",
+        "confidence": 1,
+        "action": "auto"
+      },
+      {
+        "claim": "The superpowers and mattpocock-skills plugins are installed at project scope.",
+        "verdict": "verified",
+        "confidence": 0.97,
+        "action": "auto"
+      },
+      {
+        "claim": "claude-mem is installed with cloud sync off and its worker reports status ok.",
+        "verdict": "verified",
+        "confidence": 0.98,
+        "action": "auto"
+      },
+      {
+        "claim": "The ui-ux-pro-max skill is installed and an iOS design-system override exists.",
+        "verdict": "verified",
+        "confidence": 0.91,
+        "action": "auto"
+      },
+      {
+        "claim": "No JEV API key or agentmemory secret appears in the repository files.",
+        "verdict": "verified",
+        "confidence": 1,
+        "action": "auto"
+      }
+    ]
+  },
+  "round2_more_explicit_evidence": {
+    "summary": {
+      "verified": 3,
+      "contradicted": 0,
+      "unsupported": 0,
+      "needs_review": 0
+    },
+    "results": [
+      {
+        "claim": "Every functional and non-functional requirement defined in the PRD is mapped to at least one test case.",
+        "verdict": "verified",
+        "confidence": 0.97,
+        "action": "auto"
+      },
+      {
+        "claim": "There are zero orphan test cases.",
+        "verdict": "verified",
+        "confidence": 0.98,
+        "action": "auto"
+      },
+      {
+        "claim": "18 ADRs exist and 14 of them contain a JEV decision record.",
+        "verdict": "verified",
+        "confidence": 1,
+        "action": "auto"
+      }
+    ]
+  }
+}

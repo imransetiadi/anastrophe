@@ -1,0 +1,25 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "label": "D19-ble-scan-strategy",
+  "recommendation": {
+    "selected": "prescan_early_exit",
+    "escaped": false,
+    "confidence": 0.51,
+    "probabilities": {"fixed_5s": 0, "early_exit": 0.39, "prescan_early_exit": 0.59, "ask_user": 0, "investigate": 0.01, "none": 0.01},
+    "contradicted_requirements": []
+  },
+  "checks": [
+    {"candidate": "fixed_5s", "requirement": 0, "answer": "contradicted"},
+    {"candidate": "fixed_5s", "requirement": 1, "answer": "supported"},
+    {"candidate": "fixed_5s", "requirement": 2, "answer": "supported"},
+    {"candidate": "early_exit", "requirement": 0, "answer": "supported"},
+    {"candidate": "early_exit", "requirement": 1, "answer": "supported"},
+    {"candidate": "early_exit", "requirement": 2, "answer": "supported"},
+    {"candidate": "prescan_early_exit", "requirement": 0, "answer": "supported"},
+    {"candidate": "prescan_early_exit", "requirement": 1, "answer": "supported"},
+    {"candidate": "prescan_early_exit", "requirement": 2, "answer": "supported"}
+  ],
+  "usage": {"input_tokens": 2677, "output_tokens": 455},
+  "status": "confidence < 0,60 → eskalasi ke pengguna (ADR-0018). Interim: early exit (sama di kedua kandidat teratas)."
+}

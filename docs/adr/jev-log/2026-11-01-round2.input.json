@@ -1,0 +1,133 @@
+{
+  "command": "npx",
+  "args": [
+    "-y",
+    "@jkudish/jev-mcp"
+  ],
+  "calls": [
+    {
+      "method": "tools/call",
+      "label": "D11-reader-strategy",
+      "params": {
+        "name": "jev_decide",
+        "arguments": {
+          "decision": "Which reader strategy should Anastrophe use for the R1 pilots?",
+          "evidence": "Settled decisions (round 1, decided by Jev): R1 ships in-app NFC (CredentialSession in eligible territories, HCE in EEA) plus BLE fallback; minimum iOS 26.0; in-app protocol ANP/1 (proprietary AID, ECDH + ECDSA, reader-group authentication); dual pilot (one Indonesian building on BLE, one Singapore/Malaysia building on NFC + BLE); BLE hands-free deferred; Apple Wallet channel planned for R2.\n\nThe in-app channels need readers that run ANP/1 over ISO 14443-4 (custom AID) and over BLE GATT. Pilot buildings' existing readers are unknown; many installed readers are MIFARE/DESFire readers wired to panels via Wiegand or OSDP. SIA confirmed OSDP Transparent Mode is open to all (2026-03-18), letting smart-card APDUs pass from a reader to a panel or gateway, but transparent readers usually lack BLE modules. Vendor readers can run custom applications only with vendor SDK cooperation. For R2 (Apple Wallet), readers must support ECP v2.3 with Apple TCI values, a Wallet credential technology (Aliro, DESFire or Seos) and pass Apple IOT certification; Aliro-certified vendor readers are expected from late 2026. Anastrophe can build a reference reader from NFC + BLE chipsets (e.g., NXP or ST parts) with a secure element for the reader-group key, outputting OSDP or Wiegand to the existing panel.",
+          "priorities": "R1 pilots must work on schedule in both pilot buildings (one BLE-only in Indonesia, one NFC + BLE in Singapore/Malaysia); minimize dependence on vendor SDK negotiations; keep a path to Aliro/ECP readers for R2.",
+          "candidates": [
+            {
+              "id": "reference_reader",
+              "description": "Anastrophe reference reader (NFC + BLE, SE for the reader-group key) installed next to/in place of the pilot doors' readers, outputting OSDP/Wiegand to the existing panel."
+            },
+            {
+              "id": "vendor_firmware",
+              "description": "Partner vendor readers loaded with ANP/1 firmware through the vendor's SDK."
+            },
+            {
+              "id": "transparent_gateway",
+              "description": "Keep existing OSDP Transparent Mode readers and run ANP/1 in an Anastrophe edge gateway (NFC only)."
+            },
+            {
+              "id": "reference_plus_gateway",
+              "description": "Reference reader for pilot doors, plus the transparent-mode gateway as the retrofit path for buildings with compatible OSDP readers."
+            }
+          ],
+          "requirements": [
+            "Supports BLE at the Indonesian pilot doors.",
+            "Does not require a vendor SDK agreement before the R1 pilot.",
+            "Supports NFC tap at the Singapore/Malaysia pilot doors."
+          ],
+          "escalate_on_contradiction": true
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "label": "D12-wallet-program-timing",
+      "params": {
+        "name": "jev_decide",
+        "arguments": {
+          "decision": "When should Anastrophe apply to the Apple Wallet Access Program?",
+          "evidence": "Settled decisions (round 1, decided by Jev): R1 ships in-app NFC (CredentialSession in eligible territories, HCE in EEA) plus BLE fallback; minimum iOS 26.0; in-app protocol ANP/1 (proprietary AID, ECDH + ECDSA, reader-group authentication); dual pilot (one Indonesian building on BLE, one Singapore/Malaysia building on NFC + BLE); BLE hands-free deferred; Apple Wallet channel planned for R2.\n\nApple Wallet Access Program: apply by requesting a participant questionnaire from Apple; Apple may then invite the partner to Apple Business Register; integration timeline is set with Apple; requirements include reader certification (ECP v2.3, Apple IOT), 99.99% uptime, multi-region DR, joint end-to-end testing at the property, and customer support. Participant roles: Credential Manager, Credential Provider, Participating Provider (single-party or multi-party). Apple Wallet access passes deliver Express Mode, power reserve and Apple Watch, matching or exceeding the Samsung experience. Regional availability, fees and acceptance criteria are unknown.",
+          "priorities": "Reach Samsung-level UX as early as possible without derailing R1; surface unknowns (regions, fees) early; avoid wasted effort if Apple declines.",
+          "candidates": [
+            {
+              "id": "apply_now",
+              "description": "Send the participant questionnaire during M0 (now), run diligence in parallel with R1 engineering."
+            },
+            {
+              "id": "after_r1_ga",
+              "description": "Apply only after R1 general availability."
+            },
+            {
+              "id": "partner_existing_provider",
+              "description": "Do not apply directly; partner with an existing Wallet credential provider (e.g., a reader vendor) for R2."
+            }
+          ],
+          "requirements": [
+            "Surfaces regional availability and fee unknowns before R1 general availability."
+          ],
+          "escalate_on_contradiction": true
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "label": "D13-entity-for-entitlement",
+      "params": {
+        "name": "jev_decide",
+        "arguments": {
+          "decision": "How should the Indonesia-based company satisfy the NFC & SE entitlement's 'established in an eligible territory' requirement for the Singapore/Malaysia pilot?",
+          "evidence": "Apple NFC & SE Platform: to be eligible for the entitlement, the developer must be established in an eligible territory (Indonesia is not one; Singapore and Malaysia are), must meet security and privacy requirements, maintain written policies for personal data processing and vulnerability disclosure, and the app must be distributed to users based in an eligible territory. The use case requires a binding agreement with the building operator. Cost, tax and legal implications of a foreign entity are unknown to the product team.",
+          "priorities": "Legal compliance first; minimize cost and time to the Singapore/Malaysia pilot.",
+          "candidates": [
+            {
+              "id": "singapore_entity",
+              "description": "Establish (or use an existing) Singapore subsidiary as the Apple developer account holder for the NFC & SE entitlement."
+            },
+            {
+              "id": "malaysia_entity",
+              "description": "Establish (or use an existing) Malaysia subsidiary as the account holder."
+            },
+            {
+              "id": "partner_publisher",
+              "description": "Have an eligible-territory partner publish a white-label app under its own developer account."
+            }
+          ],
+          "escalate_on_contradiction": true
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "label": "D14-primary-claim-policy",
+      "params": {
+        "name": "jev_decide",
+        "arguments": {
+          "decision": "What default policy should decide who becomes the PRIMARY holder when a physical card is first enrolled?",
+          "evidence": "Physical card UIDs can be read by anyone who briefly holds the card and can be cloned onto magic cards, so possessing or reading a card is weak proof of ownership. Building registries usually map each card to a holder record that often includes a phone number or email; some registries lack contact data. The first enrollee sets the security code that later members must enter (as in Samsung NFC Access Card). Admin approval adds operator workload. Users verify their phone/email by OTP at sign-up.",
+          "priorities": "Prevent card hijacking by someone who borrowed a card, keep enrollment fast for legitimate holders, keep admin workload low.",
+          "candidates": [
+            {
+              "id": "holder_match_else_approval",
+              "description": "PRIMARY only when the user's verified phone/email matches the registry holder; otherwise the enrollment waits for admin approval; the legitimate holder can file a dispute."
+            },
+            {
+              "id": "admin_approval_always",
+              "description": "Every PRIMARY enrollment requires admin approval."
+            },
+            {
+              "id": "first_tap_wins",
+              "description": "Whoever enrolls the card first becomes PRIMARY."
+            }
+          ],
+          "requirements": [
+            "Someone who briefly borrows a card cannot become PRIMARY without additional verification.",
+            "A legitimate holder with matching contact data can finish enrollment without waiting for an admin."
+          ],
+          "escalate_on_contradiction": true
+        }
+      }
+    }
+  ]
+}

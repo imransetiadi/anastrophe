@@ -1,0 +1,320 @@
+{
+  "command": "npx",
+  "args": [
+    "-y",
+    "@jkudish/jev-mcp"
+  ],
+  "calls": [
+    {
+      "method": "tools/call",
+      "label": "D01-release1-channels",
+      "params": {
+        "name": "jev_decide",
+        "arguments": {
+          "decision": "Which credential channels should Release 1 (MVP) of the Anastrophe iPhone access-card app ship?",
+          "evidence": "The product team is an Indonesian company (i-3.co.id). Goal: an iPhone app ('Anastrophe') equivalent to Samsung Wallet NFC Access Card (up to 8 building access cards, add by tapping physical card, security code for members, offline use). Planned launch window: R1 MVP about 6-7 months from now (mid 2027).\n\nApple NFC & SE Platform (in-app Secure Element credentials via CredentialSession, iOS 18.1+): requires an agreement with Apple, an NFC & SE entitlement, applet review by an independent accredited lab, and onboarding in Apple Business Register. To be eligible the developer must be established in an eligible territory. Eligible territories (checked live 2026-11-01) include AU, BR, CA, JP, NZ, UK, US (iOS 18.1+), Switzerland (18.2+), Hong Kong, Malaysia, Singapore, Taiwan, UAE, Saudi Arabia, Mexico and others (iOS 18.4+), Vietnam, India and others (iOS 26.0+). Indonesia, Thailand and the Philippines are NOT listed. Use cases allowed include corporate badges, home keys, student IDs and hotel keys, requiring a binding agreement with the building operator. The app must be opened by the user; Express Mode is not available for in-app credentials.\n\nApple CardSession HCE (iOS 17.4+): host card emulation for apps, only for users in the European Economic Area, requires an HCE entitlement listing AIDs; emulation lasts max 60 seconds; development testing outside the EEA is possible on iOS 18.2+ with up to 100 test devices.\n\nApple Wallet Access Program: access passes in Apple Wallet with credential technologies MIFARE DESFire, HID Seos or Aliro. Features: Express Mode (no Face ID), auto-presentment, power reserve, automatic Apple Watch provisioning, easy provisioning to a new device, suspend via Find My Lost Mode. Requirements: partner application and business/technical diligence by Apple, readers supporting ECP v2.3 with Apple-provided TCI values and Apple IOT certification, server SLAs of 99.99% uptime and p90 latency under 2.2 s, multi-region disaster recovery with failover within 30 minutes, joint end-to-end testing with Apple. Timeline is controlled by Apple. Regional availability is not documented; Apple Pay is not available in Indonesia (Apple list dated 2026-10-27).\n\nBLE in-app channel: works on iPhone in every region without special Apple entitlement; HID Mobile Access uses Bluetooth LE for 'Tap' on iOS and 'Twist and Go'; requires readers with a BLE module; background scanning on iOS must filter by service UUID, is slower and does not auto-resume after Bluetooth resets.\n\nAliro 1.0 (CSA, released 2026-02-26): standard for mobile access credentials over NFC (mandatory tier), BLE and UWB; backed by Apple, Google, Samsung, HID, Allegion, ASSA ABLOY; on iPhone the Aliro credential lives in Apple Wallet; Apple Wallet supports Aliro protocol 1.0 since iOS 26.4; primary applet AID A000000909ACCE5501; PKI with ephemeral key exchange; devices withhold identity until the reader is authenticated; certified products expected from late 2026.",
+          "priorities": "Ship R1 on schedule for customers of an Indonesia-based company; demonstrate NFC tap on iPhone where legally possible; avoid depending on uncertain third-party approvals for R1; keep the architecture ready to add Apple Wallet later.",
+          "candidates": [
+            {
+              "id": "nfc_inapp_plus_ble",
+              "description": "R1 ships in-app NFC (Secure Element via CredentialSession in eligible territories, HCE in the EEA) plus BLE as the universal fallback (the only channel in Indonesia). Apple Wallet is pursued in parallel for R2."
+            },
+            {
+              "id": "ble_only",
+              "description": "R1 ships BLE only in all markets; NFC (in-app or Wallet) comes later."
+            },
+            {
+              "id": "nfc_inapp_only",
+              "description": "R1 ships in-app NFC only, launching only in eligible territories."
+            },
+            {
+              "id": "wallet_first",
+              "description": "R1 waits for Apple Wallet Access Program acceptance and ships Apple Wallet access passes (Aliro) first."
+            }
+          ],
+          "requirements": [
+            "The R1 channel set is usable by end users located in Indonesia.",
+            "R1 does not depend on acceptance into the Apple Wallet Access Program.",
+            "R1 offers NFC tap on iPhone in at least one market."
+          ],
+          "escalate_on_contradiction": true
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "label": "D02-min-ios",
+      "params": {
+        "name": "jev_decide",
+        "arguments": {
+          "decision": "What minimum iOS version should the Anastrophe app require at launch?",
+          "evidence": "iOS 27 is the current major version (released September 2026) and supports iPhone 11 and later plus iPhone SE 2nd and 3rd generation. iOS 26 dropped iPhone XS, XS Max and XR. Product policy: support the current and previous major iOS versions.\n\nApple NFC & SE Platform (in-app Secure Element credentials via CredentialSession, iOS 18.1+): requires an agreement with Apple, an NFC & SE entitlement, applet review by an independent accredited lab, and onboarding in Apple Business Register. To be eligible the developer must be established in an eligible territory. Eligible territories (checked live 2026-11-01) include AU, BR, CA, JP, NZ, UK, US (iOS 18.1+), Switzerland (18.2+), Hong Kong, Malaysia, Singapore, Taiwan, UAE, Saudi Arabia, Mexico and others (iOS 18.4+), Vietnam, India and others (iOS 26.0+). Indonesia, Thailand and the Philippines are NOT listed. Use cases allowed include corporate badges, home keys, student IDs and hotel keys, requiring a binding agreement with the building operator. The app must be opened by the user; Express Mode is not available for in-app credentials.\n\nAliro 1.0 in Apple Wallet since iOS 26.4. Launch is planned for mid 2027.",
+          "priorities": "Cover every targeted NFC & SE region (including Vietnam) with one code path, keep the device/OS test matrix small, and still reach most active iPhones.",
+          "candidates": [
+            {
+              "id": "ios_18_4",
+              "description": "Minimum iOS 18.4 (iPhone XS and later); Vietnam features gated at runtime to iOS 26."
+            },
+            {
+              "id": "ios_26_0",
+              "description": "Minimum iOS 26.0 (iPhone 11 and later, iPhone SE 2nd gen and later); supports iOS 26 and iOS 27."
+            },
+            {
+              "id": "ios_27_0",
+              "description": "Minimum iOS 27.0 (latest only)."
+            }
+          ],
+          "requirements": [
+            "Meets the minimum iOS version required for NFC & SE in Vietnam without runtime gating.",
+            "Supports no more than two major iOS versions at launch."
+          ],
+          "escalate_on_contradiction": true
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "label": "D03-inapp-protocol",
+      "params": {
+        "name": "jev_decide",
+        "arguments": {
+          "decision": "Which reader protocol should the in-app NFC and BLE channels of Anastrophe use?",
+          "evidence": "Aliro 1.0 (CSA, released 2026-02-26): standard for mobile access credentials over NFC (mandatory tier), BLE and UWB; backed by Apple, Google, Samsung, HID, Allegion, ASSA ABLOY; on iPhone the Aliro credential lives in Apple Wallet; Apple Wallet supports Aliro protocol 1.0 since iOS 26.4; primary applet AID A000000909ACCE5501; PKI with ephemeral key exchange; devices withhold identity until the reader is authenticated; certified products expected from late 2026.\n\niPhone randomizes the ISO 14443 UID on each tap; apps cannot set the UID or emulate MIFARE Classic; UID-only readers are incompatible and insecure.\n\nApple CardSession HCE (iOS 17.4+): host card emulation for apps, only for users in the European Economic Area, requires an HCE entitlement listing AIDs; emulation lasts max 60 seconds; development testing outside the EEA is possible on iOS 18.2+ with up to 100 test devices.\n\nApple NFC & SE Platform (in-app Secure Element credentials via CredentialSession, iOS 18.1+): requires an agreement with Apple, an NFC & SE entitlement, applet review by an independent accredited lab, and onboarding in Apple Business Register. To be eligible the developer must be established in an eligible territory. Eligible territories (checked live 2026-11-01) include AU, BR, CA, JP, NZ, UK, US (iOS 18.1+), Switzerland (18.2+), Hong Kong, Malaysia, Singapore, Taiwan, UAE, Saudi Arabia, Mexico and others (iOS 18.4+), Vietnam, India and others (iOS 26.0+). Indonesia, Thailand and the Philippines are NOT listed. Use cases allowed include corporate badges, home keys, student IDs and hotel keys, requiring a binding agreement with the building operator. The app must be opened by the user; Express Mode is not available for in-app credentials.\n\nAnastrophe controls the reader firmware or an edge gateway for in-app channels. An in-app HCE app must list its AIDs in its entitlement; an in-app Secure Element applet is Anastrophe's own code reviewed by a lab.",
+          "priorities": "Strong security (no static identifiers, anti-replay, privacy against rogue readers), no third-party licensing dependency for R1, the same protocol over NFC APDUs and BLE GATT, small messages (each APDU under 255 bytes).",
+          "candidates": [
+            {
+              "id": "anp1_proprietary",
+              "description": "Anastrophe Protocol v1: own proprietary AID, ephemeral ECDH P-256 key agreement, reader authenticated by a reader-group key before the phone reveals any identity, phone signs the transcript with an ECDSA key in Secure Enclave or the SE applet, AES-GCM session encryption; framed identically over BLE."
+            },
+            {
+              "id": "aliro_inapp",
+              "description": "Implement the Aliro user-device protocol inside the app/applet, reusing the Aliro AID A000000909ACCE5501."
+            },
+            {
+              "id": "hid_seos_license",
+              "description": "License HID Seos and use HID's mobile SDK and readers."
+            },
+            {
+              "id": "static_id",
+              "description": "Present a static credential identifier that the reader looks up."
+            }
+          ],
+          "requirements": [
+            "Does not reuse an AID that belongs to another standard or wallet.",
+            "Does not rely on a static identifier for authentication.",
+            "Works over both NFC APDUs and BLE GATT without licensing a third party."
+          ],
+          "escalate_on_contradiction": true
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "label": "D04-key-access-control",
+      "params": {
+        "name": "jev_decide",
+        "arguments": {
+          "decision": "Which Keychain/Secure Enclave access control should protect Anastrophe's in-app credential private keys (HCE and BLE channels)?",
+          "evidence": "Apple NFC & SE Platform transactions require Face ID or Touch ID, and the device passcode can be used at any time if biometrics are unavailable or disabled. Apple Wallet access passes are removed when the user turns off the device passcode. Credentials can be suspended or revoked remotely by the user (web portal) and by the building admin. Some supported devices (iPhone SE) use Touch ID. If a key uses biometryCurrentSet, re-enrolling Face ID or adding a fingerprint permanently invalidates the key and the user must re-provision. userPresence allows any enrolled biometry or the device passcode. biometryAny allows any enrolled biometry but not the passcode.",
+          "priorities": "Do not lock users out unexpectedly (e.g., after Face ID re-enrollment), match Apple's platform behavior for contactless credentials, still require user authentication per presentment; remote revocation covers the stolen-and-passcode-known case.",
+          "candidates": [
+            {
+              "id": "user_presence",
+              "description": "kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly with [.privateKeyUsage, .userPresence]."
+            },
+            {
+              "id": "biometry_current_set",
+              "description": "kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly with [.privateKeyUsage, .biometryCurrentSet]."
+            },
+            {
+              "id": "biometry_any",
+              "description": "kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly with [.privateKeyUsage, .biometryAny]."
+            }
+          ],
+          "requirements": [
+            "The credential remains usable after the user re-enrolls Face ID.",
+            "Each presentment requires user authentication on the device."
+          ],
+          "escalate_on_contradiction": true
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "label": "D05-cert-validity",
+      "params": {
+        "name": "jev_decide",
+        "arguments": {
+          "decision": "What default validity should Anastrophe's in-app credential certificates have (sites can override between 1 and 30 days)?",
+          "evidence": "Readers may operate offline; online readers receive revocations within 60 seconds and offline readers at their next sync (default every 15 minutes), but a fully disconnected reader only stops a revoked credential when its certificate expires. The app renews the certificate automatically whenever online and less than 50% of validity remains; iOS background refresh is best-effort. Users may be offline for several days (e.g., travel, long weekends). Apple Wallet passes are managed separately by Apple's platform.",
+          "priorities": "Bound the worst-case exposure of a revoked credential on a disconnected reader while avoiding lockouts for users who are offline for a few days.",
+          "candidates": [
+            {
+              "id": "days_1",
+              "description": "1-day certificates."
+            },
+            {
+              "id": "days_7",
+              "description": "7-day certificates, renewed when under 50% remains."
+            },
+            {
+              "id": "days_30",
+              "description": "30-day certificates."
+            }
+          ],
+          "requirements": [
+            "A user who is offline for 3 days can still enter.",
+            "A revoked credential stops working on a fully offline reader within one week."
+          ],
+          "escalate_on_contradiction": true
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "label": "D06-pilot-market",
+      "params": {
+        "name": "jev_decide",
+        "arguments": {
+          "decision": "Where should Anastrophe run its R1 pilot?",
+          "evidence": "The product team is an Indonesian company (i-3.co.id). Goal: an iPhone app ('Anastrophe') equivalent to Samsung Wallet NFC Access Card (up to 8 building access cards, add by tapping physical card, security code for members, offline use). Planned launch window: R1 MVP about 6-7 months from now (mid 2027).\n\nApple NFC & SE Platform (in-app Secure Element credentials via CredentialSession, iOS 18.1+): requires an agreement with Apple, an NFC & SE entitlement, applet review by an independent accredited lab, and onboarding in Apple Business Register. To be eligible the developer must be established in an eligible territory. Eligible territories (checked live 2026-11-01) include AU, BR, CA, JP, NZ, UK, US (iOS 18.1+), Switzerland (18.2+), Hong Kong, Malaysia, Singapore, Taiwan, UAE, Saudi Arabia, Mexico and others (iOS 18.4+), Vietnam, India and others (iOS 26.0+). Indonesia, Thailand and the Philippines are NOT listed. Use cases allowed include corporate badges, home keys, student IDs and hotel keys, requiring a binding agreement with the building operator. The app must be opened by the user; Express Mode is not available for in-app credentials.\n\nBLE in-app channel: works on iPhone in every region without special Apple entitlement; HID Mobile Access uses Bluetooth LE for 'Tap' on iOS and 'Twist and Go'; requires readers with a BLE module; background scanning on iOS must filter by service UUID, is slower and does not auto-resume after Bluetooth resets.\n\nThe NFC & SE entitlement requires the developer to be established in an eligible territory, so an Indonesian company needs an entity in, e.g., Singapore or Malaysia to obtain it. Samsung's NFC Access Card feature has rolled out in Hong Kong, Malaysia, Vietnam, Thailand and the Philippines.",
+          "priorities": "Validate product-market fit in the company's home market while proving NFC tap on iPhone in a real building; keep legal/entity overhead in R1 manageable.",
+          "candidates": [
+            {
+              "id": "sg_my_hk",
+              "description": "Pilot only in Singapore/Malaysia/Hong Kong with NFC + BLE."
+            },
+            {
+              "id": "indonesia_ble",
+              "description": "Pilot only in Indonesia with BLE."
+            },
+            {
+              "id": "dual_pilot",
+              "description": "Two pilots: one Indonesian building on BLE and one Singapore or Malaysia building on NFC + BLE."
+            }
+          ],
+          "requirements": [
+            "Validates NFC tap on iPhone in a real building.",
+            "Validates the product with end users in Indonesia."
+          ],
+          "escalate_on_contradiction": true
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "label": "D07-ble-handsfree",
+      "params": {
+        "name": "jev_decide",
+        "arguments": {
+          "decision": "Should R1 include BLE hands-free (background proximity) unlocking?",
+          "evidence": "BLE in-app channel: works on iPhone in every region without special Apple entitlement; HID Mobile Access uses Bluetooth LE for 'Tap' on iOS and 'Twist and Go'; requires readers with a BLE module; background scanning on iOS must filter by service UUID, is slower and does not auto-resume after Bluetooth resets.\n\nHands-free unlocking can open doors the user only walks past; reliability of background BLE on iOS 26/27 is untested for this product; HID uses Location Services to detect readers in the background.",
+          "priorities": "For R1, reliability and safety over convenience; avoid unintended unlocks; keep the permission footprint minimal.",
+          "candidates": [
+            {
+              "id": "foreground_tap_only",
+              "description": "R1 supports BLE Tap from the app or widget only; hands-free is evaluated after field tests (P2)."
+            },
+            {
+              "id": "optin_handsfree_r1",
+              "description": "R1 ships opt-in hands-free unlocking in the background."
+            }
+          ],
+          "requirements": [
+            "Avoids unintended door openings."
+          ],
+          "escalate_on_contradiction": true
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "label": "D08-wallet-members",
+      "params": {
+        "name": "jev_decide",
+        "arguments": {
+          "decision": "For the Apple Wallet channel (R2), how should a primary cardholder's family members get access to the same card?",
+          "evidence": "Samsung NFC Access Card: members add the same physical card and must enter the security code created by the first holder; the primary owner can delete members and change the code; cards cannot be shared to other parties. Apple Wallet Access Program: pass sharing is optional; the Credential Manager sets share permissions; senders share via iMessage, SMS, email or WhatsApp with an optional 6-digit activation code; Credential Managers can set device limits; cross-platform sharing via IETF Secure Credential Transfer.",
+          "priorities": "Mirror Samsung's behavior (no sharing to arbitrary parties), keep the owner in control, minimize custom UX and keep one consistent member model across channels.",
+          "candidates": [
+            {
+              "id": "app_security_code",
+              "description": "Members join in the Anastrophe app with the owner's security code; each member provisions their own Wallet pass; Wallet sharing disabled."
+            },
+            {
+              "id": "wallet_sharing",
+              "description": "Use Apple Wallet pass sharing with a 6-digit activation code as the member mechanism."
+            },
+            {
+              "id": "site_configurable",
+              "description": "Default to app security code; sites may enable Wallet sharing."
+            }
+          ],
+          "requirements": [
+            "The owner can see and remove members.",
+            "The card cannot be shared to arbitrary third parties."
+          ],
+          "escalate_on_contradiction": true
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "label": "D09-backend-topology",
+      "params": {
+        "name": "jev_decide",
+        "arguments": {
+          "decision": "What backend deployment topology should Anastrophe use for R1?",
+          "evidence": "R1 target availability is 99.9%; presentment works offline, so a backend outage blocks only enrollment, renewal and admin actions. The PRD requires RTO <= 30 minutes and RPO <= 5 minutes. R2 (Apple Wallet) requires multi-region disaster recovery with failover within 30 minutes, 99.99% production uptime, and joint DR testing with Apple. The team is a startup and cost-sensitive.",
+          "priorities": "Meet R1 objectives cost-effectively while avoiding a rewrite when R2 requires multi-region DR.",
+          "candidates": [
+            {
+              "id": "single_region_ha",
+              "description": "R1: single region, multi-AZ HA, cross-region backups; R2: add multi-region."
+            },
+            {
+              "id": "multi_region_passive",
+              "description": "R1: primary region plus hot-standby secondary region with automated failover; promote to active-active for R2 if needed."
+            },
+            {
+              "id": "multi_region_active",
+              "description": "R1: active-active in two regions."
+            }
+          ],
+          "requirements": [
+            "Can recover from a full region outage within 30 minutes.",
+            "Does not require re-architecture to meet R2 disaster-recovery requirements."
+          ],
+          "escalate_on_contradiction": true
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "label": "D10-member-limit",
+      "params": {
+        "name": "jev_decide",
+        "arguments": {
+          "decision": "What default maximum number of members per card should Anastrophe use (sites can override)?",
+          "evidence": "Samsung's FAQ does not state a member limit. Typical households in target markets have 2-6 people. Each member gets their own credential on their own device; each credential is audited and can be revoked by the owner or admin. The Apple Wallet program lets the Credential Manager set device limits per pass.",
+          "priorities": "Cover typical households without encouraging credential sprawl; sites can override.",
+          "candidates": [
+            {
+              "id": "max_2",
+              "description": "Default 2 members per card."
+            },
+            {
+              "id": "max_4",
+              "description": "Default 4 members per card."
+            },
+            {
+              "id": "max_6",
+              "description": "Default 6 members per card."
+            }
+          ],
+          "escalate_on_contradiction": true
+        }
+      }
+    }
+  ]
+}

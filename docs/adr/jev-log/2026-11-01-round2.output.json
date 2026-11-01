@@ -1,0 +1,245 @@
+{
+  "results": [
+    {
+      "method": "initialize",
+      "serverInfo": {
+        "name": "jev-mcp",
+        "version": "0.14.7"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "jev_decide",
+      "label": "D11-reader-strategy",
+      "result": {
+        "tool": "jev_decide",
+        "model": "jev-1.14.0",
+        "provider": "typesafe",
+        "recommendation": {
+          "selected": "reference_reader",
+          "escaped": false,
+          "confidence": 0.66,
+          "probabilities": {
+            "reference_reader": 0.71,
+            "vendor_firmware": 0,
+            "transparent_gateway": 0,
+            "reference_plus_gateway": 0.28,
+            "ask_user": 0,
+            "investigate": 0.01,
+            "none": 0
+          },
+          "contradicted_requirements": []
+        },
+        "requirements_checked": 3,
+        "checks": [
+          {
+            "candidate": "reference_reader",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "reference_reader",
+            "requirement": 1,
+            "answer": "supported"
+          },
+          {
+            "candidate": "reference_reader",
+            "requirement": 2,
+            "answer": "supported"
+          },
+          {
+            "candidate": "vendor_firmware",
+            "requirement": 0,
+            "answer": "unknown"
+          },
+          {
+            "candidate": "vendor_firmware",
+            "requirement": 1,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "vendor_firmware",
+            "requirement": 2,
+            "answer": "unknown"
+          },
+          {
+            "candidate": "transparent_gateway",
+            "requirement": 0,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "transparent_gateway",
+            "requirement": 1,
+            "answer": "supported"
+          },
+          {
+            "candidate": "transparent_gateway",
+            "requirement": 2,
+            "answer": "supported"
+          },
+          {
+            "candidate": "reference_plus_gateway",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "reference_plus_gateway",
+            "requirement": 1,
+            "answer": "supported"
+          },
+          {
+            "candidate": "reference_plus_gateway",
+            "requirement": 2,
+            "answer": "supported"
+          }
+        ],
+        "warnings": [],
+        "usage": {
+          "input_tokens": 2753,
+          "output_tokens": 593
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "jev_decide",
+      "label": "D12-wallet-program-timing",
+      "result": {
+        "tool": "jev_decide",
+        "model": "jev-1.14.0",
+        "provider": "typesafe",
+        "recommendation": {
+          "selected": "apply_now",
+          "escaped": false,
+          "confidence": 1,
+          "probabilities": {
+            "apply_now": 1,
+            "after_r1_ga": 0,
+            "partner_existing_provider": 0,
+            "ask_user": 0,
+            "investigate": 0,
+            "none": 0
+          },
+          "contradicted_requirements": []
+        },
+        "requirements_checked": 1,
+        "checks": [
+          {
+            "candidate": "apply_now",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "after_r1_ga",
+            "requirement": 0,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "partner_existing_provider",
+            "requirement": 0,
+            "answer": "unknown"
+          }
+        ],
+        "warnings": [],
+        "usage": {
+          "input_tokens": 1299,
+          "output_tokens": 203
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "jev_decide",
+      "label": "D13-entity-for-entitlement",
+      "result": {
+        "tool": "jev_decide",
+        "model": "jev-1.14.0",
+        "provider": "typesafe",
+        "recommendation": {
+          "selected": "investigate",
+          "escaped": true,
+          "confidence": 0.27,
+          "probabilities": {
+            "singapore_entity": 0.19,
+            "malaysia_entity": 0.02,
+            "partner_publisher": 0.2,
+            "ask_user": 0.19,
+            "investigate": 0.39,
+            "none": 0.01
+          },
+          "contradicted_requirements": []
+        },
+        "requirements_checked": 0,
+        "checks": [],
+        "warnings": [],
+        "usage": {
+          "input_tokens": 774,
+          "output_tokens": 75
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "jev_decide",
+      "label": "D14-primary-claim-policy",
+      "result": {
+        "tool": "jev_decide",
+        "model": "jev-1.14.0",
+        "provider": "typesafe",
+        "recommendation": {
+          "selected": "holder_match_else_approval",
+          "escaped": false,
+          "confidence": 1,
+          "probabilities": {
+            "holder_match_else_approval": 1,
+            "admin_approval_always": 0,
+            "first_tap_wins": 0,
+            "ask_user": 0,
+            "investigate": 0,
+            "none": 0
+          },
+          "contradicted_requirements": []
+        },
+        "requirements_checked": 2,
+        "checks": [
+          {
+            "candidate": "holder_match_else_approval",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "holder_match_else_approval",
+            "requirement": 1,
+            "answer": "supported"
+          },
+          {
+            "candidate": "admin_approval_always",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "admin_approval_always",
+            "requirement": 1,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "first_tap_wins",
+            "requirement": 0,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "first_tap_wins",
+            "requirement": 1,
+            "answer": "contradicted"
+          }
+        ],
+        "warnings": [],
+        "usage": {
+          "input_tokens": 1558,
+          "output_tokens": 335
+        }
+      }
+    }
+  ],
+  "stderr": "[jev-mcp] ready — model jev-latest\n"
+}

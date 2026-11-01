@@ -1,0 +1,642 @@
+{
+  "results": [
+    {
+      "method": "initialize",
+      "serverInfo": {
+        "name": "jev-mcp",
+        "version": "0.14.7"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "jev_decide",
+      "label": "D01-release1-channels",
+      "result": {
+        "tool": "jev_decide",
+        "model": "jev-1.14.0",
+        "provider": "typesafe",
+        "recommendation": {
+          "selected": "nfc_inapp_plus_ble",
+          "escaped": false,
+          "confidence": 0.89,
+          "probabilities": {
+            "nfc_inapp_plus_ble": 0.91,
+            "ble_only": 0.04,
+            "nfc_inapp_only": 0,
+            "wallet_first": 0,
+            "ask_user": 0.01,
+            "investigate": 0.02,
+            "none": 0.02
+          },
+          "contradicted_requirements": []
+        },
+        "requirements_checked": 3,
+        "checks": [
+          {
+            "candidate": "nfc_inapp_plus_ble",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "nfc_inapp_plus_ble",
+            "requirement": 1,
+            "answer": "supported"
+          },
+          {
+            "candidate": "nfc_inapp_plus_ble",
+            "requirement": 2,
+            "answer": "supported"
+          },
+          {
+            "candidate": "ble_only",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "ble_only",
+            "requirement": 1,
+            "answer": "supported"
+          },
+          {
+            "candidate": "ble_only",
+            "requirement": 2,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "nfc_inapp_only",
+            "requirement": 0,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "nfc_inapp_only",
+            "requirement": 1,
+            "answer": "supported"
+          },
+          {
+            "candidate": "nfc_inapp_only",
+            "requirement": 2,
+            "answer": "supported"
+          },
+          {
+            "candidate": "wallet_first",
+            "requirement": 0,
+            "answer": "unknown"
+          },
+          {
+            "candidate": "wallet_first",
+            "requirement": 1,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "wallet_first",
+            "requirement": 2,
+            "answer": "supported"
+          }
+        ],
+        "warnings": [],
+        "usage": {
+          "input_tokens": 3179,
+          "output_tokens": 596
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "jev_decide",
+      "label": "D02-min-ios",
+      "result": {
+        "tool": "jev_decide",
+        "model": "jev-1.14.0",
+        "provider": "typesafe",
+        "recommendation": {
+          "selected": "ios_26_0",
+          "escaped": false,
+          "confidence": 0.87,
+          "probabilities": {
+            "ios_18_4": 0.01,
+            "ios_26_0": 0.89,
+            "ios_27_0": 0.01,
+            "ask_user": 0.01,
+            "investigate": 0.02,
+            "none": 0.06
+          },
+          "contradicted_requirements": []
+        },
+        "requirements_checked": 2,
+        "checks": [
+          {
+            "candidate": "ios_18_4",
+            "requirement": 0,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "ios_18_4",
+            "requirement": 1,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "ios_26_0",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "ios_26_0",
+            "requirement": 1,
+            "answer": "supported"
+          },
+          {
+            "candidate": "ios_27_0",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "ios_27_0",
+            "requirement": 1,
+            "answer": "supported"
+          }
+        ],
+        "warnings": [],
+        "usage": {
+          "input_tokens": 1853,
+          "output_tokens": 332
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "jev_decide",
+      "label": "D03-inapp-protocol",
+      "result": {
+        "tool": "jev_decide",
+        "model": "jev-1.14.0",
+        "provider": "typesafe",
+        "recommendation": {
+          "selected": "anp1_proprietary",
+          "escaped": false,
+          "confidence": 0.93,
+          "probabilities": {
+            "anp1_proprietary": 0.94,
+            "aliro_inapp": 0.03,
+            "hid_seos_license": 0,
+            "static_id": 0,
+            "ask_user": 0,
+            "investigate": 0.02,
+            "none": 0.01
+          },
+          "contradicted_requirements": []
+        },
+        "requirements_checked": 3,
+        "checks": [
+          {
+            "candidate": "anp1_proprietary",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "anp1_proprietary",
+            "requirement": 1,
+            "answer": "supported"
+          },
+          {
+            "candidate": "anp1_proprietary",
+            "requirement": 2,
+            "answer": "supported"
+          },
+          {
+            "candidate": "aliro_inapp",
+            "requirement": 0,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "aliro_inapp",
+            "requirement": 1,
+            "answer": "supported"
+          },
+          {
+            "candidate": "aliro_inapp",
+            "requirement": 2,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "hid_seos_license",
+            "requirement": 0,
+            "answer": "unknown"
+          },
+          {
+            "candidate": "hid_seos_license",
+            "requirement": 1,
+            "answer": "unknown"
+          },
+          {
+            "candidate": "hid_seos_license",
+            "requirement": 2,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "static_id",
+            "requirement": 0,
+            "answer": "unknown"
+          },
+          {
+            "candidate": "static_id",
+            "requirement": 1,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "static_id",
+            "requirement": 2,
+            "answer": "unknown"
+          }
+        ],
+        "warnings": [],
+        "usage": {
+          "input_tokens": 3006,
+          "output_tokens": 599
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "jev_decide",
+      "label": "D04-key-access-control",
+      "result": {
+        "tool": "jev_decide",
+        "model": "jev-1.14.0",
+        "provider": "typesafe",
+        "recommendation": {
+          "selected": "user_presence",
+          "escaped": false,
+          "confidence": 0.93,
+          "probabilities": {
+            "user_presence": 0.94,
+            "biometry_current_set": 0,
+            "biometry_any": 0.02,
+            "ask_user": 0.01,
+            "investigate": 0.01,
+            "none": 0.02
+          },
+          "contradicted_requirements": []
+        },
+        "requirements_checked": 2,
+        "checks": [
+          {
+            "candidate": "user_presence",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "user_presence",
+            "requirement": 1,
+            "answer": "supported"
+          },
+          {
+            "candidate": "biometry_current_set",
+            "requirement": 0,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "biometry_current_set",
+            "requirement": 1,
+            "answer": "supported"
+          },
+          {
+            "candidate": "biometry_any",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "biometry_any",
+            "requirement": 1,
+            "answer": "supported"
+          }
+        ],
+        "warnings": [],
+        "usage": {
+          "input_tokens": 1730,
+          "output_tokens": 329
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "jev_decide",
+      "label": "D05-cert-validity",
+      "result": {
+        "tool": "jev_decide",
+        "model": "jev-1.14.0",
+        "provider": "typesafe",
+        "recommendation": {
+          "selected": "days_7",
+          "escaped": false,
+          "confidence": 0.78,
+          "probabilities": {
+            "days_1": 0.02,
+            "days_7": 0.82,
+            "days_30": 0,
+            "ask_user": 0.02,
+            "investigate": 0.01,
+            "none": 0.13
+          },
+          "contradicted_requirements": []
+        },
+        "requirements_checked": 2,
+        "checks": [
+          {
+            "candidate": "days_1",
+            "requirement": 0,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "days_1",
+            "requirement": 1,
+            "answer": "supported"
+          },
+          {
+            "candidate": "days_7",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "days_7",
+            "requirement": 1,
+            "answer": "supported"
+          },
+          {
+            "candidate": "days_30",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "days_30",
+            "requirement": 1,
+            "answer": "contradicted"
+          }
+        ],
+        "warnings": [],
+        "usage": {
+          "input_tokens": 1515,
+          "output_tokens": 332
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "jev_decide",
+      "label": "D06-pilot-market",
+      "result": {
+        "tool": "jev_decide",
+        "model": "jev-1.14.0",
+        "provider": "typesafe",
+        "recommendation": {
+          "selected": "dual_pilot",
+          "escaped": false,
+          "confidence": 0.84,
+          "probabilities": {
+            "sg_my_hk": 0.01,
+            "indonesia_ble": 0.01,
+            "dual_pilot": 0.87,
+            "ask_user": 0.04,
+            "investigate": 0.04,
+            "none": 0.03
+          },
+          "contradicted_requirements": []
+        },
+        "requirements_checked": 2,
+        "checks": [
+          {
+            "candidate": "sg_my_hk",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "sg_my_hk",
+            "requirement": 1,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "indonesia_ble",
+            "requirement": 0,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "indonesia_ble",
+            "requirement": 1,
+            "answer": "supported"
+          },
+          {
+            "candidate": "dual_pilot",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "dual_pilot",
+            "requirement": 1,
+            "answer": "supported"
+          }
+        ],
+        "warnings": [],
+        "usage": {
+          "input_tokens": 1869,
+          "output_tokens": 332
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "jev_decide",
+      "label": "D07-ble-handsfree",
+      "result": {
+        "tool": "jev_decide",
+        "model": "jev-1.14.0",
+        "provider": "typesafe",
+        "recommendation": {
+          "selected": "foreground_tap_only",
+          "escaped": false,
+          "confidence": 1,
+          "probabilities": {
+            "foreground_tap_only": 1,
+            "optin_handsfree_r1": 0,
+            "ask_user": 0,
+            "investigate": 0,
+            "none": 0
+          },
+          "contradicted_requirements": []
+        },
+        "requirements_checked": 1,
+        "checks": [
+          {
+            "candidate": "foreground_tap_only",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "optin_handsfree_r1",
+            "requirement": 0,
+            "answer": "contradicted"
+          }
+        ],
+        "warnings": [],
+        "usage": {
+          "input_tokens": 963,
+          "output_tokens": 152
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "jev_decide",
+      "label": "D08-wallet-members",
+      "result": {
+        "tool": "jev_decide",
+        "model": "jev-1.14.0",
+        "provider": "typesafe",
+        "recommendation": {
+          "selected": "app_security_code",
+          "escaped": false,
+          "confidence": 0.89,
+          "probabilities": {
+            "app_security_code": 0.91,
+            "wallet_sharing": 0.06,
+            "site_configurable": 0.01,
+            "ask_user": 0,
+            "investigate": 0.01,
+            "none": 0.01
+          },
+          "contradicted_requirements": []
+        },
+        "requirements_checked": 2,
+        "checks": [
+          {
+            "candidate": "app_security_code",
+            "requirement": 0,
+            "answer": "unknown"
+          },
+          {
+            "candidate": "app_security_code",
+            "requirement": 1,
+            "answer": "supported"
+          },
+          {
+            "candidate": "wallet_sharing",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "wallet_sharing",
+            "requirement": 1,
+            "answer": "contradicted"
+          },
+          {
+            "candidate": "site_configurable",
+            "requirement": 0,
+            "answer": "unknown"
+          },
+          {
+            "candidate": "site_configurable",
+            "requirement": 1,
+            "answer": "contradicted"
+          }
+        ],
+        "warnings": [],
+        "usage": {
+          "input_tokens": 1572,
+          "output_tokens": 332
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "jev_decide",
+      "label": "D09-backend-topology",
+      "result": {
+        "tool": "jev_decide",
+        "model": "jev-1.14.0",
+        "provider": "typesafe",
+        "recommendation": {
+          "selected": "multi_region_passive",
+          "escaped": false,
+          "confidence": 0.48,
+          "probabilities": {
+            "single_region_ha": 0.35,
+            "multi_region_passive": 0.57,
+            "multi_region_active": 0.01,
+            "ask_user": 0.02,
+            "investigate": 0.03,
+            "none": 0.02
+          },
+          "contradicted_requirements": []
+        },
+        "requirements_checked": 2,
+        "checks": [
+          {
+            "candidate": "single_region_ha",
+            "requirement": 0,
+            "answer": "unknown"
+          },
+          {
+            "candidate": "single_region_ha",
+            "requirement": 1,
+            "answer": "supported"
+          },
+          {
+            "candidate": "multi_region_passive",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "multi_region_passive",
+            "requirement": 1,
+            "answer": "supported"
+          },
+          {
+            "candidate": "multi_region_active",
+            "requirement": 0,
+            "answer": "supported"
+          },
+          {
+            "candidate": "multi_region_active",
+            "requirement": 1,
+            "answer": "supported"
+          }
+        ],
+        "warnings": [],
+        "usage": {
+          "input_tokens": 1567,
+          "output_tokens": 326
+        }
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "jev_decide",
+      "label": "D10-member-limit",
+      "result": {
+        "tool": "jev_decide",
+        "model": "jev-1.14.0",
+        "provider": "typesafe",
+        "recommendation": {
+          "selected": "max_4",
+          "escaped": false,
+          "confidence": 0.65,
+          "probabilities": {
+            "max_2": 0,
+            "max_4": 0.71,
+            "max_6": 0.26,
+            "ask_user": 0.01,
+            "investigate": 0.02,
+            "none": 0
+          },
+          "contradicted_requirements": []
+        },
+        "requirements_checked": 0,
+        "checks": [],
+        "warnings": [],
+        "usage": {
+          "input_tokens": 649,
+          "output_tokens": 74
+        }
+      }
+    }
+  ],
+  "stderr": "[jev-mcp] ready — model jev-latest\n"
+}

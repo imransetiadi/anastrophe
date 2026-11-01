@@ -1,0 +1,31 @@
+# macOS
+.DS_Store
+
+# Claude Code — personal/local settings (secrets & per-user config stay out of the repo)
+.claude/settings.local.json
+
+# Xcode / Swift
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+.build/
+.swiftpm/
+
+# Node
+node_modules/
+
+# Secrets & local env
+.env
+.env.*
+*.p8
+*.p12
+*.pem
+*.mobileprovision
+
+# Konfigurasi build per developer & kunci CA lab (rencana R1)
+Config/Local.xcconfig
+scripts/anp1/.lab/
+
+# Python
+__pycache__/

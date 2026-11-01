@@ -1,0 +1,16 @@
+{
+  "tool": "jev_decide",
+  "label": "D19-ble-scan-strategy",
+  "arguments": {
+    "decision": "How should the Anastrophe BLE \"Tap\" flow scan for readers so that the R1 app meets its latency target while keeping strongest-reader selection?",
+    "evidence": "SDD §6.3 Tap flow (LAContext auth; 5 s scan filtered by service UUID; strongest reader above per-reader threshold e.g. -55 dBm per FR-83; connect/MTU/ANP/1/RESULT/disconnect; max 1 txn per 3 s per reader). NFR-P04: intent to reader decision <= 1.5 s p95. FR-80, FR-83, O-B04, O-B01. Current LiveBLECentral.scan always sleeps the full 5 s; an independent code reviewer flagged that NFR-P04 / TC-PRSB-01 then fail deterministically (plan/SDD contradiction). Reader advertising intervals typically 100-250 ms; Face ID precedes scanning and takes several hundred ms.",
+    "priorities": "Meet NFR-P04 (<= 1.5 s p95 intent-to-decision) in the R1 pilots; keep FR-83; stay foreground-only (ADR-0012); keep the implementation simple and testable without hardware.",
+    "candidates": ["fixed_5s", "early_exit", "prescan_early_exit"],
+    "requirements": [
+      "Can achieve intent-to-decision <= 1.5 s at p95 when a reader is within ~30 cm (NFR-P04).",
+      "Processes only the strongest reader at or above the RSSI threshold (FR-83).",
+      "Performs no Bluetooth scanning while the app is in the background (ADR-0012)."
+    ],
+    "escalate_on_contradiction": true
+  }
+}

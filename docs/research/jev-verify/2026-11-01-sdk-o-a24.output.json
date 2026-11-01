@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-01",
+  "tool": "jev_verify",
+  "model": "jev-1.14.0",
+  "purpose": "Verifikasi O-A24 (E31) sebelum dipakai di SDD §5.4 dan PRD FR-01",
+  "evidence_ids": ["sec-swiftinterface (SecureElementCredential.swiftinterface, iOS SDK 27.2)", "corenfc-swiftinterface (CoreNFC.swiftinterface, iOS SDK 27.2)"],
+  "summary": {"verified": 4, "contradicted": 0, "unsupported": 0, "needs_review": 0},
+  "results": [
+    {"claim": "CredentialSession.isEligible: get async throws", "verdict": "verified", "confidence": 1.0, "action": "auto"},
+    {"claim": "CardSession.isEligible: get async (tidak throws)", "verdict": "verified", "confidence": 0.98, "action": "auto"},
+    {"claim": "CardSession & EventStream tidak Sendable; APDU & NFCPresentmentIntentAssertion Sendable", "verdict": "verified", "confidence": 0.92, "action": "auto"},
+    {"claim": "NFCPresentmentIntentAssertion tanpa metode pelepasan (isValid, acquire(), deinit)", "verdict": "verified", "confidence": 0.89, "action": "auto"}
+  ],
+  "usage": {"input_tokens": 2747, "output_tokens": 457}
+}
