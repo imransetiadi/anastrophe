@@ -1,0 +1,47 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "kebijakan_gedung",
+    "escaped": false,
+    "confidence": 0.63,
+    "probabilities": {
+      "kebijakan_gedung": 0.68,
+      "minor_klien": 0.01,
+      "filter_cli_fr50": 0.28,
+      "akses_cepat": 0,
+      "ask_user": 0.01,
+      "investigate": 0.01,
+      "none": 0.01
+    },
+    "contradicted_requirements": []
+  },
+  "checks": {
+    "kebijakan_gedung": [
+      "supported",
+      "supported",
+      "supported"
+    ],
+    "minor_klien": [
+      "supported",
+      "contradicted",
+      "supported"
+    ],
+    "filter_cli_fr50": [
+      "supported",
+      "supported",
+      "supported"
+    ],
+    "akses_cepat": [
+      "supported",
+      "unknown",
+      "supported"
+    ]
+  },
+  "warnings": [],
+  "usage": {
+    "input_tokens": 3340,
+    "output_tokens": 590
+  }
+}

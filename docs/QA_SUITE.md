@@ -257,6 +257,8 @@ Format ID: `TC-<AREA>-<NN>`. **Prio:** P0/P1/P2. **Tipe:** U unit · I integrasi
 | TC-ADM-10 | Laporan & ekspor | Ekspor kredensial aktif per kanal & adopsi | FR-58 | P1 | E |
 | TC-ADM-11 | Antrean sengketa | Keputusan tercatat; REASSIGN berjalan (lihat TC-ENR-03) | FR-59 | P0 | E |
 | TC-ADM-12 | Alert aksi massal | Revoke > 50 kredensial dalam 5 menit | Konfirmasi tambahan + alert Security Officer | NFR-S10 | P1 | S |
+| TC-ADM-13 | Kebijakan gedung lewat CLI | `policy` membaca kebijakan; mengubah masa berlaku (1–30) dan kanal (`ble`, `nfcHCE`, `semua`) hanya untuk kunci yang diberikan, zona tetap, audit `site.policy_updated`; nilai di luar batas ditolak tanpa perubahan; masa berlaku baru dipakai saat sertifikat diterbitkan | FR-55 | P0 | I |
+| TC-ADM-14 | Kanal gedung ditegakkan | Lookup kode gedung dan respons enrolment membawa kanal efektif gedung; provisioning dengan kanal terlarang → 400 `ENR-INVALID-CHANNEL` hanya sesudah rahasia enrolment valid; app memilih kanal yang diizinkan atau menampilkan pesan tanpa provisioning | FR-55, FR-05 | P0 | I |
 
 ### 5.10 Konformansi protokol ANP/1 (PROTO)
 
@@ -623,7 +625,7 @@ Jadwal mengikuti milestone PRD §13; uji pilot mencakup 2 lokasi (ADR-0011).
 | FR-02 | TC-ELG-05, TC-UX-11 |
 | FR-03 | TC-ACC-01, TC-ACC-02, TC-ACC-03 |
 | FR-04 | TC-ELG-01, TC-ELG-04, TC-ELG-08 |
-| FR-05 | TC-ELG-06, TC-ELG-07, TC-ENR-22 |
+| FR-05 | TC-ELG-06, TC-ELG-07, TC-ENR-22, TC-ADM-14 |
 | FR-06 | TC-ACC-05, TC-ACC-06, TC-PRIV-02 |
 | FR-07 | TC-ACC-04 |
 | FR-10 | TC-ENR-01, TC-ENR-21, TC-ENR-22 |
@@ -668,7 +670,7 @@ Jadwal mengikuti milestone PRD §13; uji pilot mencakup 2 lokasi (ADR-0011).
 | FR-52 | TC-ADM-04 |
 | FR-53 | TC-ADM-05 |
 | FR-54 | TC-ADM-06, TC-ADM-07 |
-| FR-55 | TC-ADM-08, TC-ELG-07 |
+| FR-55 | TC-ADM-08, TC-ELG-07, TC-ADM-13, TC-ADM-14 |
 | FR-56 | TC-ADM-01, TC-ADM-02 |
 | FR-57 | TC-ADM-09, TC-RDR-09 |
 | FR-58 | TC-ADM-10 |
