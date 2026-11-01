@@ -17,7 +17,10 @@ struct DiagnosticsInput: Sendable {
     let locale: String
     let channels: [ChannelKind: ChannelAvailability]
     let serviceConfigured: Bool
-    let cards: [CardSummary]
+    /// Store kartu berhasil dibuka saat app dimulai (`AppServices.storageFailed` false).
+    let storageAvailable: Bool
+    /// nil bila kartu tidak bisa dibaca; dibedakan dari "tanpa kartu" agar dukungan tidak salah diagnosis.
+    let cards: [CardSummary]?
 }
 
 /// Teks laporan diagnostik (FR-63): baris `kunci: nilai` dengan label tetap (tidak dilokalisasi) agar
@@ -35,9 +38,14 @@ enum DiagnosticsReport {
                 lines.append("kanal \(kind.rawValue): \(availability)")
             }
         }
+        lines.append("penyimpanan: \(input.storageAvailable ? "ok" : "gagal")")
         lines.append("layanan: \(input.serviceConfigured ? "ya" : "tidak")")
-        lines.append("kartu: \(input.cards.count)")
-        for (index, card) in input.cards.enumerated() {
+        guard let cards = input.cards else {
+            lines.append("kartu: tidak terbaca")
+            return lines.joined(separator: "\n")
+        }
+        lines.append("kartu: \(cards.count)")
+        for (index, card) in cards.enumerated() {
             let channels = card.channels.isEmpty ? "-" : card.channels.map(\.rawValue).joined(separator: "+")
             let expiry = card.notAfter.map { "berlaku sampai \($0.formatted(.iso8601.year().month().day()))" } ?? "tanpa masa berlaku"
             lines.append("kartu \(index + 1): \(card.status.rawValue), \(channels), \(expiry)")
@@ -47,10 +55,11 @@ enum DiagnosticsReport {
 }
 
 extension AppServices {
-    /// Bahan laporan dari kondisi app saat ini. Store yang gagal dibaca menghasilkan daftar kartu kosong.
+    /// Bahan laporan dari kondisi app saat ini. Penyimpanan yang gagal dibuka atau kartu yang gagal dibaca
+    /// dilaporkan sebagai "tidak terbaca", bukan sebagai nol kartu (review akhir Bantuan #2).
     func diagnosticsInput() async -> DiagnosticsInput {
         let info = Bundle.main.infoDictionary
-        let cards = (try? await cards.all()) ?? []
+        let cards: [Card]? = storageFailed ? nil : try? await cards.all()
         return DiagnosticsInput(
             appVersion: info?["CFBundleShortVersionString"] as? String ?? "?",
             build: info?["CFBundleVersion"] as? String ?? "?",
@@ -58,7 +67,8 @@ extension AppServices {
             locale: Locale.current.identifier,
             channels: await availability(),
             serviceConfigured: apiBaseURL != nil,
-            cards: cards.map { card in
+            storageAvailable: !storageFailed,
+            cards: cards?.map { card in
                 CardSummary(status: card.displayStatus(),
                             channels: ChannelKind.priorityOrder.filter { card.credentials[$0] != nil },
                             notAfter: card.notAfter)

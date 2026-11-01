@@ -19,7 +19,7 @@ enum AppEnvironment {
         #endif
         // Alamat API enrolment dari Info.plist ANAPIBaseURL (AN_API_BASE_URL); DEBUG: -ANAPIBaseURL menimpanya.
         let apiBaseURL = BackendConfiguration.apiBaseURL(infoValue: Bundle.main.object(forInfoDictionaryKey: "ANAPIBaseURL") as? String, arguments: arguments)
-        let services = (try? AppServices.live(nfcEmulationEntitled: nfcEmulationEntitled, apiBaseURL: apiBaseURL)) ?? AppServices.storageUnavailable()
+        let services = (try? AppServices.live(nfcEmulationEntitled: nfcEmulationEntitled, apiBaseURL: apiBaseURL)) ?? AppServices.storageUnavailable(apiBaseURL: apiBaseURL)
         #if DEBUG
         // -ANLabBackend/-ANLabDevice/-ANLabSite, -ANLabRenew, -ANLabDelete, dan alur Tambah Kartu
         // (-ANLabCardReader, -ANLabOpenURL, -ANLabAddCode).

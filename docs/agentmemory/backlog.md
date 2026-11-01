@@ -75,5 +75,13 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
       - doc paket devseed masih menyebut keluaran lama;
       - `site-code` tanpa `--site` dijawab "gedung tidak ditemukan";
       - `SiteJoinCode.display` belum terpakai.
+- **Bantuan (minor review akhir, ADR-0048)** — pengguna memutuskan apakah dikerjakan:
+  - **M1 status kanal:** nilai awal kosong sempat terbaca "belum tersedia" sebelum dimuat; status tidak disegarkan setelah kembali dari Pengaturan; `availability()` dipanggil dua kali.
+  - **M2 tautan undangan:** tautan yang dibuka saat Bantuan tampil tertahan sampai Bantuan ditutup (laten sampai Associated Domains).
+  - **M3 isi laporan:** tanggal berlaku ditulis dalam UTC, bukan waktu lokal; belum ada stempel waktu pembuatan; `bahasa` memakai `Locale.current`, bukan bahasa app; status enum ditulis lewat deskripsi implisit.
+  - **M5 hapus kartu:** jawaban belum menyebut butuh internet dan Face ID/kode sandi; EN "through this iPhone" berbeda dari dialog ("with this iPhone").
+  - **M7 klaim tanpa bukti:** Bluetooth "semua wilayah" tanpa syarat gedung memakai pembaca Bluetooth (sudah di SDD, belum di salinan app); klaim hapus lewat Lacak tanpa ID bukti; "autentikasi" di jawaban ponsel hilang belum diganti "Face ID, Touch ID, atau kode sandi".
+  - **M8 duplikasi:** salinan perangkat didukung ada di empat string.
+  - **M10 aksesibilitas:** `ProgressView` laporan belum berlabel.
 - **Test flaky:** `BLETapTests.autentikasiBatalMembatalkanPemindaian` sesekali gagal (pembatalan pemindaian bergantung waktu); lulus 6/6 saat diulang.
 - **Riwayat tap:** judul baris "Ditolak · alasan" dirakit di kode (M8; dikerjakan saat bahasa ketiga ditambahkan); VoiceOver baris Status belum diperiksa dengan Accessibility Inspector.

@@ -40,12 +40,15 @@ enum HelpTopic: String, CaseIterable, Identifiable {
 
 enum HelpContent {
     /// Status satu cara akses di iPhone ini untuk bagian "Cara akses di iPhone ini" (FR-60 per kanal).
+    /// Penyebab dari build atau program (mis. build tanpa emulasi) tidak menyalahkan iPhone atau wilayah.
     static func status(for availability: ChannelAvailability?) -> String {
         switch availability {
         case .available?: localized("help.channel.available")
         case .bluetoothOff?: localized("help.channel.bluetooth_off")
         case .bluetoothUnauthorized?: localized("help.channel.bluetooth_denied")
-        default: localized("help.channel.unavailable")
+        case .unsupportedDevice?: localized("help.channel.unsupported_device")
+        case .notEligible?, .regionBlocked?: localized("help.channel.unavailable")
+        case .entitlementMissing?, .programNotEnabled?, nil: localized("help.channel.not_yet")
         }
     }
 }

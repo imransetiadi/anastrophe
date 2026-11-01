@@ -33,9 +33,10 @@
 | 2.17 | 2026-11-02 | Siklus hidup kartu oleh operator (suspend/resume/revoke, ADR-0036), denylist dari pencabutan, token baca status dan `GET /cards/{id}/status` (ADR-0037); provisioning hanya memasang hash bila belum ada; `:renew` memeriksa status setelah bukti kepemilikan; celah pembatalan suspend/revoke tercatat di ADR-0038 (§8.1, §8.4.2, §8.4.3, §8.5, §15). |
 | 2.18 | 2026-11-02 | Rahasia enrolment untuk kredensial pertama dan penolakan tambah kanal ke kartu aktif (ADR-0040); celah penerbitan kredensial lewat id instance ditutup (§8.4.1, §8.5, §15). |
 | 2.19 | 2026-11-02 | `credentials.max_not_after` dan masa berlaku denylist dari sertifikat terpanjang, purge per jam (§8.1, §8.4.3). |
-| 2.22 | 2026-11-02 | Layar Bantuan (ADR-0048): FAQ sepuluh topik, status cara akses di iPhone ini, iPhone yang didukung, laporan diagnostik tanpa rahasia (§5.9). |
-| 2.21 | 2026-11-02 | Review akhir alur Tambah Kartu: oracle tebakan identitas kartu menjadi gerbang pra-pilot (ADR-0046), batas 4 permintaan menunggu per kartu `ENR-PENDING-LIMIT` (ADR-0047), `ENR-SITE-UNSUPPORTED` menawarkan undangan, dan klaim pembaca kartu disertai bukti (§5.8, §8.1, §10.1, §15). |
 | 2.20 | 2026-11-02 | Alur Tambah Kartu produksi (ADR-0043): kode gedung `sites.join_code` dan `GET /v1/sites/lookup` (ADR-0044), baris perangkat dibuat di transaksi enrolment (ADR-0045), alamat API dari Info.plist, tautan undangan hanya mengisi field (§5.6, §5.8, §8.1, §8.4.1, §8.5, §15). |
+| 2.21 | 2026-11-02 | Review akhir alur Tambah Kartu: oracle tebakan identitas kartu menjadi gerbang pra-pilot (ADR-0046), batas 4 permintaan menunggu per kartu `ENR-PENDING-LIMIT` (ADR-0047), `ENR-SITE-UNSUPPORTED` menawarkan undangan, dan klaim pembaca kartu disertai bukti (§5.8, §8.1, §10.1, §15). |
+| 2.22 | 2026-11-02 | Layar Bantuan (ADR-0048): FAQ sepuluh topik, status cara akses di iPhone ini, iPhone yang didukung, laporan diagnostik tanpa rahasia (§5.9). |
+| 2.23 | 2026-11-02 | Review akhir Bantuan: laporan diagnostik memuat status penyimpanan dan "tidak terbaca" saat kartu gagal dibaca; status cara akses tidak menyalahkan iPhone/wilayah untuk penyebab dari build atau program; rujukan bukti Bluetooth (§5.9). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -340,12 +341,12 @@ Komponen:
 
 Tombol "Bantuan" ada di toolbar tab Kunci pada semua build. Layarnya tidak menghubungi jaringan dan berisi lima bagian:
 
-- **Cara akses di iPhone ini:** status "Tempel ke pembaca" dan "Bluetooth" dari kelayakan perangkat (§5.4). Statusnya: tersedia, Bluetooth mati, izinkan Bluetooth, atau belum tersedia di iPhone/wilayah ini.
+- **Cara akses di iPhone ini:** status "Tempel ke pembaca" dan "Bluetooth" dari kelayakan perangkat (§5.4). Statusnya: tersedia, Bluetooth mati, izinkan Bluetooth, tidak didukung iPhone ini (`unsupportedDevice`), belum tersedia di iPhone/wilayah ini (`notEligible`, `regionBlocked`), atau "belum tersedia" netral untuk penyebab dari build atau program (`entitlementMissing`, `programNotEnabled`), sehingga build tanpa emulasi tidak menyalahkan iPhone atau wilayah pengguna.
 - **Pertanyaan umum:** sepuluh topik FR-60, yaitu perangkat, kartu, batas 8, offline, layar terkunci (FR-27), hapus kartu, anggota, berbagi, pindah iPhone, dan ponsel hilang. Jawabannya mengikuti perilaku R1, tanpa menjanjikan fitur yang belum ada.
-- **iPhone yang didukung (FR-02):** iPhone 11 dan yang lebih baru serta SE generasi 2 dan 3, dengan iOS 26+ (ADR-0006, O-D01, O-D02). "Tempel ke pembaca" bergantung wilayah dan gedung (O-A08).
+- **iPhone yang didukung (FR-02):** iPhone 11 dan yang lebih baru serta SE generasi 2 dan 3, dengan iOS 26+ (ADR-0006, O-D01, O-D02). "Tempel ke pembaca" bergantung wilayah dan gedung (O-A08). Bluetooth tidak bergantung wilayah, tetapi butuh pembaca ber-Bluetooth (I-06, I-13).
 - **Diagnostik (FR-63):** teks laporan dibagikan lewat lembar bagikan sistem.
-  - Isinya versi app/build, iOS, bahasa, status kanal, layanan terkonfigurasi, jumlah kartu, serta status/kanal/tanggal berlaku per kartu.
-  - Masukan laporan (`CardSummary`) sengaja tidak membawa `cred_id`, id kartu server, `device_id`, token, nama kartu, zona, atau URL layanan.
+  - Isinya versi app/build, iOS, bahasa, status kanal, status penyimpanan (`ok`/`gagal`), layanan terkonfigurasi, jumlah kartu, serta status/kanal/tanggal berlaku per kartu. Penyimpanan yang gagal dibuka atau kartu yang gagal dibaca ditulis `kartu: tidak terbaca`, bukan nol kartu.
+  - Masukan laporan (`DiagnosticsInput`, `CardSummary`) sengaja tidak membawa `cred_id`, id kartu server, `device_id`, token, nama kartu, zona, atau URL layanan.
 - **Dukungan:** pengelola gedung, karena kanal dukungan Anastrophe belum ditetapkan.
 
 ## 6. Presentasi per kanal

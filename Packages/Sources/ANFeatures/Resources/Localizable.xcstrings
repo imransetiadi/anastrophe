@@ -1329,6 +1329,22 @@
         }
       }
     },
+    "help.channel.not_yet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not available yet"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum tersedia"
+          }
+        }
+      }
+    },
     "help.channel.unavailable": {
       "localizations": {
         "en": {
@@ -1341,6 +1357,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Belum tersedia di iPhone atau wilayah ini"
+          }
+        }
+      }
+    },
+    "help.channel.unsupported_device": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not supported on this iPhone"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak didukung iPhone ini"
           }
         }
       }
@@ -1382,13 +1414,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The report contains the app version, iOS version, access method status, and card status. It doesn't include keys, tokens, card identities, or card names."
+            "value": "The report contains the app and iOS versions, language and region, storage and service status, access method status, and the number, status, access methods, and validity dates of your cards. It doesn't include keys, secret codes, card identities, or card names."
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Laporan berisi versi app, versi iOS, status cara akses, dan status kartu. Laporan tidak memuat kunci, token, identitas kartu, atau nama kartu."
+            "value": "Laporan berisi versi app dan iOS, bahasa dan wilayah, status penyimpanan dan layanan, status cara akses, serta jumlah, status, cara akses, dan masa berlaku kartu. Laporan tidak memuat kunci, kode rahasia, identitas kartu, atau nama kartu."
           }
         }
       }
@@ -1638,13 +1670,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Yes. Cards work without mobile data or Wi-Fi. They're renewed automatically when you use them with an internet connection, so connect your iPhone to the internet now and then to keep your cards valid."
+            "value": "Yes, as long as the card is still valid. Cards work without mobile data or Wi-Fi, and they're renewed automatically when you use them while your iPhone is connected to the internet. If you don't use a card with an internet connection for a long time, it expires and works again only after your iPhone connects. So use your card while connected to the internet at least every few days."
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ya. Kartu bisa dipakai tanpa data seluler atau Wi-Fi. Kartu diperbarui otomatis saat dipakai dengan koneksi internet, jadi sambungkan iPhone ke internet sesekali agar kartu tetap berlaku."
+            "value": "Ya, selama kartu masih berlaku. Kartu bisa dipakai tanpa data seluler atau Wi-Fi, dan diperbarui otomatis saat dipakai ketika iPhone terhubung ke internet. Bila lama tidak dipakai dengan internet, kartu kedaluwarsa dan baru bisa dipakai lagi setelah iPhone terhubung. Jadi, pakai kartu saat iPhone terhubung ke internet setidaknya setiap beberapa hari."
           }
         }
       }
@@ -1702,13 +1734,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cards don't move to a new iPhone through iCloud backup or by signing in. On your new iPhone, add the card again; your building management may need to approve it. Delete the card from your old iPhone if you still can."
+            "value": "Cards don't move to a new iPhone through iCloud backup. If you still have your old iPhone, delete the card there first (you need an internet connection), then add the card on your new iPhone. If the card is still on another iPhone, for example because your old iPhone was lost, your building management needs to approve the new iPhone."
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kartu tidak ikut pindah lewat cadangan iCloud atau login di iPhone lain. Di iPhone baru, tambahkan kartu lagi; pengelola gedung mungkin perlu menyetujuinya. Hapus kartu dari iPhone lama bila masih bisa."
+            "value": "Kartu tidak ikut pindah lewat cadangan iCloud. Bila iPhone lama masih ada, hapus kartu di sana lebih dulu (butuh internet), lalu tambahkan kartu di iPhone baru. Bila kartu masih ada di iPhone lain, misalnya karena iPhone lama hilang, pengelola gedung perlu menyetujui iPhone baru."
           }
         }
       }

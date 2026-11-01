@@ -131,8 +131,9 @@ public final class AppServices {
         #endif
     }
 
-    /// Dipakai bila `live()` gagal membuka penyimpanan: tidak ada presentasi, UI memberi tahu.
-    public static func storageUnavailable() -> AppServices {
+    /// Dipakai bila `live()` gagal membuka penyimpanan: tidak ada presentasi, UI memberi tahu. Alamat layanan
+    /// tetap diteruskan agar laporan diagnostik tidak salah menyebut layanan belum terkonfigurasi.
+    public static func storageUnavailable(apiBaseURL: URL? = nil) -> AppServices {
         let secrets = InMemorySecretStore()
         return AppServices(
             cards: EmptyCardStore(),
@@ -143,7 +144,8 @@ public final class AppServices {
             foreground: ForegroundState(),
             authenticator: UnavailableAuthenticator(),
             tapHistory: InMemoryTapHistoryStore(),
-            storageFailed: true
+            storageFailed: true,
+            apiBaseURL: apiBaseURL
         )
     }
 
