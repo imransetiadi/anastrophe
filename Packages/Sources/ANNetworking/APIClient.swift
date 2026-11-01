@@ -24,7 +24,7 @@ public struct APIClient: Sendable {
         return decoder
     }()
 
-    private let baseURL: URL
+    public let baseURL: URL
     private let transport: any HTTPTransport
 
     public init(baseURL: URL, transport: any HTTPTransport = URLSession.shared) {

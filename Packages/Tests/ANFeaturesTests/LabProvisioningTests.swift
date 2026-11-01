@@ -31,6 +31,7 @@ final class SequenceTransport: HTTPTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var replies: [(Int, String, String)]
     private(set) var paths: [String] = []
+    private(set) var bodies: [Data?] = []
 
     init(_ replies: [(status: Int, body: String, contentType: String)]) {
         self.replies = replies.map { ($0.status, $0.body, $0.contentType) }
@@ -38,7 +39,8 @@ final class SequenceTransport: HTTPTransport, @unchecked Sendable {
 
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         let reply: (Int, String, String)? = lock.withLock {
-            paths.append(request.url?.path() ?? "")
+            paths.append(request.url?.path(percentEncoded: false) ?? "")
+            bodies.append(request.httpBody)
             return replies.isEmpty ? nil : replies.removeFirst()
         }
         guard let (status, body, contentType) = reply else { throw URLError(.cannotConnectToHost) }
@@ -51,9 +53,9 @@ func configBody(_ channels: [String] = ["ble"]) -> (status: Int, body: String, c
     (200, #"{"enabled_channels":[\#(channels.map { "\"\($0)\"" }.joined(separator: ",")) ],"wallet_program_enabled":false}"#, "application/json")
 }
 
-func provisionedBody(credentialID: Data, groupKey: String? = nil) -> String {
+func provisionedBody(credentialID: Data, groupKey: String? = nil, notAfter: String = "2026-11-08T00:00:00Z", notBefore: String? = nil) -> String {
     let groupKey = groupKey ?? P256.Signing.PrivateKey().publicKey.x963Representation.base64EncodedString()
-    return #"{"credential_id":"\#(credentialID.base64EncodedString())","channel":"ble","certificate":"\#(Data(repeating: 0xCE, count: 188).base64EncodedString())","not_after":"2026-11-08T00:00:00Z","site_name":"Gedung Lab","zones":["Pintu Lab"],"group_keys":{"a1a2a3a4a5a6a7a8":["\#(groupKey)"]}}"#
+    return #"{"credential_id":"\#(credentialID.base64EncodedString())","channel":"ble","certificate":"\#(Data(repeating: 0xCE, count: 188).base64EncodedString())",\#(notBefore.map { #""not_before":"\#($0)","# } ?? "")"not_after":"\#(notAfter)","site_name":"Gedung Lab","zones":["Pintu Lab"],"group_keys":{"a1a2a3a4a5a6a7a8":["\#(groupKey)"]}}"#
 }
 
 @Suite("Provisioning lab lewat backend dev (rencana lab end-to-end)")
@@ -76,6 +78,21 @@ struct LabBackendProvisioningTests {
         #expect(try keys.hasKey(for: serverCredID))
         #expect(try records.record(for: serverCredID) != nil)
         #expect(transport.paths == ["/v1/config", "/v1/enrollments", "/v1/enrollments/6f1c2a9e-0000-4000-8000-000000000001/credentials"])
+    }
+
+    @Test func provisionViaBackendMenyimpanRenewalURL() async throws {
+        // ADR-0023: record mengingat backend penerbit dan awal masa berlaku untuk perpanjangan.
+        let cards = try SwiftDataCardStore(directory: temporaryDirectory())
+        let serverCredID = Data(repeating: 0x5F, count: 16)
+        let transport = SequenceTransport([
+            configBody(),
+            (201, #"{"enrollment_id":"e1"}"#, "application/json"),
+            (200, provisionedBody(credentialID: serverCredID, notBefore: "2026-11-01T00:00:00Z"), "application/json"),
+        ])
+        _ = try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", channel: .ble, keys: keys, records: records, cards: cards)
+        let record = try #require(try records.record(for: serverCredID))
+        #expect(record.renewalURL == base)
+        #expect(record.notBefore == Date(timeIntervalSince1970: 1_793_491_200))
     }
 
     @Test(arguments: [
