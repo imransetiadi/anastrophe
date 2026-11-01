@@ -24,3 +24,4 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0018](0018-jev-sebagai-decision-layer.md) | JEV sebagai lapisan pengambil keputusan desain | Diterima (berbasis bukti; tidak memerlukan JEV) | — | — |
 | [ADR-0019](0019-strategi-pemindaian-ble.md) | Strategi pemindaian BLE Tap: pindai saat lembar dibuka + early exit | Diterima (keputusan pengguna setelah eskalasi) | `prescan_early_exit` | 0.51 |
 | [ADR-0020](0020-bahasa-backend-r1.md) | Bahasa backend R1: Go | Diterima (provisional — tinjau ulang di akhir M1) | `go` | 0.7 |
+| [ADR-0021](0021-cbor-cose-minimal.md) | CBOR/COSE minimal ditulis sendiri untuk CredentialCert | Diterima | `keep_minimal` | 0.98 |

@@ -1,0 +1,26 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "label": "D21-cbor-cose-minimal",
+  "input": {
+    "decision": "Should the Anastrophe Go backend keep its hand-written minimal CBOR/COSE code for CredentialCert, or switch to third-party CBOR/COSE libraries?",
+    "candidates": ["keep_minimal", "use_libraries"],
+    "requirements": [
+      "Produces exactly one valid byte encoding per certificate and rejects non-canonical input.",
+      "Keeps the security-critical dependency surface small.",
+      "Stays interoperable with the Python lab tool's CBOR subset."
+    ],
+    "escalate_on_contradiction": true
+  },
+  "recommendation": {"selected": "keep_minimal", "escaped": false, "confidence": 0.98, "probabilities": {"keep_minimal": 0.98, "use_libraries": 0.01, "ask_user": 0, "investigate": 0.01, "none": 0}, "contradicted_requirements": []},
+  "checks": [
+    {"candidate": "keep_minimal", "requirement": 0, "answer": "supported"},
+    {"candidate": "keep_minimal", "requirement": 1, "answer": "supported"},
+    {"candidate": "keep_minimal", "requirement": 2, "answer": "supported"},
+    {"candidate": "use_libraries", "requirement": 0, "answer": "unknown"},
+    {"candidate": "use_libraries", "requirement": 1, "answer": "contradicted"},
+    {"candidate": "use_libraries", "requirement": 2, "answer": "unknown"}
+  ],
+  "usage": {"input_tokens": 1836, "output_tokens": 320},
+  "status": "≥ 0,80 → Diterima (ADR-0018)."
+}

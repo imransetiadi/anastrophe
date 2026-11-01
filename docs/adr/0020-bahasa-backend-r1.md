@@ -11,7 +11,7 @@ SDD §3.3 menyebut backend referensi "TypeScript (Node.js 24) atau Go". Topologi
 
 ## Keputusan
 
-**Go (1.24+)** dengan pustaka standar untuk kripto/HTTP/mTLS, pustaka CBOR/COSE, PostgreSQL 16 lewat pgx, dan satu biner statis per region. Provisional: ditinjau ulang di akhir M1, terutama bila komposisi tim ternyata lebih kuat di TypeScript.
+**Go (1.24+)** dengan pustaka standar untuk kripto/HTTP/mTLS, PostgreSQL 16 lewat pgx, dan satu biner statis per region. CBOR/COSE untuk `CredentialCert` ditulis sendiri sebagai subset minimal yang ketat (diamandemen oleh ADR-0021). Provisional: ditinjau ulang di akhir M1, terutama bila komposisi tim ternyata lebih kuat di TypeScript.
 
 ## Konsekuensi
 

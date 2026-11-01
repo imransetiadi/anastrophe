@@ -522,7 +522,7 @@ Lingkungan: branch `feat/r1-scaffold`, Xcode 27.2 (27B52), host macOS dan iOS Si
 
 | Kasus | Hasil | Bukti |
 |---|---|---|
-| TC-PROTO-01 | Lulus (sisi app) | `TestVectorTests` 7/7 terhadap `anp1-v1.json` dari implementasi Python independen; uji mutasi HKDF/nonce gagal sesuai harapan |
+| TC-PROTO-01 | Lulus (sisi app dan backend Go) | `TestVectorTests` 7/7 (Swift) dan `internal/anp1` (Go) terhadap `anp1-v1.json` dari implementasi Python independen; uji mutasi HKDF/nonce gagal sesuai harapan di kedua sisi |
 | TC-PROTO-02, TC-PROTO-09, TC-PROTO-12, TC-PROTO-14 | Lulus | `APDUTests`, `BLEFrameTests`, ukuran APDU vector < 255 B |
 | TC-PROTO-03, TC-PROTO-08 | Logika lulus; I dengan reader referensi tertunda | `PhoneSessionTests.transaksiLengkapGranted`, `jalurGetCert` |
 | TC-PROTO-04, TC-PROTO-05 | Lulus (respons identik, jumlah verifikasi ECDSA sama); ukur timing di HIL tertunda | `groupTakDikenalDanTandaTanganSalahIdentik`, `groupTakDikenalSamaBeratDenganTandaTanganSalah` |
