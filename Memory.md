@@ -12,7 +12,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 ## Status terkini
 
 - Branch kerja: `feat/r1-scaffold`, di-push ke GitHub private `imransetiadi/anastrophe` (origin) atas permintaan pengguna; belum di-merge.
-- Suite terakhir: Swift host 345 test (1 dilewati, tanpa gagal), simulator 343 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 10 paket lulus dengan PostgreSQL.
+- Suite terakhir: Swift host 354 test (1 dilewati, tanpa gagal), simulator 352 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 10 paket lulus dengan PostgreSQL.
 - Menunggu keputusan pengguna:
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
   - ADR-0038: cara mencegah pemegang kartu membatalkan suspend/revoke operator; rekomendasi `hold_pending_approval`, JEV 0,45.
@@ -20,7 +20,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
   - ADR-0046: kontrol enumerasi identitas kartu lewat enrolment, yang menjadi **gerbang pra-pilot** bersama App Attest; rekomendasi deteksi per gedung + pembatas per perangkat yang di-attest, JEV 0,49.
   - ADR-0047: kedaluwarsa permintaan `PENDING_APPROVAL` (batas 4 per kartu sudah diterapkan), JEV 0,51.
 
-  - Tinjauan 13 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan (`docs/adr/jev-log/*-gate.json`).
+  - Tinjauan 14 gate JEV (13 tereskalasi, 1 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung (`docs/adr/jev-log/*-gate.json`).
   - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
 
@@ -42,6 +42,33 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Ketahanan | Update dijaga status, urutan kunci instance → kredensial, denylist dari sertifikat terpanjang + purge, pembaruan kartu atomik, jam monotonik yang ikut berjalan saat tidur | ADR-0042 |
 | Tambah Kartu | Alur produksi di semua build: kode gedung + tempel kartu (pembaca identifier saja) atau tautan undangan, kanal otomatis, perangkat dibuat saat enrolment, batas 4 permintaan menunggu per kartu. Gerbang pra-pilot terbuka: App Attest + kontrol enumerasi kartu (ADR-0046) | FR-05, FR-10–FR-13, ADR-0043–ADR-0047 |
 | Bantuan | Tombol Bantuan di tab Kunci: FAQ sepuluh topik (ID/EN), status cara akses di iPhone ini, iPhone yang didukung, laporan diagnostik tanpa rahasia | FR-60, FR-02, FR-27, FR-63, ADR-0048 |
+| Kebijakan gedung | CLI `policy` untuk masa berlaku sertifikat dan kanal per gedung; kanal efektif gedung di lookup/enrolment dan ditegakkan saat provisioning; app memilih kanal yang diizinkan | FR-55 (sebagian), FR-05, ADR-0049 |
+
+## API-2026-11-02-0559 - Kebijakan gedung: masa berlaku dan kanal per gedung (Selesai, commit lokal; gate review)
+
+Fokus dari ADR-0049 (JEV 0,63, Provisional). Ini irisan FR-55 yang bisa dibangun sekarang; persetujuan opsional (FR-17) dan perpanjangan tidak disentuh.
+
+Isi pekerjaan:
+- **CLI `anastrophe-registry policy`:** baca/ubah masa berlaku (1–30 hari) dan kanal (`ble`, `nfcHCE`, `semua`), audit, dan peringatan bila tidak ada kanal efektif.
+- **Store:** pembaruan JSONB di SQL (`zones_bitmap` 64-bit aman), dan pembacaan aman untuk nilai yang bukan array.
+- **Kanal efektif gedung:** dikirim di lookup kode gedung dan respons enrolment. Provisioning menolak kanal terlarang hanya sesudah rahasia enrolment diperiksa.
+- **App:** pemeriksaan sebelum enrolment (jalur kartu), pemilihan ulang sesudah enrolment, pesan netral bila penyebabnya bukan iPhone, dan "Coba lagi" yang mencari ulang kode gedung.
+
+Review akhir (opus) memberi verdict "With fixes":
+- `policy.channels` bukan array → 500, diperbaiki;
+- Minor 1–3 dinaikkan dan diperbaiki;
+- test masa berlaku lewat `UpdateSitePolicy` ditambahkan;
+- sisa minor di [backlog](docs/agentmemory/backlog.md).
+
+Bukti:
+- Go 10 paket lulus; Swift host 354 test, simulator 352 test.
+- Mutasi tertangkap.
+- E2e lab: `nfcHCE` saja → pesan tanpa card instance; `semua` → kartu `ble` aktif 3,0 hari.
+- `check_docs` 0 masalah.
+
+`jev_gate`: review (composite 0,79, `test_gap`).
+
+Commit unit ini: `c34516a`, `3dd7289`, `07509f5`, `8c99c8f`, `bb6c899`, `f0b2a95`, `bd4b0fa`, dan commit ini. Obsidian: `sessions/2026-11-02-kebijakan-gedung.md`, `decisions/ADR-0049…`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
 
 ## APP-2026-11-02-0518 - Layar Bantuan dan FAQ in-app (Selesai, commit lokal; gate tereskalasi)
 

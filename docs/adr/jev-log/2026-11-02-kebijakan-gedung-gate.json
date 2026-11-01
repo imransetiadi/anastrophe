@@ -1,0 +1,40 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "action": "review",
+  "label": "kebijakan-gedung-plan-close-gate",
+  "request": "Close plan 2026-11-02-kebijakan-gedung (ADR-0049) including the final-review fix pass.",
+  "reason_codes": [
+    "safe_to_apply_below_auto_accept",
+    "confidence_below_auto_accept",
+    "review_required",
+    "claim_confidence_below_auto_accept"
+  ],
+  "review": {
+    "safe_to_apply": 0.59,
+    "composite": 0.795,
+    "limiting_rubrics": [
+      "test_gap"
+    ],
+    "scores": {
+      "correctness": 1.84,
+      "spec_match": 1.94,
+      "test_gap": 0.2,
+      "blast_radius": 1.99
+    }
+  },
+  "verification": {
+    "action": "review",
+    "verified": 8,
+    "contradicted": 0,
+    "unsupported": 0,
+    "needs_review": 1,
+    "note_needs_review": "Klaim e2e lab (0,73): e2e dijalankan sebelum fix pass; pesan kanal kosong kini netral (siteChannelsNotOffered)."
+  },
+  "note": "Tidak diajukan ulang (ADR-0018); masuk daftar gate yang menunggu tinjauan pengguna.",
+  "usage": {
+    "input_tokens": 4787,
+    "output_tokens": 398
+  }
+}
