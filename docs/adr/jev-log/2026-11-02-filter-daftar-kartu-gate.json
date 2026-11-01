@@ -1,0 +1,40 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "action": "review",
+  "label": "filter-daftar-kartu-plan-close-gate",
+  "request": "Close plan 2026-11-02-filter-daftar-kartu (ADR-0050, FR-50) including the final-review fix pass.",
+  "reason_codes": [
+    "safe_to_apply_below_auto_accept",
+    "confidence_below_auto_accept",
+    "review_required",
+    "claim_confidence_below_auto_accept"
+  ],
+  "review": {
+    "safe_to_apply": 0.79,
+    "composite": 0.864,
+    "limiting_rubrics": [
+      "blast_radius"
+    ],
+    "scores": {
+      "correctness": 1.93,
+      "spec_match": 1.93,
+      "test_gap": 0.23,
+      "blast_radius": 1.26
+    }
+  },
+  "verification": {
+    "action": "review",
+    "verified": 4,
+    "contradicted": 0,
+    "unsupported": 0,
+    "needs_review": 1,
+    "note_needs_review": "Klaim kolom keluaran tanpa identitas (0,67) hanya didukung kutipan reviewer."
+  },
+  "note": "Tidak diajukan ulang (ADR-0018); masuk daftar gate yang menunggu tinjauan pengguna.",
+  "usage": {
+    "input_tokens": 2688,
+    "output_tokens": 278
+  }
+}

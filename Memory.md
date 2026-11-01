@@ -20,7 +20,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
   - ADR-0046: kontrol enumerasi identitas kartu lewat enrolment, yang menjadi **gerbang pra-pilot** bersama App Attest; rekomendasi deteksi per gedung + pembatas per perangkat yang di-attest, JEV 0,49.
   - ADR-0047: kedaluwarsa permintaan `PENDING_APPROVAL` (batas 4 per kartu sudah diterapkan), JEV 0,51.
 
-  - Tinjauan 14 gate JEV (13 tereskalasi, 1 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung (`docs/adr/jev-log/*-gate.json`).
+  - Tinjauan 15 gate JEV (13 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu (`docs/adr/jev-log/*-gate.json`).
   - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
 
@@ -37,12 +37,27 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Riwayat tap | Log lokal 30 hari: lima terbaru di detail, "Lihat semua" ke riwayat penuh, store pulih sendiri bila rusak | FR-30, ADR-0029, ADR-0030 |
 | Registri kartu | Enrolment hanya untuk kartu terdaftar (HMAC per gedung), alasan FR-13, perangkat tambahan menunggu operator, enrolment yang belum selesai dilanjutkan, CLI `anastrophe-registry` | FR-11, FR-13, FR-52, ADR-0031, ADR-0032, ADR-0034 |
 | Undangan | Token sekali pakai (32 byte acak, hanya hash yang disimpan), CLI `invite` dengan identitas kartu dari berkas atau stdin, enrolment `{device_id, invitation}`, dan undangan berkartu yang menyetujui enrolment perangkat yang masih menunggu; app mengurai tautan `/i/<token>` | FR-12, FR-53, ADR-0033, ADR-0035 |
-| Siklus hidup kartu | Operator: `list`, `suspend`, `resume`, `revoke` (audit, denylist); app membaca status kartu dengan token baca status tanpa Face ID/passcode. Keterbatasan terbuka: pendaftaran ulang kartu fisik bisa membatalkan suspend/revoke (ADR-0038) | FR-38, FR-50 (sebagian), FR-51, ADR-0036, ADR-0037, ADR-0038 |
+| Siklus hidup kartu | Operator: `list` (filter status, kanal, awalan id), `suspend`, `resume`, `revoke` (audit, denylist); app membaca status kartu dengan token baca status tanpa Face ID/passcode. Keterbatasan terbuka: pendaftaran ulang kartu fisik bisa membatalkan suspend/revoke (ADR-0038) | FR-38, FR-50 (sebagian), FR-51, ADR-0036, ADR-0037, ADR-0038 |
 | Provisioning aman | Rahasia enrolment dari app (hanya hash di server) wajib untuk kredensial pertama; tambah kanal ke kartu aktif ditolak. Risiko sisa: id perangkat + identitas kartu bisa mengambil alih enrolment yang belum selesai (ADR-0041) | FR-16, ADR-0039, ADR-0040, ADR-0041 |
 | Ketahanan | Update dijaga status, urutan kunci instance → kredensial, denylist dari sertifikat terpanjang + purge, pembaruan kartu atomik, jam monotonik yang ikut berjalan saat tidur | ADR-0042 |
 | Tambah Kartu | Alur produksi di semua build: kode gedung + tempel kartu (pembaca identifier saja) atau tautan undangan, kanal otomatis, perangkat dibuat saat enrolment, batas 4 permintaan menunggu per kartu. Gerbang pra-pilot terbuka: App Attest + kontrol enumerasi kartu (ADR-0046) | FR-05, FR-10–FR-13, ADR-0043–ADR-0047 |
 | Bantuan | Tombol Bantuan di tab Kunci: FAQ sepuluh topik (ID/EN), status cara akses di iPhone ini, iPhone yang didukung, laporan diagnostik tanpa rahasia | FR-60, FR-02, FR-27, FR-63, ADR-0048 |
 | Kebijakan gedung | CLI `policy` untuk masa berlaku sertifikat dan kanal per gedung; kanal efektif gedung di lookup/enrolment dan ditegakkan saat provisioning; app memilih kanal yang diizinkan | FR-55 (sebagian), FR-05, ADR-0049 |
+
+## API-2026-11-02-0613 - Filter kanal dan pencarian daftar kartu (Selesai, commit lokal; gate review)
+
+Fokus dari ADR-0050 (JEV 1,0). `anastrophe-registry list` kini punya `--channel ble|nfcHCE` (kredensial ACTIVE/SUSPENDED) dan `--id <awalan id card instance>`, digabung AND dengan `--status`.
+
+Rincian:
+- Awalan id divalidasi lalu dibandingkan dengan `left()`, sehingga tanpa pola `LIKE` dari masukan.
+- Keluaran tanpa identitas kartu atau kontak.
+- FR-50 masih sebagian: pencarian nama atau nomor kartu menunggu portal dan akun.
+
+Review akhir (opus) memberi verdict "With fixes". Dua celah test (kartu SUSPENDED dan AND dengan status) ditutup oleh `TestFilterDaftarStatusSuspendedDanAND`, yang terbukti menangkap dua mutasi yang lolos sebelumnya. Minor lain di backlog.
+
+Bukti: Go 10 paket lulus; `check_docs` 0 masalah. `jev_gate`: review (composite 0,86).
+
+Commit unit ini: `15efce0`, `e308e21`, `4651dbe`, `02daca4`, dan commit ini. Obsidian: `sessions/2026-11-02-filter-daftar-kartu.md`, `decisions/ADR-0050…`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
 
 ## API-2026-11-02-0559 - Kebijakan gedung: masa berlaku dan kanal per gedung (Selesai, commit lokal; gate review)
 
