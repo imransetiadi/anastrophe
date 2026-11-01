@@ -34,6 +34,7 @@ Dokumen v2 (2026-11-01). Keputusan desain diambil lewat lapisan keputusan **JEV*
 ├── Anastrophe.xcodeproj          # app shell iOS (target Anastrophe, iOS 26.0)
 ├── App/                          # @main + aset app
 ├── Packages/                     # Swift package lokal: modul AN* (SDD §5.1) + unit test
+├── backend/                      # backend Go: REST /v1, CredentialCert, PostgreSQL (ADR-0020)
 ├── docs/
 │   ├── PRD.md · SDD.md · QA_SUITE.md
 │   ├── adr/                      # NNNN-slug.md + jev-log/ (input/output JEV)
@@ -70,6 +71,13 @@ swift test --package-path Packages                                   # unit test
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test)    # unit test di simulator iOS
 xcodebuild -project Anastrophe.xcodeproj -scheme Anastrophe \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build     # build app
+```
+
+Backend (Go, ADR-0020; butuh PostgreSQL 16 lokal untuk test integrasi):
+
+```bash
+(cd backend && go test ./... && go vet ./...)
+ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_SOFTWARE_CA=1 go run ./backend/cmd/anastrophe-api   # dev/lab saja
 ```
 
 Kanal N (`CardSession`/`CredentialSession`) butuh entitlement Apple yang belum dimiliki (PRD D1/D7). Sampai entitlement itu ada, kanal N selalu tertahan di gating dan app tidak crash. Kanal B dan seluruh logika protokol bisa dikembangkan dan diuji sekarang. Rencana kerja berikutnya: [`docs/superpowers/plans/2026-11-01-r1-tracer-bullet.md`](docs/superpowers/plans/2026-11-01-r1-tracer-bullet.md).

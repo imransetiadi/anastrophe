@@ -774,6 +774,12 @@ Tidak ada GPS, tidak ada tracking lintas app (ATT tidak dipakai). Privacy Manife
 | `ENR-SITE-UNSUPPORTED` | Gedung belum memakai Anastrophe | "Gedung ini belum mendukung Anastrophe." | "Usulkan gedung saya" (FR-64) |
 | `ENR-PENDING-APPROVAL` | Kontak tidak cocok registri | "Menunggu persetujuan pengelola gedung." | Notifikasi saat disetujui |
 | `ENR-LIMIT` | Sudah 8 kartu | "Maksimal 8 kartu per iPhone." | Hapus kartu lain |
+| `ENR-NOT-FOUND` | Enrolment/perangkat/gedung tidak dikenal server (404) | "Pendaftaran kartu tidak ditemukan. Mulai lagi." | Ulangi Tambah kartu |
+| `ENR-INVALID-KEY` | Kunci publik kanal bukan titik P-256 yang valid (400) | "Kartu tidak dapat disiapkan. Coba lagi." | Buat ulang kunci, ulangi |
+| `ENR-INVALID-CHANNEL` | Kanal tidak didukung untuk provisioning (400) | "Cara akses ini belum didukung." | Pilih kanal lain |
+| `REQ-IDEMPOTENCY-KEY` | POST mutasi tanpa header `Idempotency-Key` (400) | — (bug klien) | Perbaiki klien |
+| `REQ-IDEMPOTENCY-CONFLICT` | `Idempotency-Key` dipakai ulang dengan isi berbeda (422) | — (bug klien) | Pakai key baru per permintaan |
+| `REQ-INVALID`, `NOT-FOUND`, `INTERNAL` | Body tidak valid (400), rute tak dikenal (404), kesalahan server (500; detail tidak pernah dikirim ke klien) | "Terjadi kesalahan. Coba lagi." | Coba lagi / laporkan |
 | `CODE-INVALID` / `CODE-LOCKED` | Security code salah / terkunci | "Kode salah. Sisa percobaan: n." / "Coba lagi dalam 30 menit." | — |
 | `CH-NOT-ELIGIBLE` | Perangkat/wilayah tidak eligible | "Fitur ini belum tersedia di perangkat/wilayah Anda." | Tampilkan kanal alternatif |
 | `CH-BT-OFF` / `CH-BT-DENIED` | Bluetooth mati / izin ditolak | "Nyalakan Bluetooth…" / "Izinkan Bluetooth di Pengaturan." | Tautan Pengaturan |

@@ -518,7 +518,7 @@ Laporan per milestone memuat: pass rate per area & kanal, cakupan traceability (
 
 ### 11.1 Hasil verifikasi — M1 tracer bullet sisi app (2026-11-01)
 
-Lingkungan: branch `feat/r1-scaffold` (belum di-commit), Xcode 27.2 (27B52), host macOS dan iOS Simulator 27.2 (iPhone 17 Pro). Hasil (setelah putaran perbaikan review akhir, iterasi 2 dan 3): 144 unit test lulus dan 1 dilewati (khusus perangkat) di host maupun simulator; `python3 -I -m unittest discover -s scripts/anp1` 6 OK. "Logika lulus" berarti alur diuji terhadap reader ANP/1 perangkat lunak dan sesi/link palsu, **bukan** perangkat keras. Kasus bertipe H tetap tertunda sampai diuji di iPhone fisik dan reader.
+Lingkungan: branch `feat/r1-scaffold`, Xcode 27.2 (27B52), host macOS dan iOS Simulator 27.2 (iPhone 17 Pro); backend Go 1.27 + PostgreSQL 16 sementara (`go test ./...` di `backend/`). Hasil (setelah putaran perbaikan review akhir, iterasi 2 dan 3): 144 unit test lulus dan 1 dilewati (khusus perangkat) di host maupun simulator; `python3 -I -m unittest discover -s scripts/anp1` 6 OK. "Logika lulus" berarti alur diuji terhadap reader ANP/1 perangkat lunak dan sesi/link palsu, **bukan** perangkat keras. Kasus bertipe H tetap tertunda sampai diuji di iPhone fisik dan reader.
 
 | Kasus | Hasil | Bukti |
 |---|---|---|
@@ -535,7 +535,8 @@ Lingkungan: branch `feat/r1-scaffold` (belum di-commit), Xcode 27.2 (27B52), hos
 | TC-PRSB-08 | Logika lulus di link palsu (MTU 23); adapter live memotong frame sesuai ATT MTU − 3 (`.withoutResponse`). Uji di perangkat dengan MTU kecil tertunda | `mtuKecilTetapGrant` |
 | TC-ELG-02 | Logika lulus | `GatingTests`, `gatingGagalTidakMembuatSesi` |
 | TC-ELG-03 | Logika lulus: tanpa entitlement, gating mengembalikan `entitlementMissing` tanpa menyentuh API CardSession, dan build default (`AN_NFC_EMULATION = NO`) tidak mengaktifkan kanal N. Uji build tanpa entitlement di perangkat tertunda | `tanpaEntitlementTidakMenyentuhCardSession` |
-| TC-ENR-11 | Sisi app lulus; sisi server tertunda (backend, ADR-0014) | `kartuKesembilanDitolak`, `problemJsonDipetakan` |
+| TC-ENR-11 | Lulus di app dan backend Go (409 `ENR-LIMIT`) | `kartuKesembilanDitolak`, `problemJsonDipetakan`, `TestBatasDelapanKartu`, `TestBatasKartuMenjadiENRLIMIT` |
+| TC-ENR-12 | Lulus di backend: race dua permintaan saat 7 kartu → tepat satu sukses (`SELECT … FOR UPDATE`, PostgreSQL 16) | `TestRaceBatasDelapan` (10× ulang tanpa gagal) |
 | TC-ENR-13 | **Tertunda** (iPhone fisik, `AN_DEVICE_TESTS=1`) | test tersedia, dilewati di simulator |
 | TC-PRSN-17 | Lulus | `teksPresentasiTanpaJargon` |
 | Temuan review C1/I1 (Face ID membuat scene `.inactive`; "Coba lagi") | Lulus: presentasi hanya dibatalkan saat `.background`; ganti item lembar tidak membatalkan presentasi baru | `inactiveTidakMembatalkanPresentasi`, `cobaLagiTidakMembatalkanPresentasiBaru`, `ketukGandaHanyaMemulaiSatuPresentasi` |
