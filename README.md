@@ -113,6 +113,6 @@ python3 scripts/docs/check_mermaid.py . /tmp/mmd <path-mmdc> <puppeteer.json>   
 
 1. Putuskan ADR-0017 (entitas); ini tidak menghalangi rencana [R1 tracer bullet](docs/superpowers/plans/2026-11-01-r1-tracer-bullet.md) sisi app, tetapi menghalangi entitlement NFC.
 1. Putuskan ADR-0022 (reader uji BLE): menentukan cara menjalankan TC-PRSB-01 sebelum reader referensi R2 tersedia.
-1. Tinjau tiga gate penutupan yang dieskalasi JEV (lab end-to-end, perpanjangan sertifikat, audit log). Semua klaim terverifikasi, tetapi skor keyakinan di bawah ambang auto-accept: [`docs/adr/jev-log/`](docs/adr/jev-log/) (`*-gate.json`).
+1. Tinjau empat gate penutupan yang dieskalasi JEV (lab end-to-end, perpanjangan sertifikat, audit log, hapus kartu). Semua klaim terverifikasi, tetapi skor keyakinan di bawah ambang auto-accept: [`docs/adr/jev-log/`](docs/adr/jev-log/) (`*-gate.json`).
 2. M0: survei reader gedung pilot, kontrak 2 operator pilot, ajukan entitlement NFC & SE, kirim kuesioner Apple Wallet Access Program.
 3. Setelah restart: jalankan `/setup-matt-pocock-skills`, lalu `/to-tickets` untuk memecah PRD/SDD menjadi tiket *tracer-bullet* R1.

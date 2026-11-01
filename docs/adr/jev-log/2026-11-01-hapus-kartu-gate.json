@@ -1,0 +1,82 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "label": "hapus-kartu-completion",
+  "date": "2026-11-01",
+  "request": "Plan 2026-11-01-hapus-kartu (Task 1-2) + final-review fixes (C1, I1-I4 in 255656f; ADR-0027/0028)",
+  "runs": [
+    {
+      "note": "klaim 3 terlalu luas (tidak menyebut jalur hapus-lokal ADR-0028)",
+      "action": "escalate",
+      "review": {
+        "safe_to_apply": 0.59,
+        "composite": 0.732,
+        "limiting": "test_gap"
+      },
+      "claims": [
+        [
+          "server revoke with proof, slot freed, audit",
+          "verified",
+          0.52
+        ],
+        [
+          "renewed card still revoked",
+          "verified",
+          0.88
+        ],
+        [
+          "suspended deletable; local-only only on CARD-GONE/CRED-NOT-FOUND",
+          "contradicted",
+          0.33
+        ],
+        [
+          "no key/no passcode handling",
+          "verified",
+          0.96
+        ],
+        [
+          "suites green",
+          "verified",
+          0.76
+        ]
+      ]
+    },
+    {
+      "note": "klaim 3 dirumuskan ulang; JEV kini menilai klaim 1 contradicted (tumpang tindih dengan jalur ADR-0028)",
+      "action": "escalate",
+      "review": {
+        "safe_to_apply": 0.41,
+        "composite": 0.645,
+        "limiting": "test_gap"
+      },
+      "claims": [
+        [
+          "server revoke with proof, slot freed, audit",
+          "contradicted",
+          0.35
+        ],
+        [
+          "renewed card still revoked",
+          "verified",
+          0.43
+        ],
+        [
+          "suspended deletable; scoped local-only rule",
+          "verified",
+          0.46
+        ],
+        [
+          "ADR-0028 local-only paths",
+          "verified",
+          0.74
+        ],
+        [
+          "suites green",
+          "verified",
+          0.33
+        ]
+      ]
+    }
+  ],
+  "status": "Eskalasi ke pengguna. Verdict berpindah antar-run untuk bukti yang sama; tidak diulang lagi (ADR-0018). Bukti uji dan e2e (provisioning→perpanjangan→hapus: REVOKED/REVOKED) ada di ledger rencana."
+}
