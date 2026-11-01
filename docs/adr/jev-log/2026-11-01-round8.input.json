@@ -1,0 +1,30 @@
+{
+  "tool": "jev_decide",
+  "label": "D24-rantai-audit",
+  "decision": "For Anastrophe's tamper-evident audit log (FR-54, SDD §8.1 table audit_events with prev_hash/hash), should the hash chain be one global chain for the whole deployment or one chain per site?",
+  "candidates": [
+    {
+      "id": "global_chain",
+      "description": "One chain across all sites: each new row's prev_hash is the hash of the latest row in the table. Appends are serialized deployment-wide (one advisory lock). Verifying any site's audit export requires the whole chain."
+    },
+    {
+      "id": "per_site_chain",
+      "description": "One chain per site: audit_events gets a site_id column and prev_hash links to the latest row of the same site. Appends serialize only within a site (advisory lock per site). Each site's audit view/export (GET /admin/sites/{id}/audit) is verifiable on its own. Events not tied to a site (e.g. account.deleted) go to a separate platform chain."
+    }
+  ],
+  "evidence_refs": [
+    "FR-54",
+    "FR-56",
+    "SDD §8.1",
+    "SDD §8.3",
+    "SDD §8.5 GET /admin/sites/{id}/audit",
+    "ADR-0014"
+  ],
+  "priorities": "1) Tamper evidence that a site's auditor can verify for their own site without seeing other tenants' data. 2) Fit the SDD data model and the per-site audit API. 3) Simplicity of implementation and verification. 4) Avoid a deployment-wide write bottleneck. The user approved autonomous iteration; decisions under 0.60 go back to the user.",
+  "requirements": [
+    "A site's audit export can be verified end to end without access to other sites' audit rows.",
+    "Appending an audit event never needs a lock shared by all sites.",
+    "Every audit row still links to the previous row of its chain, so deleting or editing any row is detectable."
+  ],
+  "escalate_on_contradiction": true
+}

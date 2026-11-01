@@ -1,0 +1,55 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "label": "D24-rantai-audit",
+  "recommendation": {
+    "selected": "per_site_chain",
+    "escaped": false,
+    "confidence": 0.95,
+    "probabilities": {
+      "global_chain": 0,
+      "per_site_chain": 0.96,
+      "ask_user": 0.02,
+      "investigate": 0.01,
+      "none": 0.01
+    },
+    "contradicted_requirements": []
+  },
+  "checks": [
+    {
+      "candidate": "global_chain",
+      "requirement": 0,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "global_chain",
+      "requirement": 1,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "global_chain",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "per_site_chain",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "per_site_chain",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "per_site_chain",
+      "requirement": 2,
+      "answer": "supported"
+    }
+  ],
+  "usage": {
+    "input_tokens": 1996,
+    "output_tokens": 323
+  },
+  "status": "≥ 0,80 → Diterima (ADR-0018)."
+}
