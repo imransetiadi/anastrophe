@@ -17,6 +17,7 @@ import (
 	"github.com/imransetiadi/anastrophe/backend/internal/anp1"
 	"github.com/imransetiadi/anastrophe/backend/internal/certs"
 	"github.com/imransetiadi/anastrophe/backend/internal/httpapi"
+	"github.com/imransetiadi/anastrophe/backend/internal/registry"
 	"github.com/imransetiadi/anastrophe/backend/internal/store"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -31,6 +32,8 @@ type Handler struct {
 	Validity time.Duration // default ADR-0010: 7 hari; gedung bisa mengatur 1–30 hari
 	// EnabledChannels = kanal yang diizinkan /v1/config (kill switch per kanal, FR-04).
 	EnabledChannels []string
+	// Registry menghitung HMAC identitas kartu per gedung (ADR-0031); wajib untuk enrolment.
+	Registry registry.MAC
 }
 
 func (h *Handler) channelEnabled(channel string) bool {
@@ -82,51 +85,78 @@ const maxBody = 4 << 10
 
 var supportedChannels = map[string]bool{"ble": true, "nfcHCE": true}
 
-// createEnrollment adalah pengganti sementara tracer bullet: enrolment produksi memakai
-// identitas kartu fisik (HMAC registri), security code, dan App Attest (rencana berikutnya).
+// createEnrollment memulai enrolment untuk kartu fisik yang terdaftar di registri gedung (FR-11,
+// FR-13; ADR-0031). Identitas kartu hanya dipakai untuk menghitung HMAC per gedung, lalu dibuang
+// (CLAUDE.md aturan 6). Security code dan App Attest menyusul bersama akun (ADR-0032).
 func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		DeviceID string `json:"device_id"`
 		SiteID   string `json:"site_id"`
+		Card     *struct {
+			Tech string `json:"tech"`
+			ID   string `json:"id"`
+		} `json:"card"`
 	}
 	body, ok := readBody(w, r)
 	if !ok {
 		return
 	}
-	if err := json.Unmarshal(body, &req); err != nil {
+	if err := json.Unmarshal(body, &req); err != nil || req.Card == nil {
 		httpapi.WriteProblem(w, problem("REQ-INVALID", http.StatusBadRequest))
 		return
 	}
-	enroll := func(add func() (string, error)) (int, []byte, error) {
-		id, err := add()
+	identity, err := registry.ParseCardIdentity(req.Card.Tech, req.Card.ID)
+	if err != nil {
+		httpapi.WriteProblem(w, problem("REQ-INVALID", http.StatusBadRequest))
+		return
+	}
+	// Dihitung di luar transaksi database: produksi memanggil KMS.
+	cardHMAC, err := h.Registry.MAC(r.Context(), req.SiteID, identity.MACInput())
+	if err != nil {
+		h.writeResult(w, 0, nil, err, "registry mac failed")
+		return
+	}
+	enroll := func(add func() (string, string, error)) (int, []byte, error) {
+		id, status, err := add()
 		var pgErr *pgconn.PgError
 		switch {
 		case errors.Is(err, store.ErrCardLimit):
 			return problemBody("ENR-LIMIT", http.StatusConflict)
+		case errors.Is(err, store.ErrDuplicateEnrollment):
+			return problemBody("ENR-DUPLICATE", http.StatusConflict)
+		case errors.Is(err, store.ErrSiteUnsupported):
+			return problemBody("ENR-SITE-UNSUPPORTED", http.StatusNotFound)
+		case errors.Is(err, store.ErrNotRegistered):
+			return problemBody("ENR-NOT-REGISTERED", http.StatusNotFound)
 		case errors.Is(err, store.ErrNotFound), errors.As(err, &pgErr) && pgErr.Code == "23503":
 			return problemBody("ENR-NOT-FOUND", http.StatusNotFound)
 		case err != nil:
 			return 0, nil, err
 		}
-		out, err := json.Marshal(map[string]string{"enrollment_id": id})
+		out, err := json.Marshal(map[string]string{"enrollment_id": id, "status": status})
 		return http.StatusCreated, out, err
 	}
 	// SDD §8.5: POST mutasi menerima Idempotency-Key; dengan key, ketuk ganda tidak memakan
 	// dua jatah dari batas 8 kartu.
 	var status int
 	var resp []byte
-	var err error
 	if key := r.Header.Get("Idempotency-Key"); key != "" {
 		if !validIdempotencyKey(key) {
 			httpapi.WriteProblem(w, problem("REQ-IDEMPOTENCY-KEY", http.StatusBadRequest))
 			return
 		}
-		hash := sha256.Sum256([]byte(r.URL.Path + "\n" + req.DeviceID + "\n" + req.SiteID))
+		// Hash memakai HMAC kartu per gedung, bukan identitas mentah: SHA-256 dari UID pendek bisa
+		// ditebak, sedangkan baris idempotency tersimpan di database (aturan 6).
+		hash := sha256.Sum256([]byte(r.URL.Path + "\n" + req.DeviceID + "\n" + req.SiteID + "\n" + hex.EncodeToString(cardHMAC)))
 		status, resp, err = h.Store.Idempotent(r.Context(), key, hash[:], func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
-			return enroll(func() (string, error) { return tx.StartEnrollment(ctx, req.DeviceID, req.SiteID, h.Now()) })
+			return enroll(func() (string, string, error) {
+				return tx.StartCardEnrollment(ctx, req.DeviceID, req.SiteID, cardHMAC, h.Now())
+			})
 		})
 	} else {
-		status, resp, err = enroll(func() (string, error) { return h.Store.StartEnrollment(r.Context(), req.DeviceID, req.SiteID, h.Now()) })
+		status, resp, err = enroll(func() (string, string, error) {
+			return h.Store.StartCardEnrollment(r.Context(), req.DeviceID, req.SiteID, cardHMAC, h.Now())
+		})
 	}
 	h.writeResult(w, status, resp, err, "create enrollment failed")
 }
@@ -236,6 +266,9 @@ func (h *Handler) issue(ctx context.Context, tx *store.Tx, enrollmentID string, 
 	}
 	// SDD §8.2: hanya kartu yang sedang diprovisikan (atau aktif untuk kanal baru) yang
 	// boleh mendapat sertifikat.
+	if enrollment.Status == "PENDING_APPROVAL" {
+		return problemBody("ENR-PENDING-APPROVAL", http.StatusConflict) // ADR-0032: menunggu operator
+	}
 	if enrollment.Status != "PROVISIONING" && enrollment.Status != "ACTIVE" {
 		return problemBody("ENR-NOT-PROVISIONABLE", http.StatusConflict)
 	}

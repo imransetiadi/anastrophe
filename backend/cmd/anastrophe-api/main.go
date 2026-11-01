@@ -27,6 +27,7 @@ import (
 	"github.com/imransetiadi/anastrophe/backend/internal/certs"
 	"github.com/imransetiadi/anastrophe/backend/internal/enroll"
 	"github.com/imransetiadi/anastrophe/backend/internal/httpapi"
+	"github.com/imransetiadi/anastrophe/backend/internal/registry"
 	"github.com/imransetiadi/anastrophe/backend/internal/store"
 )
 
@@ -45,6 +46,10 @@ func run() error {
 	}
 	if os.Getenv("ANASTROPHE_DEV_SOFTWARE_CA") != "1" {
 		return errors.New("Site CA KMS/HSM belum tersedia; set ANASTROPHE_DEV_SOFTWARE_CA=1 hanya untuk dev/lab")
+	}
+	registryMAC, err := registryFromEnv(os.Getenv)
+	if err != nil {
+		return err
 	}
 	db, err := store.Open(ctx, dsn)
 	if err != nil {
@@ -72,6 +77,7 @@ func run() error {
 		Now:             time.Now,
 		Validity:        7 * 24 * time.Hour,
 		EnabledChannels: enabledChannels,
+		Registry:        registryMAC,
 	}
 	go func() {
 		for range time.Tick(time.Hour) {
@@ -132,4 +138,14 @@ func logAuditHeads(ctx context.Context, db *store.Store) {
 		}
 		slog.Info("audit chain head", "chain", h.Chain, "seq", h.Seq, "hash", hex.EncodeToString(h.Hash))
 	}
+}
+
+// registryFromEnv memberi kunci registri per gedung (ADR-0031). Produksi memakai KMS (belum
+// tersedia); dev/lab memakai ANASTROPHE_DEV_REGISTRY_KEY (32 byte hex). Tanpa kunci, API tidak start.
+func registryFromEnv(getenv func(string) string) (registry.MAC, error) {
+	key := getenv("ANASTROPHE_DEV_REGISTRY_KEY")
+	if key == "" {
+		return nil, errors.New("ANASTROPHE_DEV_REGISTRY_KEY wajib diisi (32 byte hex; KMS registri belum tersedia)")
+	}
+	return registry.NewDevMAC(key)
 }

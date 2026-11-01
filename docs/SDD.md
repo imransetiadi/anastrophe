@@ -23,6 +23,7 @@
 | 2.7 | 2026-11-01 | Riwayat tap: store yang rusak atau tak termigrasi dibuat ulang, galat lain memakai riwayat sementara di memori tanpa menghapus berkas (ADR-0029, §5.3); detail kartu menampilkan lima tap terbaru dan "Lihat semua" ke riwayat 30 hari (ADR-0030). |
 | 2.8 | 2026-11-01 | Riwayat tap: baris tak terbaca dilewati; entri kartu yang sudah tidak ada dibersihkan saat daftar dimuat dengan daftar kartu yang dibaca ulang tepat sebelum menghapus (galat baca tidak menghapus apa pun); daftar kartu tampil sebelum riwayat selesai dimuat (§5.3). |
 | 2.9 | 2026-11-01 | Registri kartu fisik (ADR-0031): `physical_cards` berisi HMAC per gedung, `card_instances.physical_card_id`, status `REJECTED`, dan aturan perangkat tambahan sebelum akun (ADR-0032) (§8.1). |
+| 2.10 | 2026-11-01 | `POST /enrollments` mewajibkan identitas kartu dan menjawab `{enrollment_id, status}`; galat `ENR-NOT-REGISTERED`, `ENR-SITE-UNSUPPORTED`, `ENR-DUPLICATE`, `ENR-PENDING-APPROVAL` (§8.5, §15). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -675,7 +676,7 @@ Semua POST mutasi menerima header `Idempotency-Key`. Error memakai RFC 9457 (`ty
 |---|---|---|
 | `POST /auth/apple` · `POST /auth/otp:send` · `POST /auth/otp:verify` | Login & verifikasi kontak | FR-03 |
 | `GET /config` | Wilayah, kanal aktif, kebijakan, versi minimum | FR-01, FR-04, FR-05 |
-| `POST /enrollments` | Mulai enrolment (kartu fisik/undangan) | FR-11, FR-12 |
+| `POST /enrollments` | Mulai enrolment (kartu fisik/undangan). Body `device_id`, `site_id`, `card` `{tech, id}` (ADR-0031): identitas hanya dipakai untuk HMAC per gedung lalu dibuang; hash idempotency memakai HMAC itu. Respons 201 `{enrollment_id, status}` dengan status `PROVISIONING` atau `PENDING_APPROVAL` (ADR-0032) | FR-11, FR-12, FR-13 |
 | `POST /enrollments/{id}/security-code` · `/verify-code` | Buat/verifikasi code | FR-14, FR-32 |
 | `POST /enrollments/{id}/credentials` | Kirim pubkey per kanal → sertifikat | FR-16 |
 | `POST /enrollments/{id}/se-personalization` | Sesi personalisasi applet (N-SE) | FR-16 |
@@ -799,7 +800,8 @@ Tidak ada GPS, tidak ada tracking lintas app (ATT tidak dipakai). Privacy Manife
 | `ENR-NOT-REGISTERED` | Kartu tidak ada di registri | "Kartu ini belum terdaftar di gedung Anda." | Tawarkan undangan |
 | `ENR-UNREADABLE` | Kartu tidak terbaca (mis. 125 kHz) | "Kartu tidak dapat dibaca iPhone." | Tawarkan undangan |
 | `ENR-SITE-UNSUPPORTED` | Gedung belum memakai Anastrophe | "Gedung ini belum mendukung Anastrophe." | "Usulkan gedung saya" (FR-64) |
-| `ENR-PENDING-APPROVAL` | Kontak tidak cocok registri | "Menunggu persetujuan pengelola gedung." | Notifikasi saat disetujui |
+| `ENR-PENDING-APPROVAL` | Kontak tidak cocok registri; sebelum ada akun juga untuk perangkat tambahan (ADR-0032). Provisioning card instance yang menunggu dijawab 409 | "Menunggu persetujuan pengelola gedung." | Notifikasi saat disetujui |
+| `ENR-DUPLICATE` | Kartu fisik yang sama sudah ada di iPhone ini (409) | "Kartu ini sudah ada di iPhone ini." | Buka kartu yang ada |
 | `ENR-LIMIT` | Sudah 8 kartu | "Maksimal 8 kartu per iPhone." | Hapus kartu lain |
 | `ENR-NOT-FOUND` | Enrolment/perangkat/gedung tidak dikenal server (404) | "Pendaftaran kartu tidak ditemukan. Mulai lagi." | Ulangi Tambah kartu |
 | `ENR-INVALID-KEY` | Kunci publik kanal bukan titik P-256 yang valid (400) | "Kartu tidak dapat disiapkan. Coba lagi." | Buat ulang kunci, ulangi |

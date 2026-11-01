@@ -77,7 +77,7 @@ Backend (Go, ADR-0020; butuh PostgreSQL 16 lokal untuk test integrasi):
 
 ```bash
 (cd backend && go test ./... && go vet ./...)
-ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_SOFTWARE_CA=1 go -C backend run ./cmd/anastrophe-api   # dev/lab saja
+ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_SOFTWARE_CA=1 ANASTROPHE_DEV_REGISTRY_KEY=<32 byte hex> go -C backend run ./cmd/anastrophe-api   # dev/lab saja; kunci registri dev (ADR-0031), bukan untuk produksi
 ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-audit   # verifikasi rantai audit (FR-54); keluar 1 bila ada yang rusak
 ```
 
@@ -85,6 +85,7 @@ Lab end-to-end (build DEBUG; kartu diterbitkan backend dev, tanpa `lab_ca.py iss
 
 ```bash
 export ANASTROPHE_DATABASE_URL=postgres://…
+export ANASTROPHE_DEV_REGISTRY_KEY=$(openssl rand -hex 32)   # kunci registri dev, sama untuk devseed dan API
 go -C backend run ./cmd/anastrophe-devseed -lab-dir ../scripts/anp1/.lab   # mencetak {"site_id","device_id"}
 ANASTROPHE_DEV_SOFTWARE_CA=1 go -C backend run ./cmd/anastrophe-api
 xcrun simctl launch booted app.anastrophe -ANLabBackend http://127.0.0.1:8080 \

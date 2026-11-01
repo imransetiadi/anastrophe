@@ -65,13 +65,13 @@ func TestHapusKartuMembebaskanSlot(t *testing.T) {
 	for i := 0; i < 7; i++ {
 		f.enroll(t)
 	}
-	if rec := f.do(t, http.MethodPost, "/v1/enrollments", "", map[string]string{"device_id": f.deviceID, "site_id": f.siteID}); rec.Code != http.StatusConflict {
+	if rec := f.do(t, http.MethodPost, "/v1/enrollments", "", f.cardBody()); rec.Code != http.StatusConflict {
 		t.Fatalf("kartu ke-9: %d", rec.Code)
 	}
 	if rec := f.deleteOwnCard(t, "del-slot"); rec.Code != http.StatusNoContent {
 		t.Fatalf("hapus: %d %s", rec.Code, rec.Body)
 	}
-	if rec := f.do(t, http.MethodPost, "/v1/enrollments", "", map[string]string{"device_id": f.deviceID, "site_id": f.siteID}); rec.Code != http.StatusCreated {
+	if rec := f.do(t, http.MethodPost, "/v1/enrollments", "", f.cardBody()); rec.Code != http.StatusCreated {
 		t.Fatalf("enrol setelah hapus: %d %s", rec.Code, rec.Body)
 	}
 }
