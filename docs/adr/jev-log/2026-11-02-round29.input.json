@@ -1,0 +1,22 @@
+{
+  "tool": "jev_decide",
+  "decision": "Bagaimana app Anastrophe mengetahui gedung (site_id) untuk jalur Tambah Kartu via kartu fisik (FR-11) di build Release?",
+  "candidates": [
+    "kode_gedung_lookup",
+    "kode_gedung_langsung",
+    "tautan_gedung",
+    "daftar_gedung"
+  ],
+  "requirements": [
+    "Penghuni bisa menentukan gedung tanpa menyalin UUID atau teks panjang; cukup mengetik kode pendek dari pengelola gedung.",
+    "Tidak membuka daftar semua gedung pelanggan kepada pihak yang tidak berwenang.",
+    "Nama gedung bisa dikonfirmasi pengguna sebelum menempelkan kartu fisik."
+  ],
+  "escalate_on_contradiction": true,
+  "evidence_summary": [
+    "POST /v1/enrollments jalur kartu wajib site_id; HMAC memakai kunci per gedung (ADR-0031).",
+    "NUID 4 byte tidak unik global sehingga pencocokan lintas gedung ambigu.",
+    "sites.site_code adalah 8 byte biner untuk sertifikat, bukan kode manusia; belum ada endpoint pencarian gedung.",
+    "Pilot R1 1–2 gedung; domain Universal Link belum ada; simulator tanpa kamera."
+  ]
+}

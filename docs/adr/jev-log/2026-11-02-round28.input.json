@@ -1,0 +1,25 @@
+{
+  "tool": "jev_decide",
+  "decision": "Fokus unit kerja berikutnya untuk app Anastrophe setelah rencana perbaikan minor (ADR-0042) selesai di commit 48e08a6.",
+  "candidates": [
+    "alur_tambah_kartu",
+    "bantuan_faq",
+    "kebijakan_gedung",
+    "anggota_security_code",
+    "sisa_minor",
+    "akses_cepat"
+  ],
+  "requirements": [
+    "Dapat diselesaikan dan diverifikasi tanpa input yang belum tersedia: DEVELOPMENT_TEAM, kunci Apple/APNs, iPhone fisik, atau keputusan ADR-0017/0022/0038/0041 yang masih menunggu.",
+    "Membuat requirement P0 R1 (kanal N+B) yang saat ini belum bisa dipakai pengguna nyata menjadi bisa dipakai.",
+    "Tidak menuntut keputusan semantik keamanan baru yang wajib dieskalasi ke pengguna sebelum bisa dibangun."
+  ],
+  "escalate_on_contradiction": true,
+  "evidence_summary": [
+    "Build Release tidak punya menu Tambah Kartu Akses: tombol keys.add hanya di #if DEBUG dan membuka LabView; tidak ada onOpenURL; CardOwnershipReader belum punya implementasi live.",
+    "FR-05, FR-10, FR-11 (sisi app), FR-12 (sisi app), dan FR-13 (sisi app) semuanya P0 dan belum bisa dipakai pengguna nyata; US-01/US-02 belum terpenuhi.",
+    "Jalur undangan, pesan alasan, pemilihan kanal, dan e2e bisa diuji di simulator + PostgreSQL lokal; jalur kartu fisik live hanya uji H.",
+    "Server enrolment tidak memerlukan akun (ADR-0032/0034/0040); App Attest belum ditegakkan server (credentials.go: menyusul bersama akun).",
+    "FAQ (FR-60) murni app; kebijakan gedung sebagian ada (sites.policy.cert_validity_days); anggota bergantung FR-03/FR-62 yang terblokir; sisa minor tidak memblokir pengguna; FR-24 butuh target extension baru."
+  ]
+}

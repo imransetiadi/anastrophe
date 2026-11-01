@@ -1,0 +1,47 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "kode_gedung_lookup",
+    "escaped": false,
+    "confidence": 0.96,
+    "probabilities": {
+      "kode_gedung_lookup": 0.97,
+      "kode_gedung_langsung": 0.01,
+      "tautan_gedung": 0.01,
+      "daftar_gedung": 0,
+      "ask_user": 0,
+      "investigate": 0,
+      "none": 0.01
+    },
+    "contradicted_requirements": []
+  },
+  "checks": {
+    "kode_gedung_lookup": [
+      "supported",
+      "supported",
+      "supported"
+    ],
+    "kode_gedung_langsung": [
+      "supported",
+      "supported",
+      "contradicted"
+    ],
+    "tautan_gedung": [
+      "contradicted",
+      "supported",
+      "contradicted"
+    ],
+    "daftar_gedung": [
+      "supported",
+      "contradicted",
+      "supported"
+    ]
+  },
+  "warnings": [],
+  "usage": {
+    "input_tokens": 3199,
+    "output_tokens": 599
+  }
+}

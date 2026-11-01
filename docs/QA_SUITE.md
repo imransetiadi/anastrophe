@@ -146,6 +146,10 @@ Format ID: `TC-<AREA>-<NN>`. **Prio:** P0/P1/P2. **Tipe:** U unit · I integrasi
 | TC-ENR-17 | App Attest gagal | Assertion dimanipulasi/jailbreak | Provisioning ditolak (403) | NFR-S03 | P0 | S | Semua |
 | TC-ENR-18 | Personalisasi applet N-SE | Enrolment di SG dengan N-SE | `provisionCredential` + mode wired + relai APDU sukses; jeda < 15 dtk antar `transceive` | FR-16 | P0 | H | N |
 | TC-ENR-19 | Provisioning hanya dari perangkat enrolment | Kirim kredensial dengan id instance dari `:challenge` tanpa rahasia enrolment; tambah kanal ke kartu aktif | 404 `ENR-NOT-FOUND` identik dengan id tak dikenal; tambah kanal ke kartu aktif ditolak (404 karena hash sudah terhapus); rahasia mentah tidak tersimpan | FR-16 | P0 | E | N, B |
+| TC-ENR-20 | Kode gedung | Operator membuat kode lewat `anastrophe-registry site-code`; app mencari kode benar, kode salah, kode rusak, dan kode kosong | Kode benar → nama gedung tampil sebelum tempel kartu; selain itu 404 `SITE-NOT-FOUND` dengan body identik; rotasi membuat kode lama tidak berlaku; normalisasi app = server (ADR-0044) | FR-11, FR-13 | P0 | I | N, B |
+| TC-ENR-21 | Perangkat baru dibuat saat enrolment | `device_id` baru: enrolment kartu terdaftar atau undangan sah; lalu enrolment ditolak (kartu tak terdaftar, gedung tak dikenal, undangan tidak sah), dengan dan tanpa Idempotency-Key | Enrolment sah membuat tepat satu baris perangkat; enrolment ditolak tidak meninggalkan baris (ADR-0045) | FR-10, FR-11, FR-12 | P0 | I | N, B |
+| TC-ENR-22 | Alur Tambah Kartu di build Release | Tambah Kartu Akses → kode gedung → tempel kartu; jalur tautan undangan; kartu tak terdaftar/tak terbaca; perangkat tanpa pembaca kartu; ketuk ganda | Kartu aktif dengan kanal terbaik (N-HCE > B) dari `/v1/config`; pesan alasan spesifik + tawaran undangan; satu enrolment per ketukan ganda; identitas kartu tidak tertinggal di app | FR-05, FR-10, FR-11, FR-12, FR-13 | P0 | U | N, B |
+| TC-ENR-23 | Instal ulang membuat id perangkat baru | Hapus penanda instalasi (instal ulang), lalu luncurkan app dua kali | Peluncuran pertama membuat `device_id` baru; peluncuran berikutnya memakai id yang sama; id tidak ikut backup | FR-40, FR-43 | P0 | U | N, B |
 
 ### 5.4 Presentasi NFC in-app (PRSN)
 
@@ -608,13 +612,13 @@ Jadwal mengikuti milestone PRD §13; uji pilot mencakup 2 lokasi (ADR-0011).
 | FR-02 | TC-ELG-05 |
 | FR-03 | TC-ACC-01, TC-ACC-02, TC-ACC-03 |
 | FR-04 | TC-ELG-01, TC-ELG-04, TC-ELG-08 |
-| FR-05 | TC-ELG-06, TC-ELG-07 |
+| FR-05 | TC-ELG-06, TC-ELG-07, TC-ENR-22 |
 | FR-06 | TC-ACC-05, TC-ACC-06, TC-PRIV-02 |
 | FR-07 | TC-ACC-04 |
-| FR-10 | TC-ENR-01 |
-| FR-11 | TC-ENR-01, TC-ENR-14, TC-ENR-15 |
-| FR-12 | TC-ENR-07, TC-ENR-08 |
-| FR-13 | TC-ENR-04, TC-ENR-05, TC-ENR-06 |
+| FR-10 | TC-ENR-01, TC-ENR-21, TC-ENR-22 |
+| FR-11 | TC-ENR-01, TC-ENR-14, TC-ENR-15, TC-ENR-20, TC-ENR-21, TC-ENR-22 |
+| FR-12 | TC-ENR-07, TC-ENR-08, TC-ENR-21, TC-ENR-22 |
+| FR-13 | TC-ENR-04, TC-ENR-05, TC-ENR-06, TC-ENR-20, TC-ENR-22 |
 | FR-14 | TC-ENR-01, TC-ENR-09, TC-ENR-10 |
 | FR-15 | TC-ENR-11, TC-ENR-12 |
 | FR-16 | TC-ENR-01, TC-ENR-13, TC-ENR-18, TC-ENR-19 |
@@ -641,10 +645,10 @@ Jadwal mengikuti milestone PRD §13; uji pilot mencakup 2 lokasi (ADR-0011).
 | FR-37 | TC-MGT-13 |
 | FR-38 | TC-MGT-11, TC-MGT-15, TC-DEV-10 |
 | FR-39 | TC-MGT-14 |
-| FR-40 | TC-DEV-01, TC-UPG-01 |
+| FR-40 | TC-DEV-01, TC-UPG-01, TC-ENR-23 |
 | FR-41 | TC-DEV-02, TC-PRSW-09 |
 | FR-42 | TC-DEV-03, TC-DEV-04, TC-DEV-05, TC-PRSW-07 |
-| FR-43 | TC-DEV-05, TC-DEV-06 |
+| FR-43 | TC-DEV-05, TC-DEV-06, TC-ENR-23 |
 | FR-44 | TC-DEV-07, TC-DEV-08 |
 | FR-45 | TC-DEV-09, TC-DEV-10, TC-DEV-11 |
 | FR-46 | TC-DEV-12, TC-PRSW-06 |
