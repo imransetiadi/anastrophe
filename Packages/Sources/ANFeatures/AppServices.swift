@@ -209,9 +209,9 @@ private struct EmptyCardStore: CardStore {
 /// Kartu & kanal yang sedang dipresentasikan, dibaca `makeProvider` di coordinator.
 private final class Selection: @unchecked Sendable {
     private let lock = NSLock()
-    private var value: (card: Card, channel: ChannelKind)?
+    private var value: (card: Card, channel: ChannelKind, tap: UUID)?
 
-    var current: (card: Card, channel: ChannelKind)? {
+    var current: (card: Card, channel: ChannelKind, tap: UUID)? {
         get { lock.withLock { value } }
         set { lock.withLock { value = newValue } }
     }
@@ -242,7 +242,7 @@ private final class LivePresentationLauncher: PresentationLaunching {
         self.config = config
         self.nfcEmulationEntitled = nfcEmulationEntitled
         makeProvider = { [selection] context in
-            guard let (card, channel) = selection.current,
+            guard let (card, channel, _) = selection.current,
                   let credentialID = card.credentials[channel],
                   let record = try records.record(for: credentialID)
             else { throw ANError.keyUnavailable }
@@ -254,19 +254,20 @@ private final class LivePresentationLauncher: PresentationLaunching {
         }
         // ADR-0023: perpanjangan memakai konteks autentikasi tap yang sama.
         prepare = { [selection] context in
-            guard let (card, channel) = selection.current else { return }
-            await scheduler.beforePresentation(card: card, channel: channel, context: context)
+            guard let (card, channel, tap) = selection.current else { return }
+            await scheduler.beforePresentation(card: card, channel: channel, context: context, tap: tap)
         }
     }
 
     func start(card: Card, channel: ChannelKind) async -> AsyncStream<PresentmentEvent> {
-        selection.current = (card, channel)
+        let tap = UUID()
+        selection.current = (card, channel, tap)
         switch channel {
         case .ble:
-            return observed(await bleCoordinator().tap())
+            return observed(await bleCoordinator().tap(), tap: tap)
         case .nfcHCE:
             #if os(iOS)
-            return observed(await hceCoordinator().present())
+            return observed(await hceCoordinator().present(), tap: tap)
             #else
             return Self.finished(.cancelled)
             #endif
@@ -285,13 +286,13 @@ private final class LivePresentationLauncher: PresentationLaunching {
 
     /// Meneruskan event tap, lalu menjalankan perpanjangan yang tertunda setelah aliran selesai.
     /// Perpanjangan berjalan di task terpisah agar tidak ikut dibatalkan saat aliran berakhir.
-    private func observed(_ upstream: AsyncStream<PresentmentEvent>) -> AsyncStream<PresentmentEvent> {
+    private func observed(_ upstream: AsyncStream<PresentmentEvent>, tap: UUID) -> AsyncStream<PresentmentEvent> {
         let scheduler = scheduler
         return AsyncStream { continuation in
             let forwarding = Task {
                 for await event in upstream { continuation.yield(event) }
                 continuation.finish()
-                Task { @MainActor in await scheduler.afterPresentation() }
+                Task { @MainActor in await scheduler.afterPresentation(tap: tap) }
             }
             continuation.onTermination = { _ in forwarding.cancel() }
         }

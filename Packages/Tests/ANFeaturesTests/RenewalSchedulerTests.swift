@@ -27,6 +27,7 @@ struct RenewalSchedulerTests {
     let issued = Date(timeIntervalSince1970: 1_793_491_200)  // 2026-11-01
     var expires: Date { issued.addingTimeInterval(7 * 86_400) }
     let context = AuthorizedContext(laContext: LAContext())
+    let tap = UUID()
     let renewReplies: [(status: Int, body: String, contentType: String)] = [
         (201, #"{"nonce":"\#(Data(repeating: 0x4E, count: 32).base64EncodedString())","expires_at":"2026-11-09T00:02:00Z"}"#, "application/json"),
         (200, provisionedBody(credentialID: Data(repeating: 0x5E, count: 16), notAfter: "2026-11-16T00:00:00Z", notBefore: "2026-11-09T00:00:00Z"), "application/json"),
@@ -53,7 +54,7 @@ struct RenewalSchedulerTests {
     @Test func kedaluwarsaDiperpanjangSebelumPresentasi() async throws {
         let (card, cards, _) = try await setUp()
         let transport = SequenceTransport(renewReplies)
-        await scheduler(cards: cards, transport: transport, daysAfterIssue: 8).beforePresentation(card: card, channel: .ble, context: context)
+        await scheduler(cards: cards, transport: transport, daysAfterIssue: 8).beforePresentation(card: card, channel: .ble, context: context, tap: tap)
         #expect(try records.record(for: credentialID)?.notAfter == Date(timeIntervalSince1970: 1_794_787_200))
     }
 
@@ -65,7 +66,7 @@ struct RenewalSchedulerTests {
         let scheduler = scheduler(cards: cards, transport: transport, clock: clock, daysAfterIssue: 8)
         let done = LockedBox(false)
         let task = Task { @MainActor in
-            await scheduler.beforePresentation(card: card, channel: .ble, context: context)
+            await scheduler.beforePresentation(card: card, channel: .ble, context: context, tap: tap)
             done.withLock { $0 = true }
         }
         await clock.waitForSleepers(1)
@@ -81,9 +82,9 @@ struct RenewalSchedulerTests {
         let (card, cards, _) = try await setUp()
         let transport = SequenceTransport(renewReplies)
         let scheduler = scheduler(cards: cards, transport: transport, daysAfterIssue: 4)
-        await scheduler.beforePresentation(card: card, channel: .ble, context: context)
+        await scheduler.beforePresentation(card: card, channel: .ble, context: context, tap: tap)
         #expect(transport.paths.isEmpty)  // tap tidak ditahan
-        await scheduler.afterPresentation()
+        await scheduler.afterPresentation(tap: tap)
         #expect(transport.paths.count == 2)
         #expect(try records.record(for: credentialID)?.notAfter == Date(timeIntervalSince1970: 1_794_787_200))
     }
@@ -92,8 +93,8 @@ struct RenewalSchedulerTests {
         let (card, cards, _) = try await setUp()
         let transport = SequenceTransport([])
         let scheduler = scheduler(cards: cards, transport: transport, daysAfterIssue: 1)
-        await scheduler.beforePresentation(card: card, channel: .ble, context: context)
-        await scheduler.afterPresentation()
+        await scheduler.beforePresentation(card: card, channel: .ble, context: context, tap: tap)
+        await scheduler.afterPresentation(tap: tap)
         #expect(transport.paths.isEmpty)
     }
 
@@ -103,9 +104,9 @@ struct RenewalSchedulerTests {
         let foreground = LockedBox(true)
         let transport = SequenceTransport(renewReplies)
         let scheduler = scheduler(cards: cards, transport: transport, daysAfterIssue: 4, foreground: foreground)
-        await scheduler.beforePresentation(card: card, channel: .ble, context: context)
+        await scheduler.beforePresentation(card: card, channel: .ble, context: context, tap: tap)
         foreground.withLock { $0 = false }
-        await scheduler.afterPresentation()
+        await scheduler.afterPresentation(tap: tap)
         #expect(transport.paths.isEmpty)
         #expect(try records.record(for: credentialID) == record)
     }
@@ -116,8 +117,8 @@ struct RenewalSchedulerTests {
         let foreground = LockedBox(true)
         let transport = FlippingTransport(replies: renewReplies, flip: foreground)
         let scheduler = scheduler(cards: cards, transport: transport, daysAfterIssue: 4, foreground: foreground)
-        await scheduler.beforePresentation(card: card, channel: .ble, context: context)
-        await scheduler.afterPresentation()
+        await scheduler.beforePresentation(card: card, channel: .ble, context: context, tap: tap)
+        await scheduler.afterPresentation(tap: tap)
         #expect(transport.paths.value == ["/v1/credentials/\(credentialID.hexString):challenge"])
     }
 
@@ -125,9 +126,9 @@ struct RenewalSchedulerTests {
         let (card, cards, _) = try await setUp()
         let transport = SequenceTransport(renewReplies)
         let scheduler = scheduler(cards: cards, transport: transport, daysAfterIssue: 4)
-        await scheduler.beforePresentation(card: card, channel: .ble, context: context)
+        await scheduler.beforePresentation(card: card, channel: .ble, context: context, tap: tap)
         scheduler.cancelPending()
-        await scheduler.afterPresentation()
+        await scheduler.afterPresentation(tap: tap)
         #expect(transport.paths.isEmpty)
     }
 
@@ -136,8 +137,33 @@ struct RenewalSchedulerTests {
         let (card, cards, _) = try await setUp()
         let signals = LockedBox(0)
         let scheduler = scheduler(cards: cards, transport: SequenceTransport(renewReplies), daysAfterIssue: 8, onRenewed: { signals.withLock { $0 += 1 } })
-        await scheduler.beforePresentation(card: card, channel: .ble, context: context)
+        await scheduler.beforePresentation(card: card, channel: .ble, context: context, tap: tap)
         #expect(signals.value == 1)
+    }
+
+    @Test func pekerjaanHanyaUntukTapYangSama() async throws {
+        // Review perpanjangan M3: aliran tap lain tidak menjalankan pekerjaan tap ini.
+        let (card, cards, _) = try await setUp()
+        let transport = SequenceTransport(renewReplies)
+        let scheduler = scheduler(cards: cards, transport: transport, daysAfterIssue: 4)
+        await scheduler.beforePresentation(card: card, channel: .ble, context: context, tap: tap)
+        await scheduler.afterPresentation(tap: UUID())
+        #expect(transport.paths.isEmpty)
+        await scheduler.afterPresentation(tap: tap)
+        #expect(transport.paths.count == 2)
+    }
+
+    @Test func tapBaruMenggantiPekerjaanLama() async throws {
+        let (card, cards, _) = try await setUp()
+        let transport = SequenceTransport(renewReplies)
+        let scheduler = scheduler(cards: cards, transport: transport, daysAfterIssue: 4)
+        let second = UUID()
+        await scheduler.beforePresentation(card: card, channel: .ble, context: context, tap: tap)
+        await scheduler.beforePresentation(card: card, channel: .ble, context: AuthorizedContext(laContext: LAContext()), tap: second)
+        await scheduler.afterPresentation(tap: tap)
+        #expect(transport.paths.isEmpty)
+        await scheduler.afterPresentation(tap: second)
+        #expect(transport.paths.count == 2)
     }
 }
 

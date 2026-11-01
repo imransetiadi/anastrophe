@@ -15,7 +15,8 @@ final class RenewalScheduler<C: Clock> where C.Duration == Duration {
     private let now: @Sendable () -> Date
     private let isForeground: @Sendable () -> Bool
     private let onRenewed: @MainActor () -> Void
-    private var pending: (card: Card, channel: ChannelKind, context: AuthorizedContext)?
+    /// Pekerjaan "sisa < 50%" milik satu tap; tap lain tidak menjalankannya.
+    private var pending: (card: Card, channel: ChannelKind, context: AuthorizedContext, tap: UUID)?
 
     init(renewer: CredentialRenewer, clock: C, now: @escaping @Sendable () -> Date = { .now },
          isForeground: @escaping @Sendable () -> Bool = { true }, onRenewed: @escaping @MainActor () -> Void = {}) {
@@ -33,8 +34,8 @@ final class RenewalScheduler<C: Clock> where C.Duration == Duration {
     }
 
     /// Dipanggil coordinator setelah autentikasi tap, sebelum sesi presentasi dibuat.
-    func beforePresentation(card: Card, channel: ChannelKind, context: AuthorizedContext) async {
-        pending = nil
+    func beforePresentation(card: Card, channel: ChannelKind, context: AuthorizedContext, tap: UUID) async {
+        cancelPending()  // tap baru: pekerjaan tap lama dibuang dan konteksnya di-invalidate
         guard let credentialID = card.credentials[channel],
               let record = try? renewer.records.record(for: credentialID),
               record.renewalURL != nil
@@ -43,15 +44,15 @@ final class RenewalScheduler<C: Clock> where C.Duration == Duration {
         case .none:
             break
         case .soon:
-            pending = (card, channel, context)
+            pending = (card, channel, context, tap)
         case .expired:
             await renewBounded(card: card, channel: channel, context: context)
         }
     }
 
     /// Dipanggil setelah aliran event tap selesai; konteks dilepas setelahnya.
-    func afterPresentation() async {
-        guard let job = pending else { return }
+    func afterPresentation(tap: UUID) async {
+        guard let job = pending, job.tap == tap else { return }
         pending = nil
         defer { job.context.laContext.invalidate() }
         // Aliran tap juga berakhir saat app ke background; jangan menandatangani di sana.
