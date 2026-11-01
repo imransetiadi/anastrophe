@@ -1,6 +1,86 @@
 {
   "sourceLanguage": "id",
   "strings": {
+    "add.error.channel_unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This feature isn't available on your device or in your region yet."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fitur ini belum tersedia di perangkat atau wilayah Anda."
+          }
+        }
+      }
+    },
+    "add.error.reader_unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This iPhone can't read physical cards."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone ini tidak bisa membaca kartu fisik."
+          }
+        }
+      }
+    },
+    "add.error.service_unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The service isn't available yet. Try again later."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Layanan belum tersedia. Coba lagi nanti."
+          }
+        }
+      }
+    },
+    "add.error.site_code_unknown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We don't recognize this building code. Check the code from your building management."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kode gedung tidak dikenal. Periksa kode dari pengelola gedung."
+          }
+        }
+      }
+    },
+    "add.error.unreadable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your iPhone couldn't read this card."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu tidak dapat dibaca iPhone."
+          }
+        }
+      }
+    },
     "card.reason.bluetooth_denied": {
       "localizations": {
         "en": {
