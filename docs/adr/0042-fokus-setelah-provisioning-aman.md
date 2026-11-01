@@ -1,6 +1,6 @@
 # ADR-0042: Fokus berikutnya setelah provisioning aman (terbuka)
 
-- **Status:** Diusulkan — butuh keputusan manusia (eskalasi)
+- **Status:** Diterapkan: rekomendasi penulis (`hardening_minors`). Dasarnya tujuan iterasi berkelanjutan pengguna dan persetujuan umumnya atas saran penulis; pengguna dapat membatalkannya.
 - **Tanggal:** 2026-11-02
 - **Pengambil keputusan:** JEV (`jev_decide`, jev-1.14.0) sebagai lapisan keputusan; dikurasi tim produk
 - **Rujukan:** FR-60, FR-05, FR-10, ADR-0018, ADR-0038, ADR-0041, backlog terverifikasi
@@ -29,3 +29,7 @@ Alur "Tambah kartu" Release masih terblokir akun, App Attest, dan iPhone fisik.
 ## Rekomendasi penulis
 
 `hardening_minors` lebih dulu. Beberapa minor menyentuh jalur keamanan yang baru dibangun: hash tertinggal pada instance aktif, purge denylist, dan parameter rahasia yang bisa terlewat. Memperbaikinya sekarang lebih murah selagi konteksnya masih segar. FAQ (FR-60) menyusul sesudahnya.
+
+## Penerapan (2026-11-02)
+
+JEV mengeskalasi pilihan ini (0,41). Tujuan sesi pengguna adalah iterasi tanpa henti ("lakukan iterasi infinity looping untuk build apps ini secara bertahap"), dan pengguna sebelumnya menyetujui saran penulis secara umum. Karena itu rekomendasi penulis diterapkan. Pilihan ini berisiko rendah, bisa dibatalkan, hanya di branch fitur, dan tidak menyentuh ADR-0038 maupun ADR-0041, yang tetap menunggu pengguna karena mengubah perilaku bagi pengguna sah.
