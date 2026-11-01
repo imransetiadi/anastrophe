@@ -4,7 +4,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 
 **Aturan pencatatan**
 
-- Setiap perubahan (commit, keputusan JEV/ADR, perbaikan hasil review) menambah satu entri di atas, dalam commit yang sama dengan perubahannya. Judul: `## AREA-YYYY-MM-DD-HHMM - Judul (Status)`.
+- Setiap unit kerja (rencana, perbaikan hasil review, keputusan JEV/ADR, perubahan dokumen) menambah satu entri di atas, dalam commit terakhir unit itu, dengan daftar semua commit-nya. Judul: `## AREA-YYYY-MM-DD-HHMM - Judul (Status)`.
 - Isi entri: apa yang berubah dan mengapa, rujukan (FR/NFR/ADR/TC), hasil uji yang benar-benar dijalankan, dan catatan sesi Obsidian terkait. Catatan sesi dan [MOC](docs/agentmemory/MOC.md) diperbarui di commit yang sama.
 - **Jangan** menulis secret, kunci, token, kontak pengguna, atau identitas kartu fisik (CLAUDE.md aturan 6 dan 9).
 - Sumber kebenaran tetap `docs/` dan riwayat git; berkas ini ringkasannya.
@@ -14,7 +14,6 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 - Branch kerja: `feat/r1-scaffold`, di-push ke GitHub private `imransetiadi/anastrophe` (origin) atas permintaan pengguna; belum di-merge.
 - Suite terakhir: Swift host 242 test (1 dilewati, tanpa gagal) dan simulator 240 test (1 dilewati). Backend Go 7 paket lulus pada iterasi hapus kartu; belum ada perubahan backend sejak itu.
 - Menunggu keputusan pengguna:
-  - Klarifikasi ADR-0001: kalimat Keputusan kini "meng-clone UID/data sektor" (perubahan pengguna), bertentangan dengan judul dan Konteks ADR itu, CLAUDE.md aturan 1, serta PRD NG1/FR-11. Implementasi tetap mengikuti aturan 1 sampai CLAUDE.md diubah.
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
   - Tinjauan 5 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap (`docs/adr/jev-log/*-gate.json`).
   - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
@@ -31,6 +30,10 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Audit | Rantai hash per gedung, append-only, pseudonim sejak ditulis, perintah `anastrophe-audit` | ADR-0024, ADR-0025 |
 | Hapus kartu | Bukti kepemilikan, kartu ditangguhkan, kartu tanpa kunci | ADR-0026, ADR-0027, ADR-0028, FR-31 |
 | Riwayat tap | Log lokal 30 hari: lima terbaru di detail, "Lihat semua" ke riwayat penuh, store pulih sendiri bila rusak | FR-30, ADR-0029, ADR-0030 |
+
+## DOC-2026-11-01-1856 - ADR-0001 dikembalikan ke keputusan asli (Selesai)
+
+Atas permintaan pengguna, kalimat Keputusan ADR-0001 dikembalikan ke versi aslinya: Anastrophe **tidak** meng-clone UID atau data sektor kartu fisik, dan setiap kartu digital adalah kredensial baru. ADR-0001 kembali konsisten dengan judul dan Konteksnya, CLAUDE.md aturan 1, serta PRD NG1/FR-11, sehingga butir klarifikasinya dihapus dari daftar tunggu. Aturan pencatatan di atas juga diperjelas menjadi per unit kerja, sesuai praktik dan catatan review. Di-push ke GitHub agar remote memuat versi asli. Obsidian: `sessions/2026-11-01-minor-riwayat-tap-dan-registri.md` dan MOC.
 
 ## DOC-2026-11-01-1843 - Minor riwayat tap, fokus registri (ADR-0031/0032), draf spesifikasi registri, push ke GitHub (Sebagian; review akhir minor masih berjalan)
 

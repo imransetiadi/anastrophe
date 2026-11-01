@@ -31,7 +31,6 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Menunggu pengguna
 
-- Klarifikasi ADR-0001: kalimat Keputusan kini "meng-clone", bertentangan dengan CLAUDE.md aturan 1 dan PRD NG1/FR-11.
 - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
 - Tinjauan gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap.
 - Integrasi branch `feat/r1-scaffold`: merge ke `main` atau PR (sudah di-push ke GitHub private).

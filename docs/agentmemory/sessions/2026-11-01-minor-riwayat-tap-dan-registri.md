@@ -29,5 +29,5 @@ Rencana: `docs/superpowers/plans/2026-11-01-riwayat-tap-minor.md`.
 
 ## ADR-0001 dan GitHub
 
-- Perubahan ADR-0001 dari pengguna ikut di-commit atas persetujuan eksplisit. Kalimat Keputusan kini "meng-clone UID/data sektor", bertentangan dengan judul dan Konteks ADR itu, CLAUDE.md aturan 1, serta PRD NG1/FR-11; menunggu klarifikasi.
+- Perubahan ADR-0001 dari pengguna sempat ikut di-commit atas persetujuan eksplisit, lalu atas permintaan pengguna dikembalikan ke keputusan aslinya (tidak meng-clone; kredensial baru).
 - Branch `feat/r1-scaffold` di-push ke repo GitHub private `imransetiadi/anastrophe` setelah pemindaian secret pada seluruh riwayat.
