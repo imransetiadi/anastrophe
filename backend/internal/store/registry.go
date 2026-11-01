@@ -149,6 +149,9 @@ func (t *Tx) enrollCard(ctx context.Context, deviceID, siteID string, cardHMAC [
 	if len(cardHMAC) != 32 {
 		return CardEnrollment{}, errInvalidHMAC
 	}
+	if err := ensureDevice(ctx, t.tx, deviceID); err != nil {
+		return CardEnrollment{}, err
+	}
 	device, _, err := lockDevice(ctx, t.tx, deviceID)
 	if err != nil {
 		return CardEnrollment{}, err
@@ -339,6 +342,14 @@ func (s *Store) DecideEnrollment(ctx context.Context, cardInstanceID string, app
 }
 
 // lockDevice mengunci baris perangkat dan menghitung card instance aktifnya (FR-15).
+// ensureDevice membuat baris perangkat app yang belum terdaftar di dalam transaksi enrolment (ADR-0045).
+// device_id dibuat app (UUID v4 acak); enrolment yang ditolak me-rollback transaksi sehingga tidak ada
+// baris perangkat yang tertinggal, dan jumlah baris dibatasi kartu terdaftar serta undangan yang sah.
+func ensureDevice(ctx context.Context, tx pgx.Tx, deviceID string) error {
+	_, err := tx.Exec(ctx, `INSERT INTO devices (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`, deviceID)
+	return err
+}
+
 func lockDevice(ctx context.Context, tx pgx.Tx, deviceID string) (device string, active int, err error) {
 	if err := tx.QueryRow(ctx, `SELECT id::text FROM devices WHERE id = $1 FOR UPDATE`, deviceID).Scan(&device); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

@@ -134,6 +134,9 @@ func (t *Tx) enrollInvitation(ctx context.Context, deviceID string, tokenHash []
 	if len(tokenHash) != 32 {
 		return CardEnrollment{}, ErrInvitationInvalid
 	}
+	if err := ensureDevice(ctx, t.tx, deviceID); err != nil {
+		return CardEnrollment{}, err
+	}
 	device, _, err := lockDevice(ctx, t.tx, deviceID)
 	if err != nil {
 		return CardEnrollment{}, err
