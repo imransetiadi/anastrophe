@@ -263,7 +263,7 @@ func (t *Tx) EnrollmentForUpdate(ctx context.Context, id string) (Enrollment, er
 	var cardBitmap, invitationBitmap *int64
 	err := t.tx.QueryRow(ctx, `
 		SELECT ci.id, ci.status, ci.device_id, s.id, s.name, s.site_code,
-		       COALESCE(ARRAY(SELECT jsonb_array_elements_text(s.policy -> 'zones')), '{}'),
+		       `+zonesSQL("s.policy")+`,
 		       s.policy ->> 'zones_bitmap',
 		       s.policy ->> 'cert_validity_days',
 		       pc.zones_bitmap,
@@ -418,7 +418,7 @@ func (t *Tx) CredentialForRenewal(ctx context.Context, credID []byte) (Renewable
 	var cardBitmap, invitationBitmap *int64
 	err := t.tx.QueryRow(ctx, `
 		SELECT c.id, c.channel, c.status, c.cred_id, c.pubkey, ci.id, ci.status, ci.device_id, s.id, s.name, s.site_code,
-		       COALESCE(ARRAY(SELECT jsonb_array_elements_text(s.policy -> 'zones')), '{}'),
+		       `+zonesSQL("s.policy")+`,
 		       s.policy ->> 'zones_bitmap',
 		       s.policy ->> 'cert_validity_days',
 		       pc.zones_bitmap,

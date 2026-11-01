@@ -85,3 +85,41 @@ func TestKanalGedungDitolakSesudahRahasia(t *testing.T) {
 		t.Fatalf("kanal diizinkan: %d %s", rec.Code, rec.Body)
 	}
 }
+
+func TestKebijakanRusakTidakMembuat500(t *testing.T) {
+	// Review akhir #1: kebijakan kanal yang bukan array tidak menggagalkan lookup maupun enrolment.
+	for _, c := range []struct {
+		policy string
+		want   []string
+	}{
+		{`{"channels": null}`, []string{"ble", "nfcHCE"}},
+		{`{"channels": "ble"}`, []string{}},
+		{`{"channels": [null]}`, []string{}},
+	} {
+		f := newFixture(t)
+		if err := f.store.SetSitePolicy(context.Background(), f.siteID, []byte(c.policy)); err != nil {
+			t.Fatal(err)
+		}
+		rec := f.get(t, "/v1/sites/lookup?code="+f.joinCode(t))
+		if rec.Code != http.StatusOK || !slices.Equal(channelsOf(t, rec.Body.Bytes()), c.want) {
+			t.Fatalf("%s lookup: %d %s", c.policy, rec.Code, rec.Body)
+		}
+		rec = f.do(t, http.MethodPost, "/v1/enrollments", "", f.cardBody())
+		if rec.Code != http.StatusCreated || !slices.Equal(channelsOf(t, rec.Body.Bytes()), c.want) {
+			t.Fatalf("%s enrolment: %d %s", c.policy, rec.Code, rec.Body)
+		}
+	}
+}
+
+func TestMasaBerlakuLewatUpdateSitePolicy(t *testing.T) {
+	// Review akhir (rencana Task 3): masa berlaku yang ditulis CLI (to_jsonb int) dipakai saat penerbitan.
+	f := newFixture(t)
+	days := 3
+	if _, err := f.store.UpdateSitePolicy(context.Background(), f.siteID, "staf-01", store.PolicyUpdate{CertValidityDays: &days}, time.Unix(1_794_000_000, 0)); err != nil {
+		t.Fatal(err)
+	}
+	_, cert := provision(t, f, "berlaku-cli-3")
+	if got := cert.NotAfter.Sub(cert.NotBefore); got != 72*time.Hour {
+		t.Fatalf("masa berlaku %v, ingin 72h", got)
+	}
+}

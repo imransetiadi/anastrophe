@@ -14,8 +14,11 @@ public enum ANError: Error, Equatable, Sendable {
     case cardReaderUnavailable
     /// Build tanpa alamat layanan (`ANAPIBaseURL` kosong), jadi enrolment belum tersedia.
     case serviceUnavailable
-    /// Kanal yang diizinkan kebijakan gedung tidak ada yang bisa dipakai di iPhone ini (ADR-0049).
+    /// Kanal yang diizinkan kebijakan gedung tidak didukung iPhone ini sendiri (ADR-0049).
     case siteChannelUnavailable
+    /// Kanal yang diizinkan gedung belum ditawarkan layanan atau build ini, sehingga tidak ada iPhone yang bisa
+    /// memakainya; pesannya tidak menyalahkan iPhone pengguna.
+    case siteChannelsNotOffered
 }
 
 /// Alasan enrolment kartu ditolak server (SDD §15).

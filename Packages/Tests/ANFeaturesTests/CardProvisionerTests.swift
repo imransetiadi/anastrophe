@@ -101,6 +101,27 @@ struct CardProvisionerTests {
         #expect(secrets.storedKeyCount == 0)
     }
 
+    @Test func kanalGedungKosongPesanNetral() async throws {
+        // Review akhir (Minor 2, dinaikkan): kanal efektif gedung kosong → tidak ada iPhone yang bisa, jadi
+        // pesannya tidak menyalahkan iPhone ini.
+        let cards = try SwiftDataCardStore(directory: temporaryDirectory())
+        let transport = SequenceTransport([configBody(["ble"])])
+        await #expect(throws: ANError.siteChannelsNotOffered) {
+            try await provisioner(transport, cards: cards).provision(.card(siteID: "site", identity: labTestCard), deviceID: "dev",
+                                                                     channel: .automatic([.ble: .available], siteChannels: []))
+        }
+    }
+
+    @Test func kanalGedungTerhalangBuildPesanNetral() async throws {
+        // Build tanpa emulasi (entitlementMissing) bukan kesalahan iPhone pengguna.
+        let cards = try SwiftDataCardStore(directory: temporaryDirectory())
+        let transport = SequenceTransport([configBody(["ble", "nfcHCE"])])
+        await #expect(throws: ANError.siteChannelsNotOffered) {
+            try await provisioner(transport, cards: cards).provision(.card(siteID: "site", identity: labTestCard), deviceID: "dev",
+                                                                     channel: .automatic([.nfcHCE: .entitlementMissing, .ble: .available], siteChannels: [.nfcHCE]))
+        }
+    }
+
     @Test func kanalDipilihUlangSesudahEnrolment() async throws {
         // Jalur undangan baru tahu kanal gedung dari respons enrolment.
         let cards = try SwiftDataCardStore(directory: temporaryDirectory())

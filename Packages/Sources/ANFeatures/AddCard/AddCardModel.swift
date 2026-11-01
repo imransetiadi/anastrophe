@@ -58,6 +58,8 @@ public final class AddCardModel {
     private let transport: any HTTPTransport
     /// Gedung terakhir yang dikonfirmasi, agar "Coba lagi" setelah gagal membaca kartu tidak meminta kode lagi.
     private var confirmedSite: SiteSummary?
+    /// Kegagalan karena kanal gedung: "Coba lagi" mencari ulang kode gedung agar kebijakan terbaru terbaca.
+    private var retryNeedsLookup = false
 
     init(services: AppServices, reader: any CardOwnershipReader, transport: any HTTPTransport = URLSession.shared) {
         self.services = services
@@ -93,6 +95,8 @@ public final class AddCardModel {
         fieldError = nil
         switch step {
         case .confirmSite: step = .siteCode
+        case .failed where retryNeedsLookup && confirmedSite != nil:
+            step = .siteCode  // kode gedung tetap terisi
         case .failed: step = confirmedSite.map { .confirmSite($0) } ?? .chooseMethod
         case .siteCode, .invitation: step = .chooseMethod
         default: break
@@ -174,6 +178,7 @@ public final class AddCardModel {
                 step = .pending(siteName: siteName)
             }
         } catch {
+            retryNeedsLookup = [ANError.siteChannelUnavailable, .siteChannelsNotOffered].contains(error as? ANError)
             step = .failed(Self.failure(for: error))
         }
     }

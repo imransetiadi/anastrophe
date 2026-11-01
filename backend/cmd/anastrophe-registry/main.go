@@ -523,10 +523,16 @@ func policy(ctx context.Context, args []string, stdout, stderr io.Writer, getenv
 	} else {
 		fmt.Fprintf(stdout, "masa berlaku sertifikat: %d hari\n", current.CertValidityDays)
 	}
-	if current.Channels == nil {
+	switch {
+	case current.Channels == nil:
 		fmt.Fprintln(stdout, "kanal: semua kanal aktif")
-	} else {
+	case len(current.Channels) == 0:
+		fmt.Fprintln(stdout, "kanal: tidak ada (enrolment baru tidak bisa diprovisikan)")
+	default:
 		fmt.Fprintf(stdout, "kanal: %s\n", strings.Join(current.Channels, ", "))
+		// Kanal yang diaktifkan layanan (/v1/config) tidak terlihat dari CLI; tanpa irisan, enrolment baru
+		// di gedung ini tidak bisa diprovisikan (review akhir, ADR-0049).
+		fmt.Fprintln(stdout, "catatan: kanal efektif = kanal ini ∩ kanal yang diaktifkan layanan (/v1/config)")
 	}
 	fmt.Fprintf(stdout, "zona: %d\n", current.ZoneCount)
 	return 0

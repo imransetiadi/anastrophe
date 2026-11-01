@@ -399,7 +399,7 @@ func (s *Store) SiteZoneNames(ctx context.Context, siteID string) ([]string, err
 		return nil, ErrNotFound
 	}
 	var names []string
-	err := s.pool.QueryRow(ctx, `SELECT COALESCE(ARRAY(SELECT jsonb_array_elements_text(policy -> 'zones')), '{}') FROM sites WHERE id = $1`, siteID).Scan(&names)
+	err := s.pool.QueryRow(ctx, `SELECT `+zonesSQL("policy")+` FROM sites WHERE id = $1`, siteID).Scan(&names)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}

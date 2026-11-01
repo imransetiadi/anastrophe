@@ -273,6 +273,22 @@
         }
       }
     },
+    "add.error.site_channels_not_offered": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The access methods your building allows aren't available yet. Contact your building management."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cara akses yang diizinkan gedung ini belum tersedia. Hubungi pengelola gedung."
+          }
+        }
+      }
+    },
     "add.error.site_code_unknown": {
       "localizations": {
         "en": {

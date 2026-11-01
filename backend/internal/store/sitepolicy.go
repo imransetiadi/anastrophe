@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -32,33 +33,42 @@ type PolicyUpdate struct {
 	Channels         *[]string
 }
 
-func parseSitePolicy(raw []byte) SitePolicy {
-	var p struct {
-		CertValidityDays int      `json:"cert_validity_days"`
-		Channels         []string `json:"channels"`
-		Zones            []string `json:"zones"`
-	}
-	_ = json.Unmarshal(raw, &p) // kebijakan rusak dibaca sebagai default, sama dengan applyPolicy
-	if p.CertValidityDays < 1 || p.CertValidityDays > 30 {
-		p.CertValidityDays = 0
-	}
-	return SitePolicy{CertValidityDays: p.CertValidityDays, Channels: p.Channels, ZoneCount: len(p.Zones)}
+// rowQuerier: pool maupun transaksi, agar CLI dan transaksi pembaruan membaca kebijakan dengan SQL yang
+// sama persis dengan penerbitan sertifikat.
+type rowQuerier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-// SitePolicyOf membaca kebijakan gedung.
-func (s *Store) SitePolicyOf(ctx context.Context, siteID string) (SitePolicy, error) {
-	if !looksLikeUUID(siteID) {
-		return SitePolicy{}, ErrNotFound
-	}
-	var raw []byte
-	err := s.pool.QueryRow(ctx, `SELECT policy::text FROM sites WHERE id = $1`, siteID).Scan(&raw)
+// sitePolicySQL membaca kebijakan seperti yang ditegakkan server: masa berlaku lewat ->> (angka maupun
+// teks), kanal lewat sitePolicyChannelsSQL, dan jumlah zona hanya bila zones berupa array.
+const sitePolicySQL = `SELECT s.policy ->> 'cert_validity_days', ` + sitePolicyChannelsSQL + `,
+	CASE WHEN jsonb_typeof(s.policy -> 'zones') = 'array' THEN jsonb_array_length(s.policy -> 'zones') ELSE 0 END
+	FROM sites s WHERE s.id = $1`
+
+func readSitePolicy(ctx context.Context, q rowQuerier, siteID string) (SitePolicy, error) {
+	var validity *string
+	var p SitePolicy
+	err := q.QueryRow(ctx, sitePolicySQL, siteID).Scan(&validity, &p.Channels, &p.ZoneCount)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return SitePolicy{}, ErrNotFound
 	}
 	if err != nil {
 		return SitePolicy{}, err
 	}
-	return parseSitePolicy(raw), nil
+	if validity != nil {
+		if days, err := strconv.Atoi(*validity); err == nil && days >= 1 && days <= 30 {
+			p.CertValidityDays = days // sama dengan applyPolicy saat penerbitan
+		}
+	}
+	return p, nil
+}
+
+// SitePolicyOf membaca kebijakan gedung persis seperti yang ditegakkan server.
+func (s *Store) SitePolicyOf(ctx context.Context, siteID string) (SitePolicy, error) {
+	if !looksLikeUUID(siteID) {
+		return SitePolicy{}, ErrNotFound
+	}
+	return readSitePolicy(ctx, s.pool, siteID)
 }
 
 // UpdateSitePolicy mengubah masa berlaku sertifikat dan/atau kanal gedung, lalu mencatat audit
@@ -90,9 +100,10 @@ func (s *Store) UpdateSitePolicy(ctx context.Context, siteID, operator string, u
 	if !looksLikeUUID(siteID) {
 		return SitePolicy{}, ErrNotFound
 	}
-	var raw []byte
+	var result SitePolicy
 	err := s.InTx(ctx, func(t *Tx) error {
-		if err := t.tx.QueryRow(ctx, `SELECT policy::text FROM sites WHERE id = $1 FOR UPDATE`, siteID).Scan(&raw); err != nil {
+		var locked string
+		if err := t.tx.QueryRow(ctx, `SELECT id::text FROM sites WHERE id = $1 FOR UPDATE`, siteID).Scan(&locked); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrNotFound
 			}
@@ -119,7 +130,8 @@ func (s *Store) UpdateSitePolicy(ctx context.Context, siteID, operator string, u
 				data["channels"] = channels
 			}
 		}
-		if err := t.tx.QueryRow(ctx, `SELECT policy::text FROM sites WHERE id = $1`, siteID).Scan(&raw); err != nil {
+		var err error
+		if result, err = readSitePolicy(ctx, t.tx, siteID); err != nil {
 			return err
 		}
 		return t.AppendAudit(ctx, AuditEvent{SiteID: siteID, Actor: "operator:" + operator, Action: "site.policy_updated", Subject: "site:" + siteID, Data: data, At: at})
@@ -127,11 +139,23 @@ func (s *Store) UpdateSitePolicy(ctx context.Context, siteID, operator string, u
 	if err != nil {
 		return SitePolicy{}, err
 	}
-	return parseSitePolicy(raw), nil
+	return result, nil
 }
 
-// sitePolicyChannelsSQL: kanal kebijakan gedung sebagai text[], NULL bila tidak dibatasi.
-const sitePolicyChannelsSQL = `CASE WHEN s.policy ? 'channels' THEN ARRAY(SELECT jsonb_array_elements_text(s.policy -> 'channels')) END`
+// sitePolicyChannelsSQL: kanal kebijakan gedung sebagai text[]. Kunci tidak ada atau JSON null → NULL (tanpa
+// pembatasan); array → elemennya, tanpa elemen null; bentuk lain (string, objek, angka) → '{}' (fail-closed:
+// tidak ada kanal). Nilai yang ditulis lewat SQL tidak pernah membuat lookup atau enrolment gagal (review
+// akhir #1).
+const sitePolicyChannelsSQL = `CASE
+	WHEN s.policy -> 'channels' IS NULL OR jsonb_typeof(s.policy -> 'channels') = 'null' THEN NULL
+	WHEN jsonb_typeof(s.policy -> 'channels') = 'array' THEN ARRAY(SELECT v FROM jsonb_array_elements_text(s.policy -> 'channels') AS v WHERE v IS NOT NULL)
+	ELSE '{}'::text[] END`
+
+// zonesSQL: nama zona dari kolom kebijakan sebagai text[] berurutan (indeks = nomor bit). Bukan array → '{}';
+// elemen null menjadi string kosong agar posisi bit tidak bergeser.
+func zonesSQL(policy string) string {
+	return `COALESCE(CASE WHEN jsonb_typeof(` + policy + ` -> 'zones') = 'array' THEN ARRAY(SELECT COALESCE(v, '') FROM jsonb_array_elements_text(` + policy + ` -> 'zones') WITH ORDINALITY AS z(v, n) ORDER BY n) END, '{}')`
+}
 
 // SiteChannelsOfInstance membaca kanal kebijakan gedung untuk card instance di dalam transaksi enrolment,
 // sehingga instance yang baru dibuat ikut terlihat. nil berarti semua kanal global.

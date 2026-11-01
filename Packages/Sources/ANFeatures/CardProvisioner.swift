@@ -110,14 +110,20 @@ struct CardProvisioner {
     }
 
     /// Kanal terbaik dari kanal global ∩ kanal gedung. Bila kanal gedung tidak bisa dipakai tetapi kanal
-    /// global bisa, galatnya `siteChannelUnavailable` agar pengguna tahu batasannya dari gedung.
+    /// global bisa, galatnya menjelaskan batasan dari gedung: iPhone hanya disalahkan bila setiap kanal yang
+    /// diizinkan terhalang oleh perangkat itu sendiri (review akhir kebijakan gedung).
     static func select(enabled: Set<ChannelKind>, siteChannels: Set<ChannelKind>?, availability: [ChannelKind: ChannelAvailability]) throws -> ChannelKind {
         let allowed = siteChannels.map { enabled.intersection($0) } ?? enabled
         if let selected = provisionableChannel(enabled: allowed, availability: availability) { return selected }
-        if siteChannels != nil, provisionableChannel(enabled: enabled, availability: availability) != nil {
+        guard siteChannels != nil, provisionableChannel(enabled: enabled, availability: availability) != nil else {
+            throw ANError.channelUnavailable(.notEligible)
+        }
+        let allowedInApp = allowed.intersection(inAppChannels)
+        let deviceCauses: Set<ChannelAvailability> = [.unsupportedDevice, .notEligible]
+        if !allowedInApp.isEmpty, allowedInApp.allSatisfy({ deviceCauses.contains(availability[$0] ?? .notEligible) }) {
             throw ANError.siteChannelUnavailable
         }
-        throw ANError.channelUnavailable(.notEligible)
+        throw ANError.siteChannelsNotOffered
     }
 
     /// Kunci kredensial baru dengan `cred_id` lokal sementara (16 byte acak).

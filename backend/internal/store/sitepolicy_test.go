@@ -137,3 +137,60 @@ func TestKanalKebijakanTerbawaKeEnrolmentDanLookup(t *testing.T) {
 		t.Fatalf("enrolment: %v %v %v", policyChannels, enrollment.Channels, err)
 	}
 }
+
+func TestKebijakanTidakBerbentukArrayTidakMenggagalkan(t *testing.T) {
+	// Review akhir #1: nilai kebijakan yang ditulis lewat SQL (null, string, objek, [null], []) tidak boleh
+	// membuat lookup, enrolment, atau EnrollmentForUpdate gagal; CLI membaca nilai yang sama dengan server.
+	ctx := context.Background()
+	at := time.Unix(1_794_000_000, 0)
+	for i, c := range []struct {
+		policy   string
+		channels []string // nil = tanpa pembatasan; [] = tidak ada kanal (fail-closed)
+		days     int
+	}{
+		{`{"channels": null}`, nil, 0},
+		{`{"channels": "ble"}`, []string{}, 0},
+		{`{"channels": {}}`, []string{}, 0},
+		{`{"channels": [null]}`, []string{}, 0},
+		{`{"channels": []}`, []string{}, 0},
+		{`{"channels": ["ble"], "zones": "x"}`, []string{"ble"}, 0},
+		{`{"cert_validity_days": "3", "zones": [null, "Lobi"]}`, nil, 3},
+	} {
+		s := freshStore(t)
+		site, device := seed(t, s)
+		if err := s.SetSitePolicy(ctx, site, []byte(c.policy)); err != nil {
+			t.Fatal(err)
+		}
+		card := bytes.Repeat([]byte{byte(0x10 + i)}, 32)
+		if _, _, err := s.UpsertPhysicalCards(ctx, site, "uji", []PhysicalCard{{CardHMAC: card}}, 0, at); err != nil {
+			t.Fatal(err)
+		}
+		code, _, err := s.RotateSiteJoinCode(ctx, site, "staf-01", at)
+		if err != nil {
+			t.Fatal(err)
+		}
+		same := func(got []string) bool {
+			return (got == nil) == (c.channels == nil) && slices.Equal(got, c.channels)
+		}
+		ref, err := s.SiteByJoinCode(ctx, code)
+		if err != nil || !same(ref.Channels) {
+			t.Fatalf("%s lookup: %#v %v", c.policy, ref.Channels, err)
+		}
+		policy, err := s.SitePolicyOf(ctx, site)
+		if err != nil || !same(policy.Channels) || policy.CertValidityDays != c.days {
+			t.Fatalf("%s CLI: %+v %v", c.policy, policy, err)
+		}
+		var enrollment Enrollment
+		err = s.InTx(ctx, func(tx *Tx) error {
+			enrolled, err := tx.EnrollCard(ctx, device, site, card, at)
+			if err != nil {
+				return err
+			}
+			enrollment, err = tx.EnrollmentForUpdate(ctx, enrolled.ID)
+			return err
+		})
+		if err != nil || !same(enrollment.Channels) || enrollment.CertValidityDays != c.days {
+			t.Fatalf("%s enrolment: %#v %d %v", c.policy, enrollment.Channels, enrollment.CertValidityDays, err)
+		}
+	}
+}

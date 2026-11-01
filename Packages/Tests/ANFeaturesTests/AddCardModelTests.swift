@@ -111,6 +111,23 @@ struct AddCardModelTests {
         #expect(transport.paths == ["/v1/sites/lookup", "/v1/config"])
     }
 
+    @Test func cobaLagiSetelahKanalGedungMencariUlang() async {
+        // Review akhir (Minor 1, dinaikkan): setelah pengelola melonggarkan kebijakan, "Coba lagi" mencari
+        // ulang kode gedung, bukan memakai kanal dari lookup pertama.
+        let restricted = (200, #"{"site_id":"\#(Self.siteID)","name":"Menara Uji","channels":["nfcHCE"]}"#, "application/json")
+        let loosened = (200, #"{"site_id":"\#(Self.siteID)","name":"Menara Uji","channels":["ble","nfcHCE"]}"#, "application/json")
+        let (model, transport, _) = make([restricted, configBody(["ble", "nfcHCE"]), loosened])
+        await confirmed(model)
+        await model.confirmAndRead()
+        guard case .failed = model.step else { Issue.record("langkah \(model.step)"); return }
+        model.back()
+        #expect(model.step == .siteCode)
+        #expect(model.codeInput == "7k2q-9xa4")
+        await model.submitCode()
+        #expect(model.step == .confirmSite(SiteSummary(siteID: Self.siteID, name: "Menara Uji", channels: [.ble, .nfcHCE])))
+        #expect(transport.paths == ["/v1/sites/lookup", "/v1/config", "/v1/sites/lookup"])
+    }
+
     @Test func kartuTakTerbacaMenawarkanUndangan() async {
         let (model, transport, _) = make([site], reader: .failure(.cardUnreadable))
         await confirmed(model)

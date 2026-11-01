@@ -83,5 +83,11 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
   - **M7 klaim tanpa bukti:** Bluetooth "semua wilayah" tanpa syarat gedung memakai pembaca Bluetooth (sudah di SDD, belum di salinan app); klaim hapus lewat Lacak tanpa ID bukti; "autentikasi" di jawaban ponsel hilang belum diganti "Face ID, Touch ID, atau kode sandi".
   - **M8 duplikasi:** salinan perangkat didukung ada di empat string.
   - **M10 aksesibilitas:** `ProgressView` laporan belum berlabel.
+- **Kebijakan gedung (minor review akhir, ADR-0049)** — pengguna memutuskan apakah dikerjakan:
+  - **Cek lebih awal:** kanal gedung baru diperiksa sesudah penghuni menempel kartu, padahal kelayakan perangkat sudah diketahui di langkah konfirmasi gedung.
+  - **Galat domain:** `ENR-INVALID-CHANNEL` belum dipetakan ke galat domain di app, sehingga kebijakan yang berubah di antara enrolment dan provisioning tampil sebagai galat umum.
+  - **Tolak lebih awal (butuh perubahan spec/ADR):** server bisa menolak enrolment bila kanal efektif gedung kosong, sesudah bukti kartu atau token, untuk menghindari slot/undangan tertahan.
+  - **E2e belum dijalankan:** jalur pembatasan non-kosong (`--channels ble`) belum diuji e2e; sudah tercakup test unit.
+  - **Perpanjangan:** perpanjangan tetap menerbitkan sertifikat untuk kanal yang kemudian dilarang gedung (ADR-0023; butuh keputusan sendiri).
 - **Test flaky:** `BLETapTests.autentikasiBatalMembatalkanPemindaian` sesekali gagal (pembatalan pemindaian bergantung waktu); lulus 6/6 saat diulang.
 - **Riwayat tap:** judul baris "Ditolak · alasan" dirakit di kode (M8; dikerjakan saat bahasa ketiga ditambahkan); VoiceOver baris Status belum diperiksa dengan Accessibility Inspector.

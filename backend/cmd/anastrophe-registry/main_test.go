@@ -796,3 +796,30 @@ func TestPolicyArgumenSalah(t *testing.T) {
 		t.Fatalf("kebijakan berubah: %+v %v", got, err)
 	}
 }
+
+func TestPolicyTanpaKanalDiperingatkan(t *testing.T) {
+	// Review akhir (Minor 3, dinaikkan): kebijakan tanpa kanal efektif terlihat jelas oleh operator, dan
+	// pembatasan kanal selalu disertai catatan irisan dengan kanal layanan.
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	if err := db.SetSitePolicy(ctx, site, []byte(`{"channels": "ble", "cert_validity_days": "3", "zones": ["A"]}`)); err != nil {
+		t.Fatal(err)
+	}
+	var out, errOut bytes.Buffer
+	if code := run(ctx, []string{"policy", "--site", site}, &out, &errOut, env(dsn)); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	for _, want := range []string{"kanal: tidak ada (enrolment baru tidak bisa diprovisikan)", "masa berlaku sertifikat: 3 hari"} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("keluaran tanpa %q:\n%s", want, out.String())
+		}
+	}
+	out.Reset()
+	if code := run(ctx, []string{"policy", "--site", site, "--channels", "nfcHCE", "--operator", "staf-01"}, &out, &errOut, env(dsn)); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	if !strings.Contains(out.String(), "catatan: kanal efektif") {
+		t.Fatalf("tanpa catatan irisan kanal:\n%s", out.String())
+	}
+}
