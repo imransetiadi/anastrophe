@@ -32,6 +32,7 @@
 | 2.16 | 2026-11-01 | Undangan berkartu menyetujui instance perangkat itu yang belum selesai (ADR-0035); kartu yang tidak lagi `ACTIVE` membuat undangannya tidak berlaku; kolom `invitations` dan `card_instances.invitation_id` di model data (§8.1). |
 | 2.17 | 2026-11-02 | Siklus hidup kartu oleh operator (suspend/resume/revoke, ADR-0036), denylist dari pencabutan, token baca status dan `GET /cards/{id}/status` (ADR-0037); provisioning hanya memasang hash bila belum ada; `:renew` memeriksa status setelah bukti kepemilikan; celah pembatalan suspend/revoke tercatat di ADR-0038 (§8.1, §8.4.2, §8.4.3, §8.5, §15). |
 | 2.18 | 2026-11-02 | Rahasia enrolment untuk kredensial pertama dan penolakan tambah kanal ke kartu aktif (ADR-0040); celah penerbitan kredensial lewat id instance ditutup (§8.4.1, §8.5, §15). |
+| 2.19 | 2026-11-02 | `credentials.max_not_after` dan masa berlaku denylist dari sertifikat terpanjang, purge per jam (§8.1, §8.4.3). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -566,7 +567,7 @@ physical_cards(id uuid pk, site_id fk, card_id_hmac bytea, holder_contact_hmac b
 card_ownerships(id uuid pk, physical_card_id fk unique, primary_user_id fk, security_code_hash text, failed_attempts int, locked_until timestamptz, max_members smallint)
 memberships(id uuid pk, ownership_id fk, user_id fk, role text check (role in ('PRIMARY','MEMBER')), removed_at timestamptz)
 card_instances(id uuid pk, membership_id fk, device_id fk, physical_card_id fk null, invitation_id fk null, status text, status_changed_at timestamptz, status_token_hash bytea null, created_at timestamptz)        -- "Kartu (digital)", maks 8 aktif per device; physical_card_id = kartu registri yang dicocokkan saat enrolment (ADR-0031); invitation_id = undangan yang dipakai (ADR-0033); status_token_hash = SHA-256 token baca status (ADR-0037)
-credentials(id uuid pk, card_instance_id fk, channel text, cred_id bytea unique, pubkey bytea, cert bytea, not_after timestamptz, last_counter bigint, status text, revoked_at timestamptz, revoke_reason text)
+credentials(id uuid pk, card_instance_id fk, channel text, cred_id bytea unique, pubkey bytea, cert bytea, not_after timestamptz, max_not_after timestamptz, last_counter bigint, status text, revoked_at timestamptz, revoke_reason text)
 wallet_passes(id uuid pk, card_instance_id fk, apple_pass_ref text, device_kind text /*iphone|watch*/, status text)   -- R2
 invitations(id uuid pk, site_id fk, physical_card_id fk null, contact_hmac bytea null, token_hash bytea unique, zones_bitmap bigint, expires_at timestamptz, used_at timestamptz null, created_at timestamptz)
 claim_disputes(id uuid pk, physical_card_id fk, reporter_user_id fk, status text, decision text, decided_by fk, decided_at timestamptz)
@@ -585,7 +586,7 @@ audit_events(id bigserial pk, chain text /* site:<uuid> | platform (ADR-0024) */
 - Siklus hidup oleh operator (ADR-0036): `suspend` ACTIVE → SUSPENDED, `resume` SUSPENDED → ACTIVE, `revoke` {ACTIVE, SUSPENDED, PROVISIONING} → REVOKED; kredensial mengikuti status instance; status lain ditolak tanpa perubahan dan tanpa audit. Audit `card.suspended`, `card.resumed`, `card.revoked {reason, credentials}` dengan alasan berupa kode `[a-z_]{1,32}`. Kunci diambil berurutan: instance, lalu kredensial (sama dengan hapus kartu).
 - Token baca status (ADR-0037): server hanya menyimpan `status_token_hash` (32 byte) yang dikirim app saat provisioning atau perpanjangan bertanda tangan; token mentah tidak pernah disimpan atau di-log.
 - `credentials.not_after ≤ issued_at + policy.cert_validity_days`.
-- `denylist_entries.expires_at = not_after` sertifikat terakhir, sehingga denylist tidak tumbuh tanpa batas.
+- `denylist_entries.expires_at` = masa berlaku terpanjang yang pernah diterbitkan untuk kredensial itu (`GREATEST(max_not_after, not_after)`), karena perpanjangan bisa memendekkan `not_after` sementara sertifikat lama masih di tangan pemegang. Baris yang sudah lewat dibuang sapuan per jam, sehingga denylist tidak tumbuh tanpa batas.
 - `sites.policy` (JSON) memuat `zones` (nama zona), `zones_bitmap` (bilangan 64-bit) dan `cert_validity_days` (1–30, default 7 sesuai ADR-0010). Tanpa `zones_bitmap`, sertifikat diterbitkan dengan bitmap 0 (*fail-closed*: tidak membuka zona mana pun).
 
 ### 8.2 State kredensial
@@ -672,7 +673,7 @@ Kapan app memicu alur ini diatur ADR-0023 (§5.5).
 
 Event `credential.revoked` → Site Sync menambah denylist + push MQTT ke reader/gateway online (target ≤ 60 dtk). Reader offline mendapatkannya pada sinkron berikutnya (default 15 menit). Reader yang terputus total tetap menolak saat sertifikat kedaluwarsa (≤ 7 hari).
 
-Implementasi saat ini: pencabutan oleh operator (`anastrophe-registry revoke`) dan hapus kartu oleh pengguna (ADR-0026) menulis `denylist_entries` dalam transaksi pencabutan, dengan `expires_at` = `not_after` sertifikat. Sinkron ke reader dan gateway belum ada (menunggu ADR-0022). Kartu yang ditangguhkan tidak masuk denylist: kredensialnya tidak bisa diperpanjang sehingga kedaluwarsa dalam ≤ 7 hari, dan app menampilkan Ditangguhkan lewat token baca status.
+Implementasi saat ini: pencabutan oleh operator (`anastrophe-registry revoke`) dan hapus kartu oleh pengguna (ADR-0026) menulis `denylist_entries` dalam transaksi pencabutan, dengan `expires_at` = masa berlaku terpanjang yang pernah diterbitkan, dan dibuang sapuan per jam setelah lewat. Sinkron ke reader dan gateway belum ada (menunggu ADR-0022). Kartu yang ditangguhkan tidak masuk denylist: kredensialnya tidak bisa diperpanjang sehingga kedaluwarsa dalam ≤ 7 hari, dan app menampilkan Ditangguhkan lewat token baca status.
 
 #### 8.4.4 Transfer perangkat (FR-41)
 

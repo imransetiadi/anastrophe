@@ -126,7 +126,7 @@ func (t *Tx) revokeInstance(ctx context.Context, cardID, reason string, now time
 	rows, err := t.tx.Query(ctx, `
 		UPDATE credentials SET status = 'REVOKED', revoked_at = $2, revoke_reason = $3
 		WHERE card_instance_id = $1 AND status IN ('ACTIVE', 'SUSPENDED')
-		RETURNING cred_id, channel, COALESCE(max_not_after, not_after)`, cardID, now, reason)
+		RETURNING cred_id, channel, GREATEST(max_not_after, not_after)`, cardID, now, reason)
 	if err != nil {
 		return nil, err
 	}

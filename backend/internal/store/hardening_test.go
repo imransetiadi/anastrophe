@@ -174,3 +174,25 @@ func TestPurgeDenylistKedaluwarsa(t *testing.T) {
 		t.Fatalf("tersisa %d (%v), ingin 1", left, err)
 	}
 }
+
+func TestDenylistMemakaiYangTerpanjangDariKeduaKolom(t *testing.T) {
+	// Review akhir perbaikan minor 2: server lama (sebelum 0012) memperpanjang not_after tanpa menyentuh
+	// max_not_after; denylist tetap harus bertahan sampai sertifikat yang masih hidup habis.
+	s := freshStore(t)
+	ctx := context.Background()
+	_, _, id, creds := activeCard(t, s, "ble")
+	var later time.Time
+	if err := s.pool.QueryRow(ctx, `UPDATE credentials SET not_after = not_after + interval '20 days' WHERE cred_id = $1 RETURNING not_after`, creds[0]).Scan(&later); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RevokeCardInstance(ctx, id, "hilang", "staf-01", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	var expires time.Time
+	if err := s.pool.QueryRow(ctx, `SELECT expires_at FROM denylist_entries WHERE cred_id = $1`, creds[0]).Scan(&expires); err != nil {
+		t.Fatal(err)
+	}
+	if !expires.Equal(later) {
+		t.Fatalf("expires_at = %v, ingin %v", expires, later)
+	}
+}

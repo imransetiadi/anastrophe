@@ -11,6 +11,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Sesi
 
+- [2026-11-02 — Perbaikan minor tertunda](sessions/2026-11-02-perbaikan-minor.md)
 - [2026-11-02 — Provisioning kredensial yang aman](sessions/2026-11-02-provisioning-aman.md)
 - [2026-11-02 — Siklus hidup kartu oleh operator dan status kartu di app](sessions/2026-11-02-siklus-hidup-kartu.md)
 - [2026-11-01 — Enrolment via undangan](sessions/2026-11-01-undangan.md)
@@ -50,6 +51,6 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 ## Menunggu pengguna
 
 - ADR-0017 (entitas hukum untuk entitlement), ADR-0022 (bentuk reader uji BLE), ADR-0038 (cegah pembatalan suspend/revoke; rekomendasi `hold_pending_approval`), ADR-0041 (pengambilalihan enrolment yang belum selesai; rekomendasi `first_writer_wins`).
-- Tinjauan gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman.
+- Tinjauan gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor.
 - Integrasi branch `feat/r1-scaffold`: merge ke `main` atau PR (sudah di-push ke GitHub private).
 - `DEVELOPMENT_TEAM` serta iPhone dan reader untuk uji bertipe H.

@@ -239,8 +239,8 @@ func invite(ctx context.Context, args []string, stdout, stderr io.Writer, getenv
 	// Review akhir undangan M6: tautan harus bisa dipakai app (InvitationLink: https, host, /i/<token>).
 	if *linkBase != "" {
 		base, err := url.Parse(*linkBase)
-		if err != nil || base.Scheme != "https" || base.Host == "" || !strings.HasSuffix(*linkBase, "/") {
-			return fail(errors.New("--link-base harus URL https dengan host dan diakhiri /, mis. https://<domain>/i/"))
+		if err != nil || base.Scheme != "https" || base.Host == "" || base.User != nil || base.Path != "/i/" || base.RawQuery != "" || base.Fragment != "" {
+			return fail(errors.New("--link-base harus tepat https://<domain>/i/ (app hanya membuka /i/<token>)"))
 		}
 	}
 	// Review akhir M5: zona undangan berkartu selalu dari registri kartu; --zones yang diabaikan diam-diam

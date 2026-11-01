@@ -14,12 +14,19 @@ final class CardStatusRefresher {
     private let cards: any CardStore
     private let records: any CredentialRecordStore
     private let tokens: any StatusTokenStore
-    /// Jam monotonik (detik sejak boot): mengubah jam dinding tidak menahan penyegaran (review M6).
+    /// Jam monotonik dalam detik: mengubah jam dinding tidak menahan penyegaran (review M6), dan waktu tidur
+    /// ponsel ikut dihitung (`ContinuousClock`; `systemUptime` berhenti saat tidur, review akhir minor 1).
     private let uptime: @Sendable () -> TimeInterval
     private var lastRefresh: TimeInterval?
 
+    private nonisolated static let origin = ContinuousClock.now
+    nonisolated static func continuousUptime() -> TimeInterval {
+        let elapsed = ContinuousClock.now - origin
+        return Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+    }
+
     init(cards: any CardStore, records: any CredentialRecordStore, tokens: any StatusTokenStore,
-         uptime: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) {
+         uptime: @escaping @Sendable () -> TimeInterval = { CardStatusRefresher.continuousUptime() }) {
         self.cards = cards
         self.records = records
         self.tokens = tokens

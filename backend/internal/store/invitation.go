@@ -37,14 +37,14 @@ func InvitationTokenHash(token string) ([]byte, error) {
 	return sum[:], nil
 }
 
-// CreateInvitation membuat undangan dan mengembalikan token mentahnya satu kali; yang disimpan hanya
-// hash-nya. Undangan berkartu wajib menunjuk kartu ACTIVE di registri gedung.
 // CreatedInvitation adalah hasil CreateInvitation: token mentah dikembalikan satu kali, id untuk audit.
 type CreatedInvitation struct {
 	ID, Token string
 	ExpiresAt time.Time
 }
 
+// CreateInvitation membuat undangan dan mengembalikan token mentahnya satu kali; yang disimpan hanya
+// hash-nya. Undangan berkartu wajib menunjuk kartu ACTIVE di registri gedung.
 func (s *Store) CreateInvitation(ctx context.Context, inv Invitation, operator string, at time.Time) (CreatedInvitation, error) {
 	if !operatorName.MatchString(operator) {
 		return CreatedInvitation{}, ErrInvalidOperator

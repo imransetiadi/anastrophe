@@ -12,13 +12,13 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 ## Status terkini
 
 - Branch kerja: `feat/r1-scaffold`, di-push ke GitHub private `imransetiadi/anastrophe` (origin) atas permintaan pengguna; belum di-merge.
-- Suite terakhir: Swift host 284 test (1 dilewati, tanpa gagal), simulator 282 test (1 dilewati), backend Go 10 paket lulus dengan PostgreSQL.
+- Suite terakhir: Swift host 288 test (1 dilewati, tanpa gagal), simulator 286 test (1 dilewati), backend Go 10 paket lulus dengan PostgreSQL.
 - Menunggu keputusan pengguna:
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
   - ADR-0038: cara mencegah pemegang kartu membatalkan suspend/revoke operator; rekomendasi `hold_pending_approval`, JEV 0,45.
   - ADR-0041: pengambilalihan enrolment yang belum selesai lewat id perangkat + identitas kartu; rekomendasi `first_writer_wins`, JEV 0,44.
 
-  - Tinjauan 10 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman (`docs/adr/jev-log/*-gate.json`).
+  - Tinjauan 11 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor (`docs/adr/jev-log/*-gate.json`).
   - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
 
@@ -37,6 +37,40 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Undangan | Token sekali pakai (32 byte acak, hanya hash yang disimpan), CLI `invite` dengan identitas kartu dari berkas atau stdin, enrolment `{device_id, invitation}`, dan undangan berkartu yang menyetujui enrolment perangkat yang masih menunggu; app mengurai tautan `/i/<token>` | FR-12, FR-53, ADR-0033, ADR-0035 |
 | Siklus hidup kartu | Operator: `list`, `suspend`, `resume`, `revoke` (audit, denylist); app membaca status kartu dengan token baca status tanpa Face ID/passcode. Keterbatasan terbuka: pendaftaran ulang kartu fisik bisa membatalkan suspend/revoke (ADR-0038) | FR-38, FR-50 (sebagian), FR-51, ADR-0036, ADR-0037, ADR-0038 |
 | Provisioning aman | Rahasia enrolment dari app (hanya hash di server) wajib untuk kredensial pertama; tambah kanal ke kartu aktif ditolak. Risiko sisa: id perangkat + identitas kartu bisa mengambil alih enrolment yang belum selesai (ADR-0041) | FR-16, ADR-0039, ADR-0040, ADR-0041 |
+| Ketahanan | Update dijaga status, urutan kunci instance → kredensial, denylist dari sertifikat terpanjang + purge, pembaruan kartu atomik, jam monotonik yang ikut berjalan saat tidur | ADR-0042 |
+
+## API-2026-11-02-0207 - Perbaikan minor tertunda dari tiga review terakhir (Selesai, commit lokal; gate tereskalasi)
+
+Fokus dari ADR-0042. JEV mengeskalasi pilihan fokus (0,41); rekomendasi penulis diterapkan atas dasar tujuan iterasi berkelanjutan dan persetujuan umum pengguna, dan pengguna bisa membatalkannya. ADR-0038 dan ADR-0041 tidak disentuh.
+
+Isi pekerjaan:
+- **Store:**
+  - Update kini dijaga status: hash rahasia hanya untuk instance yang menunggu, dan resume diulang sekali bila sapuan menandai instance `ABANDONED` di tengah transaksi.
+  - Perpanjangan mengunci instance sebelum kredensial (dibuktikan dengan test deterministik `NOWAIT`).
+  - Revoke operator menulis audit `credential.revoked` per kredensial.
+  - Migrasi 0012 `max_not_after`: denylist bertahan sampai sertifikat terpanjang yang pernah diterbitkan habis (`GREATEST`), lalu dibuang sapuan per jam.
+- **CLI:** `invite` mencetak id undangan, dan `--link-base` harus tepat `https://<domain>/i/`.
+- **Test:** idempotency rahasia, hash, dan token undangan; alur persetujuan operator lewat HTTP; peta rahasia fixture dijaga mutex.
+- **App:**
+  - `CardStore.update(id:mutate:)` atomik dan dipakai penyegar status.
+  - Penyegar melewati kartu Dicabut dan membatasi frekuensi dengan `ContinuousClock`, yang ikut berjalan saat ponsel tidur.
+  - Perpanjangan menyimpan `serverCardID` dari challenge.
+  - Parameter rahasia enrolment di `APIClient` kini wajib.
+
+Review akhir (opus): 0 Critical, 0 Important; kelima Review Focus terpenuhi. Fix pass:
+- `GREATEST` untuk masa berlaku denylist.
+- Path `/i/` untuk `--link-base`.
+- `ContinuousClock` untuk penyegar (dinaikkan dari minor karena kartu ditangguhkan bisa tetap tampil Aktif setelah ponsel tidur).
+- Sinkron SDD dan backlog.
+- Minor lain dan deadlock enrolment–sapuan yang sudah ada sebelumnya dicatat di [backlog](docs/agentmemory/backlog.md).
+
+Bukti:
+- Go 10 paket lulus; Swift host 288 test, simulator 286 test; `check_docs` 0 masalah.
+- RED terlihat untuk setiap perbaikan, dan uji mutasi tertangkap.
+
+`jev_gate` tereskalasi (composite 0,73, `spec_match`); 7 klaim terverifikasi.
+
+Commit unit ini: `77f6149`, `79ad48e`, `543576b`, `8f12f03`, `6bfe802`, `cc31e88`, dan commit ini. Obsidian: `sessions/2026-11-02-perbaikan-minor.md`, `decisions/ADR-0042…`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
 
 ## API-2026-11-02-0123 - Provisioning kredensial yang aman (Selesai dengan risiko sisa terbuka, commit lokal; I1 dan gate tereskalasi)
 

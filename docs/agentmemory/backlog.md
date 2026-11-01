@@ -26,6 +26,7 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
 | Peringatan Swift 6 di `LiveCardEmulation` | Tidak muncul lagi di build terakhir |
 | Kebersihan skrip lab (`__pycache__`, `init` menimpa `site.json`, tmp berisi kunci CA) | `__pycache__/` di-ignore; `init` butuh `--force` dan menulis dengan izin 0600; test memakai `addCleanup(shutil.rmtree, ...)` |
 | Penerbitan kredensial lewat id instance dari `:challenge` (prioritas tinggi, review akhir siklus hidup) | ADR-0040: provisioning wajib rahasia enrolment dan hanya untuk instance `PROVISIONING` (`TestProvisioningTanpaRahasiaIdentik`; lab: 404 tanpa rahasia) |
+| Minor siklus hidup M1/M3/M4/M5b/M6/M8, provisioning M1/M2/M4/M5/M6, undangan M4/M6/M7(id)/M9 | Rencana perbaikan minor (ADR-0042): update dijaga status, urutan kunci perpanjangan, denylist dari sertifikat terpanjang + purge, pembaruan kartu terarah, jam `ContinuousClock`, parameter rahasia wajib, CLI id undangan dan `--link-base` `/i/` |
 
 ## Terbuka
 
@@ -34,23 +35,20 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
 - **Perpanjangan:** celah test (cek kanal dan kunci group di renewer, kredensial non-ACTIVE di backend); slot pekerjaan tunggal tidak terikat ke tap; renewer menulis salinan kartu lama; endpoint `:challenge` tanpa autentikasi bisa memperbesar tabel (dibersihkan per jam) dan membedakan status kredensial; drift dokumen (ADR-0023 "paralel", SDD §8.4.2 App Attest, QA TC-DEV-09).
 - **Presentasi:** hitung mundur HCE mulai saat lembar muncul dan angka `coolingDown` tidak berkurang (belum diverifikasi ulang); presentasi tumpang tindih (`heldIntent` dan `connectWaiters`); panjang fragmen BLE memakai panjang tulis `.withResponse`; paritas timing mengasumsikan maksimal 2 kunci per group.
 - **Prioritas tinggi, keamanan (review akhir provisioning aman I1):** tanpa autentikasi perangkat, pihak yang tahu id perangkat dan identitas kartu (atau token undangan) bisa mengganti hash rahasia enrolment instance yang belum selesai lalu memprovisikannya. Menunggu keputusan pengguna di ADR-0041 (rekomendasi `first_writer_wins`).
-- **Siklus hidup kartu (review akhir rencana siklus hidup):**
+- **Siklus hidup kartu (sisa setelah rencana perbaikan minor):**
   - Pendaftaran ulang kartu fisik bisa membatalkan suspend/revoke (C1): menunggu keputusan pengguna di ADR-0038.
-  - Deadlock jarang antara perpanjangan yang memasang hash (kredensial → instance) dan transisi operator (instance → kredensial); retry berhasil (M1).
-  - `expires_at` denylist bisa lebih awal bila validitas kebijakan dipendekkan, dan belum ada purge baris kedaluwarsa (M3).
-  - Penyegar status menulis ulang seluruh `Card` sehingga bisa tertimpa penulis lain sampai penyegaran berikutnya (M4).
-  - Kartu yang dibuat sebelum fitur ini: yang ditangguhkan sebelum perpanjangan tidak pernah mendapat token; `CRED-NOT-RENEWABLE` belum dipetakan ke Ditangguhkan; token disimpan di id challenge bila record tanpa `serverCardID` (M5).
-  - Penyegar tetap memeriksa kartu Dicabut, dan batas frekuensinya memakai jam dinding (M6).
-  - Test tabel lengkap untuk pemetaan status (M7).
-  - Revoke operator hanya mencatat jumlah, sedangkan hapus kartu menulis `credential.revoked` per kredensial (pemicu Site Sync §8.4.3) (M8).
-  - Pesan transisi ilegal CLI bisa menyarankan `reject` untuk `PENDING_APPROVAL` (M10).
-- **Undangan (review akhir rencana undangan):**
+  - `CRED-NOT-RENEWABLE` belum dipetakan ke Ditangguhkan untuk kartu pra-fitur tanpa token (M5a; ambigu dengan kill switch).
+  - Test tabel lengkap untuk pemetaan status (M7); pesan transisi ilegal CLI bisa menyarankan `reject` untuk `PENDING_APPROVAL` (M10).
+  - Perpanjangan dan `KeysViewModel.load` masih menulis ulang seluruh kartu, sehingga perubahan status dari penyegar bisa terbalik sampai penyegaran berikutnya (review perbaikan minor 5).
+  - Purge denylist belum memberi margin toleransi jam reader ±5 menit; belum berdampak sebelum Site Sync ada (review perbaikan minor 4).
+  - Belum ada indeks `denylist_entries.expires_at` (review perbaikan minor 9).
+- **Enrolment dan sapuan per jam (pra-ada, review perbaikan minor):** deadlock 40P01 bisa terjadi bila enrolment mengambil kunci audit gedung lalu menunggu baris yang dipegang sapuan; usulan perbaikan: tulis audit `enrollment.abandoned` di akhir transaksi setelah semua kunci baris diambil. Pola serupa pada `DecideEnrollment` dan audit `abandonStale` lintas gedung.
+- **Provisioning (sisa):** penolakan operator yang bersamaan dengan perangkat melanjutkan instance menunggu dijawab `ENR-DUPLICATE` (review perbaikan minor 7); rahasia dan hash-nya sama-sama `Data`, jadi tertukar di pemanggil tetap terkompilasi; bawaan `update(id:)` non-atomik bisa terpakai diam-diam oleh store pembungkus baru (review perbaikan minor 9).
+- **Test konkurensi:** tiga test baru memakai jeda 300 ms; di runner lambat bisa lulus tanpa menguji balapan (tidak pernah gagal palsu); ganti dengan polling `pg_stat_activity` (review perbaikan minor 8).
+- **Undangan (sisa):**
   - Melanjutkan instance ditolak setelah undangan kedaluwarsa, walau instance masih `PROVISIONING` (M2).
   - Waktu respons berbeda per jalur (tak dikenal ±122 µs, terpakai ±183 µs); tidak bisa dieksploitasi tanpa token 256 bit, perlu dicatat di TC-ENR-08 (M3).
-  - `UPDATE` saat melanjutkan tanpa penjaga status di `invitation.go` dan `registry.go`, sehingga balapan dengan sapuan per jam bisa memberi 200 untuk instance yang baru `ABANDONED` (M4).
-  - `--link-base` tidak divalidasi (https dan garis miring akhir) (M6).
-  - CLI tidak mencetak id undangan, dan belum ada pencabutan undangan (bersama FR-51) (M7).
-  - Hash idempotency jalur undangan belum diuji (M9).
-  - Test kecil: galat tebusan pertama diabaikan, test bocor CLI hanya memeriksa bentuk base64 (M12).
+  - Belum ada pencabutan undangan (bersama FR-51) (sisa M7).
+  - Test kecil: galat tebusan pertama diabaikan (M12).
 - **Test flaky:** `BLETapTests.autentikasiBatalMembatalkanPemindaian` sesekali gagal (pembatalan pemindaian bergantung waktu); lulus 6/6 saat diulang.
 - **Riwayat tap:** judul baris "Ditolak · alasan" dirakit di kode (M8; dikerjakan saat bahasa ketiga ditambahkan); VoiceOver baris Status belum diperiksa dengan Accessibility Inspector.

@@ -641,10 +641,12 @@ func TestInviteLinkBaseHarusHttpsDenganGarisMiring(t *testing.T) {
 	db, dsn := freshStore(t)
 	site := siteWithZones(t, db)
 	for base, want := range map[string]int{
-		"http://contoh.test/i/":  2,
-		"https://contoh.test/i":  2,
-		"https:///i/":            2,
-		"https://contoh.test/i/": 0,
+		"http://contoh.test/i/":      2,
+		"https://contoh.test/i":      2,
+		"https:///i/":                2,
+		"https://contoh.test/":       2, // review akhir perbaikan minor 6: app hanya membuka /i/<token>
+		"https://contoh.test/i/?x=1": 2,
+		"https://contoh.test/i/":     0,
 	} {
 		var out, errOut bytes.Buffer
 		code := run(context.Background(), []string{"invite", "--site", site, "--zones", "Lobi", "--link-base", base, "--operator", "staf-01"}, &out, &errOut, env(dsn))
