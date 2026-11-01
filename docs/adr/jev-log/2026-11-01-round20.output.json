@@ -1,0 +1,88 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "operator_lifecycle_status",
+    "escaped": false,
+    "confidence": 0.98,
+    "probabilities": {
+      "operator_lifecycle_status": 0.98,
+      "faq_in_app": 0.02,
+      "hardening_backlog": 0,
+      "add_card_flow_mocked": 0,
+      "ask_user": 0,
+      "investigate": 0,
+      "none": 0
+    },
+    "contradicted_requirements": []
+  },
+  "requirements_checked": 3,
+  "checks": [
+    {
+      "candidate": "operator_lifecycle_status",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "operator_lifecycle_status",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "operator_lifecycle_status",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "faq_in_app",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "faq_in_app",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "faq_in_app",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "hardening_backlog",
+      "requirement": 0,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "hardening_backlog",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "hardening_backlog",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "add_card_flow_mocked",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "add_card_flow_mocked",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "add_card_flow_mocked",
+      "requirement": 2,
+      "answer": "supported"
+    }
+  ],
+  "warnings": [],
+  "usage": {
+    "input_tokens": 3774,
+    "output_tokens": 590
+  }
+}

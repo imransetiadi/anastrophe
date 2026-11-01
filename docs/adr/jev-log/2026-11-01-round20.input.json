@@ -1,0 +1,37 @@
+{
+ "tool": "jev_decide",
+ "label": "D36-fokus-siklus-hidup-operator",
+ "decision": "Which focus should the next autonomous iteration of Anastrophe (iOS access-card app + Go backend, branch feat/r1-scaffold) build, now that card-registry enrolment (ADR-0031/0032/0034) and invitation enrolment (ADR-0033/0035) are complete?",
+ "candidates": [
+  {
+   "id": "operator_lifecycle_status",
+   "description": "FR-51 + FR-38: operator suspend, resume and revoke of a card instance via the anastrophe-registry CLI (audited, credentials follow the instance status, revoked credentials recorded in denylist_entries for later reader sync), plus a way for the app to learn the server-side status of its cards so cards show Ditangguhkan/Dicabut and cannot be presented."
+  },
+  {
+   "id": "faq_in_app",
+   "description": "FR-60: an in-app FAQ screen with per-channel answers in Indonesian and English, reachable from the Keys tab. App-only."
+  },
+  {
+   "id": "hardening_backlog",
+   "description": "Fix the verified open backlog items (invitation minors, renewal test gaps, presentation overlap, BLE fragment length, flaky BLE test, monotonic audit time). No new user-facing feature."
+  },
+  {
+   "id": "add_card_flow_mocked",
+   "description": "FR-05/FR-10/FR-11/FR-12: the Release 'Tambah kartu' flow built behind protocols with mocked device registration and NFC reading; live wiring waits for FR-03 accounts, App Attest and a physical iPhone."
+  }
+ ],
+ "evidence_refs": [
+  "PRD FR-51, FR-38, FR-60, FR-05, FR-10, FR-62",
+  "SDD §8.4.3",
+  "store.SetCardInstanceStatus (test-only)",
+  "docs/agentmemory/backlog.md",
+  "Memory.md Menunggu keputusan pengguna"
+ ],
+ "priorities": "1) Implement a currently missing P0 requirement that is not blocked by pending user decisions (ADR-0017, ADR-0022, DEVELOPMENT_TEAM), hardware (type H tests) or Apple capabilities (Sign in with Apple, APNs, App Attest). 2) Safety and security correctness under the project rules. 3) Verifiable end-to-end in the iOS simulator with the local backend. 4) Bounded to one plan of 3–5 tasks that builds on existing modules.",
+ "requirements": [
+  "Implements at least one P0 requirement from the PRD that is currently missing.",
+  "Can be verified end-to-end in the iOS simulator with the local backend, without a physical iPhone, reader hardware, an Apple Developer team, or a pending user decision.",
+  "Fits in one plan of at most 5 tasks that builds on existing modules."
+ ],
+ "escalate_on_contradiction": true
+}

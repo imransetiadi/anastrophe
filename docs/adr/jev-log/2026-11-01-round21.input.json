@@ -1,0 +1,39 @@
+{
+ "tool": "jev_decide",
+ "label": "D37-sinkron-status-kartu",
+ "decision": "How should the Anastrophe iOS app learn the server-side status of its cards (ACTIVE, SUSPENDED, REVOKED) after an operator suspends, resumes or revokes them (FR-38, ADR-0036), given that push notifications are not available yet?",
+ "candidates": [
+  {
+   "id": "status_read_token",
+   "description": "When a credential is provisioned (and on renewal if missing), the server issues a random 32-byte status token per card instance, stores only its SHA-256, and the app keeps it in the Keychain with afterFirstUnlockThisDeviceOnly. On foreground (throttled, online only) the app calls GET /v1/cards/{id}/status with the token as a bearer credential and updates the local card status; 410 CARD-GONE marks the card revoked. No key signature, so no prompt."
+  },
+  {
+   "id": "signed_status_on_user_action",
+   "description": "Add POST /v1/credentials/{cred}:status using a :challenge nonce and a credential-key signature over 'ANP1-STATUS' ‖ cred_id ‖ nonce. The app runs it only inside actions the user already authenticated (presentation or renewal), so there is no extra prompt, but status updates only when the card is used."
+  },
+  {
+   "id": "challenge_reports_status",
+   "description": "Add card_status (ACTIVE or SUSPENDED) to the existing unauthenticated :challenge 201 response. The app polls :challenge on foreground (throttled) and updates the local status. One request, no new secret, but anyone who knows a cred_id can then distinguish SUSPENDED from ACTIVE."
+  },
+  {
+   "id": "renewal_time_only",
+   "description": "No new call: :renew's 409 gains a reason (suspended or channel_blocked) and the app updates the status only when it renews (after a tap or near expiry); 410 CARD-GONE marks the card revoked."
+  }
+ ],
+ "evidence_refs": [
+  "CLAUDE.md aturan 5 / ADR-0009 (.userPresence)",
+  "ADR-0026 (challenge + tanda tangan)",
+  "SDD §8.4.2 catatan keamanan tracer",
+  "ADR-0023",
+  "ANStorage.SecretStore afterFirstUnlockThisDeviceOnly (SDD §5.3)",
+  "FR-25",
+  "pola token undangan ADR-0033"
+ ],
+ "priorities": "1) Security and privacy: nobody who only knows a cred_id or device_id learns more than today, and no secret is stored raw on the server. 2) Usability on a real iPhone: no Face ID or passcode prompt outside an action the user started. 3) Timeliness: the app reflects a suspension or resumption soon after it happens while online. 4) Minimal new API surface and reuse of existing patterns.",
+ "requirements": [
+  "A party that knows only a cred_id or a device_id cannot learn whether a card is suspended.",
+  "On a real iPhone, refreshing the status never triggers a Face ID or passcode prompt outside an action the user started.",
+  "While online, the app reflects a suspension or resumption at its next foreground refresh, without a tap or a renewal."
+ ],
+ "escalate_on_contradiction": true
+}

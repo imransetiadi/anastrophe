@@ -39,3 +39,5 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0033](0033-fokus-enrolment-undangan.md) | Iterasi berikutnya: enrolment via undangan | Diterima | `invitation_enrolment` | 0.89 |
 | [ADR-0034](0034-lanjutkan-enrolment-belum-selesai.md) | Enrolment yang belum selesai dilanjutkan; PROVISIONING tanpa kredensial kedaluwarsa 15 menit | Diterima | `resume_plus_expiry` | 0.81 |
 | [ADR-0035](0035-undangan-berkartu-menyetujui-instance.md) | Undangan berkartu menyetujui instance yang belum selesai milik perangkat yang sama | Diterima | `promote_existing` | 0.94 |
+| [ADR-0036](0036-fokus-siklus-hidup-kartu-operator.md) | Fokus berikutnya: siklus hidup kartu oleh operator dan status kartu di app | Diterima | `operator_lifecycle_status` | 0.98 |
+| [ADR-0037](0037-token-baca-status-kartu.md) | App membaca status kartu dengan token baca status | Diterima | `status_read_token` | 0.96 |
