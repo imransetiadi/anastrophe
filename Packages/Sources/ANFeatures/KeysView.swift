@@ -11,6 +11,8 @@ public struct KeysView: View {
     @State private var path: [Card.ID] = []
     @State private var presentation: PresentationController
     @State private var showsLab = false
+    /// Layar Bantuan (ADR-0048).
+    @State private var showsHelp = false
     @State private var deleteMessage: String?
     @State private var deleting: Card.ID?
     /// Alur Tambah Kartu (FR-10): dari tombol atau dari tautan undangan yang dibuka sistem.
@@ -59,8 +61,13 @@ public struct KeysView: View {
                         }
                         .disabled(!model.canAddCard || services.storageFailed)
                     }
+                    ToolbarItem(placement: Self.leadingPlacement) {
+                        Button { showsHelp = true } label: {
+                            Label(localized("keys.help"), systemImage: "questionmark.circle")
+                        }
+                    }
                     #if DEBUG
-                    ToolbarItem(placement: Self.labPlacement) {
+                    ToolbarItem(placement: Self.leadingPlacement) {
                         Button(localized("keys.lab")) { showsLab = true }
                     }
                     #endif
@@ -98,6 +105,9 @@ public struct KeysView: View {
             // Tautan undangan https://<host>/i/<token> (FR-12). Tidak menyela presentasi yang sedang berjalan.
             guard let entry = AddCardEntry.entry(for: url), presentation.request == nil else { return }
             addCard = AddCardRequest(entry: entry)
+        }
+        .sheet(isPresented: $showsHelp) {
+            HelpView(services: services)
         }
         .sheet(item: $addCard) { request in
             AddCardView(services: services, entry: request.entry, reader: services.makeCardReader(),
@@ -168,8 +178,7 @@ public struct KeysView: View {
         }
     }
 
-    #if DEBUG
-    private static var labPlacement: ToolbarItemPlacement {
+    private static var leadingPlacement: ToolbarItemPlacement {
         #if os(iOS)
         .topBarLeading
         #else
@@ -177,6 +186,7 @@ public struct KeysView: View {
         #endif
     }
 
+    #if DEBUG
     /// Hasil provisioning dari argumen `-ANLabBackend` (DEBUG saja).
     @ViewBuilder
     private var labBanner: some View {
@@ -224,6 +234,7 @@ public struct KeysView: View {
         #if DEBUG
         switch services.demoScreen {
         case "lab": showsLab = true
+        case "help": showsHelp = true
         case "detail": if let first = model.cards.first { path = [first.id] }
         case "presentation", "bluetooth-denied": if let first = model.cards.first(where: { model.presentability(of: $0).canPresent }) { use(first) }
         default: break

@@ -26,7 +26,7 @@ enum AppEnvironment {
         services.configureLabBackend(arguments: arguments)
         // Verifikasi visual lab dengan layanan live; layar presentasi tidak dibuka otomatis karena
         // akan memulai presentasi nyata tanpa pengguna memilih kartu (CLAUDE.md aturan 4).
-        services.demoScreen = ["detail", "lab"].contains(screen ?? "") ? screen : nil
+        services.demoScreen = ["detail", "lab", "help"].contains(screen ?? "") ? screen : nil
         #endif
         return services
     }
