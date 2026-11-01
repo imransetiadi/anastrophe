@@ -44,3 +44,4 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0038](0038-cegah-pembatalan-tindakan-operator.md) | Pemegang kartu tidak boleh membatalkan suspend/revoke operator (terbuka) | Diusulkan — butuh keputusan manusia (eskalasi) | — (escalate) | 0.45 |
 | [ADR-0039](0039-fokus-provisioning-aman.md) | Fokus berikutnya: provisioning kredensial hanya untuk perangkat yang memulai enrolment | Diterima | `secure_provisioning` | 0.92 |
 | [ADR-0040](0040-rahasia-enrolment-kredensial-pertama.md) | Rahasia enrolment untuk kredensial pertama; tambah kanal ke kartu aktif ditolak | Diterima | `secret_first_block_add_channel` | 0.83 |
+| [ADR-0041](0041-pengambilalihan-enrolment-belum-selesai.md) | Pengambilalihan enrolment yang belum selesai lewat id perangkat (terbuka) | Diusulkan — butuh keputusan manusia (eskalasi) | — (escalate) | 0.44 |

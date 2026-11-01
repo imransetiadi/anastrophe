@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -217,9 +219,19 @@ func allTablesText(t *testing.T, dsn string) string {
 			t.Fatal(err)
 		}
 		b.WriteString(strings.ToLower(text))
+		// Kolom bytea tampil sebagai "\\x<hex>"; isinya juga didekode agar teks yang bocor ke sana
+		// (mis. body respons di idempotency_keys) ikut terlihat (review akhir provisioning I2).
+		for _, m := range byteaHex.FindAllStringSubmatch(text, -1) {
+			if raw, err := hex.DecodeString(m[1]); err == nil {
+				b.WriteString(" ")
+				b.WriteString(strings.ToLower(string(raw)))
+			}
+		}
 	}
 	return b.String()
 }
+
+var byteaHex = regexp.MustCompile(`\\\\x([0-9a-fA-F]+)`)
 
 // recordingMAC mencatat ID gedung yang diterima sumber MAC.
 type recordingMAC struct {

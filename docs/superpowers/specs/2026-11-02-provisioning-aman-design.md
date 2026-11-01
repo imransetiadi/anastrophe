@@ -11,12 +11,13 @@
 1. App membuat rahasia enrolment 32 byte per enrolment dan mengirim SHA-256-nya sebagai `provisioning_key_hash` di `POST /v1/enrollments` (kartu maupun undangan).
 2. Server menyimpan hash itu pada card instance (`PROVISIONING` atau `PENDING_APPROVAL`, baru maupun dilanjutkan/dipromosikan) dalam transaksi enrolment yang sama.
 3. Provisioning wajib membawa `Authorization: Bearer <rahasia base64url>`. Rahasia hilang, rusak, atau salah dijawab sama dengan id tak dikenal (404 `ENR-NOT-FOUND`). Rahasia diperiksa sebelum status instance diungkap.
-4. Provisioning hanya untuk instance `PROVISIONING`: tambah kanal ke instance ACTIVE ditolak (409 `ENR-NOT-PROVISIONABLE`).
+4. Provisioning hanya untuk instance `PROVISIONING`: tambah kanal ke instance ACTIVE ditolak (404 `ENR-NOT-FOUND` karena hash sudah terhapus; 409 `ENR-NOT-PROVISIONABLE` sebagai pertahanan berlapis bila hash masih ada).
 5. Hash dihapus setelah kredensial pertama tersimpan.
 
 ## Non-goal
 
 - App Attest dan autentikasi perangkat (butuh tim Apple), serta alur tambah kanal bertanda tangan (butuh ADR baru bila produk memerlukannya).
+- Autentikasi pemanggil enrolment: pihak yang tahu id perangkat dan identitas kartu masih bisa mengganti hash instance yang belum selesai (risiko sisa, ADR-0041).
 - Menghapus `card_instance_id` dari jawaban `:challenge`. Id itu masih dipakai sebagai cadangan hapus kartu (ADR-0027) dan tidak lagi cukup untuk provisioning.
 
 ## Anti-goal

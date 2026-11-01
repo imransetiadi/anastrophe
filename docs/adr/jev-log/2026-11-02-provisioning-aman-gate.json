@@ -1,0 +1,78 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "action": "escalate",
+  "label": "provisioning-aman-plan-close-gate",
+  "request": "Close the plan 2026-11-02-provisioning-aman (FR-16; ADR-0039/0040) plus the final-review fix pass (I1 escalated as ADR-0041, I2 leak test fixed, M3/M5).",
+  "reason_codes": [
+    "safe_to_apply_below_review",
+    "review_escalated",
+    "claim_confidence_below_auto_accept"
+  ],
+  "review": {
+    "safe_to_apply": 0.36,
+    "composite": 0.737,
+    "scores": {
+      "correctness": 1.75,
+      "spec_match": 1.71,
+      "test_gap": 0.32,
+      "blast_radius": 1.94
+    }
+  },
+  "verification": {
+    "verified": 7,
+    "contradicted": 0,
+    "unsupported": 0,
+    "needs_review": 1,
+    "results": [
+      {
+        "claim": "Go suite 10/10 ok after fix pass",
+        "verdict": "verified",
+        "confidence": 0.89,
+        "action": "auto"
+      },
+      {
+        "claim": "RED: provisioning without secret 200 and PENDING leak; after: 7 failure forms identical 404",
+        "verdict": "verified",
+        "confidence": 0.77,
+        "action": "review"
+      },
+      {
+        "claim": "Add channel to ACTIVE refused (404, re-armed 409), credential count 1",
+        "verdict": "verified",
+        "confidence": 0.98,
+        "action": "auto"
+      },
+      {
+        "claim": "E2E: app provisioned; :challenge instance id without/with fake secret 404 identical; count 1",
+        "verdict": "verified",
+        "confidence": 0.94,
+        "action": "auto"
+      },
+      {
+        "claim": "Strengthened leak test detects bearer leaked into idempotency bytea body",
+        "verdict": "verified",
+        "confidence": 0.94,
+        "action": "auto"
+      },
+      {
+        "claim": "Residual takeover risk not fixed; escalated as ADR-0041 (JEV 0.44); docs state it",
+        "verdict": "verified",
+        "confidence": 0.89,
+        "action": "auto"
+      },
+      {
+        "claim": "check_docs 0 problems",
+        "verdict": "verified",
+        "confidence": 1.0,
+        "action": "auto"
+      }
+    ]
+  },
+  "note": "Tidak diajukan ulang (ADR-0018); menunggu tinjauan pengguna bersama ADR-0041.",
+  "usage": {
+    "input_tokens": 4556,
+    "output_tokens": 358
+  }
+}

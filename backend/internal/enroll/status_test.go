@@ -202,7 +202,8 @@ func TestTokenStatusTidakBocor(t *testing.T) {
 	encoded := []string{base64.RawURLEncoding.EncodeToString(token), base64.StdEncoding.EncodeToString(token), hex.EncodeToString(token)}
 	for _, text := range []string{logs.String(), allTablesText(t, f.dsn)} {
 		for _, form := range encoded {
-			if strings.Contains(text, form) {
+			// allTablesText menurunkan huruf seluruh dump, jadi bentuk huruf kecil juga dicari.
+			if strings.Contains(text, form) || strings.Contains(text, strings.ToLower(form)) {
 				t.Fatalf("token baca status mentah bocor dalam bentuk %q", form)
 			}
 		}

@@ -20,7 +20,8 @@ Padahal satu-satunya pemanggil provisioning di app adalah alur enrolment yang me
 
 ## Konsekuensi
 
-- `cred_id`, id instance, id perangkat, maupun data reader tidak lagi cukup untuk menerbitkan kredensial.
+- `cred_id`, id instance, maupun data reader tidak lagi cukup untuk menerbitkan kredensial.
+- **Risiko sisa** (review akhir I1): tanpa autentikasi perangkat, pihak yang tahu id perangkat dan identitas kartu fisik (atau token undangan) masih bisa mengganti hash instance yang belum selesai lalu memprovisikannya. Keputusan perbaikannya terbuka di ADR-0041.
 - Tidak ada rahasia baru yang tersimpan di perangkat atau server, kecuali hash sementara milik instance yang sedang diprovisikan.
 - Fitur tambah kanal di masa depan butuh ADR dan alur bertanda tangan sendiri.
 

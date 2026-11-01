@@ -14,7 +14,7 @@
 
 - Rahasia 32 byte, base64url tanpa padding di header `Authorization: Bearer`; server hanya menyimpan SHA-256 (`provisioning_key_hash`).
 - Kegagalan rahasia → 404 `ENR-NOT-FOUND` identik dengan id tak dikenal, diperiksa sebelum status.
-- Provisioning hanya untuk `PROVISIONING`; ACTIVE → 409 `ENR-NOT-PROVISIONABLE`. Hash dihapus setelah kredensial pertama.
+- Provisioning hanya untuk `PROVISIONING`; ACTIVE ditolak (404 karena hash terhapus; 409 `ENR-NOT-PROVISIONABLE` bila hash masih ada). Hash dihapus setelah kredensial pertama.
 - Dokumen Bahasa Indonesia; `check_docs.py` 0 masalah.
 
 ## Review Focus
@@ -43,5 +43,5 @@
 
 ### Task 3: E2E lab dan dokumen
 
-- [ ] E2E: provisioning lab berhasil; tanpa rahasia atau dengan id dari `:challenge` → 404; tambah kanal ke kartu aktif → 409.
+- [ ] E2E: provisioning lab berhasil; tanpa rahasia atau dengan id dari `:challenge` → 404. (Tambah kanal tidak bisa diuji di lab karena API dev hanya mengaktifkan `ble`; dicakup `TestTambahKanalKartuAktifDitolak`.)
 - [ ] SDD §8.4.1/§8.5/§15 dan catatan keamanan tracer; QA TC-ENR-19 + §14; README; commit.

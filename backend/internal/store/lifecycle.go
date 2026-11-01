@@ -188,9 +188,9 @@ func (t *Tx) SetStatusTokenHash(ctx context.Context, cardInstanceID string, hash
 	return nil
 }
 
-// InitStatusTokenHash memasang hash token baca status hanya bila instance belum punya. Provisioning hanya
-// dilindungi id instance (yang bisa didapat dari :challenge), jadi tidak boleh mengganti hash milik
-// pemegang kartu (review akhir I1); penggantian hanya lewat perpanjangan bertanda tangan.
+// InitStatusTokenHash memasang hash token baca status hanya bila instance belum punya (review akhir
+// siklus hidup I1); penggantian hanya lewat perpanjangan bertanda tangan. Provisioning kini juga butuh
+// rahasia enrolment (ADR-0040), tetapi aturan ini tetap mencegah penggantian lewat provisioning.
 func (t *Tx) InitStatusTokenHash(ctx context.Context, cardInstanceID string, hash []byte) error {
 	if len(hash) != 32 {
 		return ErrInvalidTokenHash

@@ -1,0 +1,34 @@
+{
+ "tool": "jev_decide",
+ "label": "D41-risiko-sisa-pengambilalihan-enrolment",
+ "decision": "ADR-0040 requirement 1 is not met for in-flight instances: an attacker who knows the device_id and the physical card identity (or the invitation token) can re-enrol as that device, replace the provisioning hash of an unfinished instance, and provision it. What should Anastrophe do about this residual risk now?",
+ "candidates": [
+  {
+   "id": "document_residual_risk",
+   "description": "Keep the current replace-on-resume rule. State the residual risk precisely in ADR-0040, SDD §8.4.1 and the tracer note, the glossary and QA, and re-open a high-priority backlog item to be closed by device authentication (App Attest or session auth after accounts). Add a test that pins today's behaviour so a later fix changes it deliberately."
+  },
+  {
+   "id": "first_writer_wins",
+   "description": "The server never replaces an existing provisioning hash. The app persists the enrolment secret in the Keychain (afterFirstUnlockThisDeviceOnly) keyed by request and then by instance id, and reuses it on resume and promotion. A lost secret leaves the instance stuck until it is abandoned (PROVISIONING, 15 minutes) or rejected by the operator (PENDING_APPROVAL)."
+  },
+  {
+   "id": "replace_with_old_secret",
+   "description": "Replacing the hash on resume requires presenting the previous secret as proof of continuity; without it the hash stays. The app keeps the secret in memory and in the Keychain for the flow; a lost secret behaves like first_writer_wins."
+  }
+ ],
+ "evidence_refs": [
+  "review akhir provisioning aman I1 (probe A/A2 di 6edc450)",
+  "ADR-0034",
+  "ADR-0035",
+  "ADR-0040",
+  "ADR-0017 (menunggu pengguna)",
+  "FR-19"
+ ],
+ "priorities": "1) Do not leave a documented security requirement silently unmet: either close the gap or record the residual risk honestly with a tracked follow-up. 2) Keep crash resume (FR-19) and invitation promotion (ADR-0035) working for legitimate users. 3) Avoid building device authentication that depends on a pending user decision. 4) Minimal change in this fix pass.",
+ "requirements": [
+  "After this fix pass, no document in the repository claims that knowing the device_id is insufficient to take over an unfinished enrolment unless the code enforces it.",
+  "A legitimate device that crashes during enrolment can still finish within the resume window without operator help.",
+  "The fix does not depend on App Attest, accounts, or another pending user decision."
+ ],
+ "escalate_on_contradiction": true
+}

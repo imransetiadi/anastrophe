@@ -191,7 +191,8 @@ func TestRahasiaEnrolmentTidakBocor(t *testing.T) {
 	f.provisionWith(t, id, bearer, "ble")
 	for _, text := range []string{logs.String(), allTablesText(t, f.dsn)} {
 		for _, form := range []string{base64.RawURLEncoding.EncodeToString(secret), base64.StdEncoding.EncodeToString(secret), hex.EncodeToString(secret)} {
-			if strings.Contains(text, form) {
+			// allTablesText menurunkan huruf seluruh dump, jadi bentuk huruf kecil juga dicari (review akhir I2).
+			if strings.Contains(text, form) || strings.Contains(text, strings.ToLower(form)) {
 				t.Fatalf("rahasia enrolment bocor dalam bentuk %q", form)
 			}
 		}
