@@ -42,7 +42,7 @@ Bahasa domain bersama (*ubiquitous language*) untuk PRD, SDD, QA Suite, kode, da
 | Istilah | Definisi | Nama di kode |
 |---|---|---|
 | **Security code** | Kode 6 digit buatan pemegang utama; diverifikasi server dan dibatasi percobaannya (ADR-0005). | `SecurityCode` |
-| **Undangan** | Token sekali pakai dari admin untuk enrolment tanpa kartu fisik. | `Invitation` |
+| **Undangan** | Token sekali pakai dari admin untuk enrolment tanpa kartu fisik (ADR-0033). Bisa diikat ke kartu terdaftar; undangan berkartu sekaligus menyetujui enrolment perangkat itu yang masih menunggu untuk kartu tersebut (ADR-0035). | `Invitation` |
 | **Sengketa klaim** | Laporan pemegang sah bahwa kartunya diklaim orang lain; diputuskan admin (FR-59). | `ClaimDispute` |
 | **Suspend / Resume** | Penangguhan sementara kredensial/pass (pengguna, admin, atau Lost Mode). | `suspend()` / `resume()` |
 | **Revoke (cabut)** | Penonaktifan permanen kredensial; masuk denylist reader. | `revoke()` |

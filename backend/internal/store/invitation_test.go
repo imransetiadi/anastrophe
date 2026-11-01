@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"strings"
 	"sync"
@@ -227,5 +228,210 @@ func TestUndanganTerbengkalaiBisaDipakaiLagi(t *testing.T) {
 	}
 	if r, err := redeem(t, s, b, token, t0.Add(AbandonedEnrollmentTTL+time.Minute)); err != nil || r.Status != "PROVISIONING" {
 		t.Fatalf("setelah terbengkalai: %+v %v", r, err)
+	}
+}
+
+type auditEntry struct {
+	Action, Actor string
+	Data          map[string]any
+}
+
+// auditOf mengembalikan audit untuk satu subject, urut kejadian.
+func auditOf(t *testing.T, s *Store, subject string) []auditEntry {
+	t.Helper()
+	rows, err := s.pool.Query(context.Background(), `SELECT action, actor, data::text FROM audit_events WHERE subject = $1 ORDER BY at, seq`, subject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (auditEntry, error) {
+		var e auditEntry
+		var data string
+		if err := row.Scan(&e.Action, &e.Actor, &data); err != nil {
+			return e, err
+		}
+		return e, json.Unmarshal([]byte(data), &e.Data)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return entries
+}
+
+func invitationIDOf(t *testing.T, s *Store, token string) string {
+	t.Helper()
+	hash, err := InvitationTokenHash(token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var id string
+	if err := s.pool.QueryRow(context.Background(), `SELECT id::text FROM invitations WHERE token_hash = $1`, hash).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+func instanceInvitation(t *testing.T, s *Store, instance string) string {
+	t.Helper()
+	var id *string
+	if err := s.pool.QueryRow(context.Background(), `SELECT invitation_id::text FROM card_instances WHERE id = $1`, instance).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	if id == nil {
+		return ""
+	}
+	return *id
+}
+
+func TestUndanganMenyetujuiInstanceMenunggu(t *testing.T) {
+	// ADR-0035 (review akhir I1): undangan berkartu menyetujui instance PENDING_APPROVAL milik perangkat
+	// itu untuk kartu yang sama; tidak ada instance baru, dan audit menunjuk undangannya.
+	s := freshStore(t)
+	ctx := context.Background()
+	now := time.Now()
+	siteID, holder := registrySite(t, s, PhysicalCard{CardHMAC: cardHMAC("A"), ZonesBitmap: 4})
+	if _, err := s.EnrollCard(ctx, holder, siteID, cardHMAC("A"), now); err != nil {
+		t.Fatal(err)
+	}
+	second := newDevice(t, s)
+	pending, err := s.EnrollCard(ctx, second, siteID, cardHMAC("A"), now)
+	if err != nil || pending.Status != "PENDING_APPROVAL" {
+		t.Fatalf("perangkat kedua: %+v %v", pending, err)
+	}
+	token := invite(t, s, Invitation{SiteID: siteID, CardHMAC: cardHMAC("A")}, now)
+	r, err := redeem(t, s, second, token, now.Add(time.Minute))
+	if err != nil || r.ID != pending.ID || r.Status != "PROVISIONING" || !r.Resumed {
+		t.Fatalf("undangan untuk instance menunggu: %+v %v", r, err)
+	}
+	invitationID := invitationIDOf(t, s, token)
+	if got := instanceInvitation(t, s, pending.ID); got != invitationID {
+		t.Fatalf("invitation_id = %q, ingin %q", got, invitationID)
+	}
+	var instances int
+	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM card_instances WHERE device_id = $1`, second).Scan(&instances); err != nil || instances != 1 {
+		t.Fatalf("instance perangkat kedua = %d (%v), ingin 1", instances, err)
+	}
+	events := auditOf(t, s, "card_instance:"+pending.ID)
+	last := events[len(events)-1]
+	if last.Action != "enrollment.approved" || last.Actor != "device:"+second ||
+		last.Data["method"] != "invitation" || last.Data["invitation"] != invitationID || last.Data["from"] != "PENDING_APPROVAL" {
+		t.Fatalf("audit = %+v", events)
+	}
+	if _, err := redeem(t, s, newDevice(t, s), token, now.Add(2*time.Minute)); !errors.Is(err, ErrInvitationInvalid) {
+		t.Fatalf("undangan dipakai ulang perangkat lain: %v", err)
+	}
+}
+
+func TestUndanganMelanjutkanInstanceKartuSendiri(t *testing.T) {
+	// ADR-0035: instance PROVISIONING dari jalur kartu dilanjutkan dan ditautkan ke undangan (terpakai).
+	s := freshStore(t)
+	ctx := context.Background()
+	now := time.Now()
+	siteID, device := registrySite(t, s, PhysicalCard{CardHMAC: cardHMAC("A"), ZonesBitmap: 4})
+	started, err := s.EnrollCard(ctx, device, siteID, cardHMAC("A"), now)
+	if err != nil || started.Status != "PROVISIONING" {
+		t.Fatalf("jalur kartu: %+v %v", started, err)
+	}
+	token := invite(t, s, Invitation{SiteID: siteID, CardHMAC: cardHMAC("A")}, now)
+	r, err := redeem(t, s, device, token, now.Add(time.Minute))
+	if err != nil || r.ID != started.ID || r.Status != "PROVISIONING" || !r.Resumed {
+		t.Fatalf("undangan untuk instance PROVISIONING: %+v %v", r, err)
+	}
+	if got := instanceInvitation(t, s, started.ID); got != invitationIDOf(t, s, token) {
+		t.Fatalf("invitation_id = %q", got)
+	}
+	events := auditOf(t, s, "card_instance:"+started.ID)
+	if last := events[len(events)-1]; last.Action != "enrollment.approved" || last.Data["from"] != "PROVISIONING" {
+		t.Fatalf("audit = %+v", events)
+	}
+	if _, err := redeem(t, s, newDevice(t, s), token, now.Add(2*time.Minute)); !errors.Is(err, ErrInvitationInvalid) {
+		t.Fatalf("undangan dipakai ulang perangkat lain: %v", err)
+	}
+}
+
+func TestUndanganLainTidakMenimpaInstance(t *testing.T) {
+	// ADR-0035: instance yang sudah milik undangan lain dilanjutkan apa adanya; undangan baru tidak terpakai.
+	s := freshStore(t)
+	now := time.Now()
+	siteID, device := registrySite(t, s, PhysicalCard{CardHMAC: cardHMAC("A"), ZonesBitmap: 4})
+	first := invite(t, s, Invitation{SiteID: siteID, CardHMAC: cardHMAC("A")}, now)
+	second := invite(t, s, Invitation{SiteID: siteID, CardHMAC: cardHMAC("A")}, now)
+	r1, err := redeem(t, s, device, first, now)
+	if err != nil || r1.Status != "PROVISIONING" {
+		t.Fatalf("undangan pertama: %+v %v", r1, err)
+	}
+	r2, err := redeem(t, s, device, second, now.Add(time.Minute))
+	if err != nil || r2.ID != r1.ID || r2.Status != "PROVISIONING" || !r2.Resumed {
+		t.Fatalf("undangan kedua: %+v %v", r2, err)
+	}
+	if got := instanceInvitation(t, s, r1.ID); got != invitationIDOf(t, s, first) {
+		t.Fatalf("invitation_id tertimpa: %q", got)
+	}
+	if r, err := redeem(t, s, newDevice(t, s), second, now.Add(2*time.Minute)); err != nil || r.Status != "PROVISIONING" {
+		t.Fatalf("undangan kedua seharusnya belum terpakai: %+v %v", r, err)
+	}
+}
+
+func TestUndanganKartuDihapusDitolak(t *testing.T) {
+	// Review akhir I2: kartu REMOVED di registri dijawab seperti undangan tak berlaku, termasuk saat melanjutkan.
+	s := freshStore(t)
+	ctx := context.Background()
+	now := time.Now()
+	siteID, device := registrySite(t, s, PhysicalCard{CardHMAC: cardHMAC("A"), ZonesBitmap: 4})
+	unused := invite(t, s, Invitation{SiteID: siteID, CardHMAC: cardHMAC("A")}, now)
+	started := invite(t, s, Invitation{SiteID: siteID, CardHMAC: cardHMAC("A")}, now)
+	if r, err := redeem(t, s, device, started, now); err != nil || r.Status != "PROVISIONING" {
+		t.Fatalf("sebelum dihapus: %+v %v", r, err)
+	}
+	if _, err := s.pool.Exec(ctx, `UPDATE physical_cards SET status = 'REMOVED' WHERE site_id = $1`, siteID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := redeem(t, s, newDevice(t, s), unused, now.Add(time.Minute)); !errors.Is(err, ErrInvitationInvalid) {
+		t.Fatalf("undangan untuk kartu REMOVED: %v", err)
+	}
+	if _, err := redeem(t, s, device, started, now.Add(time.Minute)); !errors.Is(err, ErrInvitationInvalid) {
+		t.Fatalf("melanjutkan undangan untuk kartu REMOVED: %v", err)
+	}
+}
+
+func TestUndanganBatasDelapanKartu(t *testing.T) {
+	// Review akhir I4 (CLAUDE.md aturan 8): perangkat penuh ditolak di jalur undangan, berkartu maupun
+	// tidak, dan undangannya tetap bisa dipakai perangkat lain.
+	s := freshStore(t)
+	ctx := context.Background()
+	now := time.Now()
+	siteID, device := registrySite(t, s, PhysicalCard{CardHMAC: cardHMAC("A"), ZonesBitmap: 4})
+	for i := 0; i < MaxActiveCardsPerDevice; i++ {
+		if _, err := s.StartEnrollment(ctx, device, siteID, now); err != nil {
+			t.Fatalf("kartu ke-%d: %v", i+1, err)
+		}
+	}
+	for name, inv := range map[string]Invitation{
+		"berkartu":    {SiteID: siteID, CardHMAC: cardHMAC("A")},
+		"tanpa-kartu": {SiteID: siteID, ZonesBitmap: 4},
+	} {
+		token := invite(t, s, inv, now)
+		if _, err := redeem(t, s, device, token, now); !errors.Is(err, ErrCardLimit) {
+			t.Fatalf("%s: perangkat penuh: %v", name, err)
+		}
+		if r, err := redeem(t, s, newDevice(t, s), token, now); err != nil || r.Status != "PROVISIONING" {
+			t.Fatalf("%s: undangan terpakai oleh percobaan yang ditolak: %+v %v", name, r, err)
+		}
+	}
+}
+
+func TestAuditEnrolmentUndanganMenautkanUndangan(t *testing.T) {
+	// ADR-0035 (requirement 2) / review akhir M8: audit enrolment lewat undangan memuat id internal
+	// undangannya, agar rantai audit menghubungkan invitation.created dengan instance yang dibuatnya.
+	s := freshStore(t)
+	now := time.Now()
+	siteID, device := registrySite(t, s, PhysicalCard{CardHMAC: cardHMAC("A"), ZonesBitmap: 4})
+	token := invite(t, s, Invitation{SiteID: siteID, ZonesBitmap: 4}, now)
+	r, err := redeem(t, s, device, token, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	events := auditOf(t, s, "card_instance:"+r.ID)
+	if len(events) != 1 || events[0].Action != "enrollment.started" || events[0].Data["method"] != "invitation" || events[0].Data["invitation"] != invitationIDOf(t, s, token) {
+		t.Fatalf("audit = %+v", events)
 	}
 }

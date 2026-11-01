@@ -51,9 +51,11 @@ struct LabBackendTarget: Equatable, Sendable {
             card = parsed
         }
         var invitation: String?
-        if arguments.contains("-ANLabInvite") {
-            guard let token = value("-ANLabInvite") else { return nil }
-            invitation = token
+        if let index = arguments.firstIndex(of: "-ANLabInvite") {
+            // Token base64url bisa diawali "-" (review akhir M1), jadi nilainya tidak disaring seperti
+            // argumen lain; bentuknya diperiksa `InvitationLink.isValidToken`.
+            guard arguments.indices.contains(index + 1) else { return nil }
+            invitation = arguments[index + 1]
         }
         self.init(url: url, deviceID: device, siteID: site, card: card, invitation: invitation)
     }

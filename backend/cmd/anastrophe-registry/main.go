@@ -1,15 +1,17 @@
-// Command anastrophe-registry adalah alat operator untuk registri kartu fisik (FR-52, ADR-0031)
-// dan persetujuan perangkat tambahan sebelum ada akun (ADR-0032).
+// Command anastrophe-registry adalah alat operator untuk registri kartu fisik (FR-52, ADR-0031),
+// persetujuan perangkat tambahan sebelum ada akun (ADR-0032), dan undangan sekali pakai (ADR-0033).
 //
 //	ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_REGISTRY_KEY=<32 byte hex> \
 //	  go -C backend run ./cmd/anastrophe-registry import --site <uuid> --file kartu.csv --operator <pegangan>
 //	go -C backend run ./cmd/anastrophe-registry approve|reject --card-instance <uuid> --operator <pegangan>
+//	go -C backend run ./cmd/anastrophe-registry invite --site <uuid> [--zones A;B | --card-file <berkas>|-] --operator <pegangan>
 //
 // CSV: tech,card_id,holder_contact,zones (zones = nama zona dipisah ";", dipetakan lewat kebijakan
-// gedung). Identitas kartu dan kontak langsung di-HMAC per gedung dan tidak pernah dicetak, dicatat,
-// atau disimpan (CLAUDE.md aturan 6). --operator adalah pegangan buram (mis. kode staf), bukan nama
-// atau email, karena tercatat apa adanya di audit append-only. Kode keluar: 0 berhasil, 1 ada baris
-// ditolak (baris lain tetap diimpor), 2 galat.
+// gedung). Berkas kartu undangan berisi satu baris <tech>:<hex>; "-" membacanya dari stdin. Identitas
+// kartu dan kontak tidak pernah lewat argumen (riwayat shell, daftar proses), langsung di-HMAC per
+// gedung, dan tidak pernah dicetak, dicatat, atau disimpan (CLAUDE.md aturan 6). --operator adalah
+// pegangan buram (mis. kode staf), bukan nama atau email, karena tercatat apa adanya di audit
+// append-only. Kode keluar: 0 berhasil, 1 ada baris ditolak (baris lain tetap diimpor), 2 galat.
 package main
 
 import (
@@ -30,7 +32,7 @@ import (
 	"github.com/imransetiadi/anastrophe/backend/internal/store"
 )
 
-const usage = "pemakaian: anastrophe-registry import --site <uuid> --file <csv> --operator <pegangan> | invite --site <uuid> [--card-tech <tech> --card-id <hex>] [--zones A;B] [--contact <kontak>] [--ttl <hari>] [--link-base <url>] --operator <pegangan> | approve|reject --card-instance <uuid> --operator <pegangan>"
+const usage = "pemakaian: anastrophe-registry import --site <uuid> --file <csv> --operator <pegangan> | invite --site <uuid> [--zones A;B | --card-file <berkas>|-] [--ttl <hari>] [--link-base <url>] --operator <pegangan> | approve|reject --card-instance <uuid> --operator <pegangan>"
 
 func main() {
 	os.Exit(run(context.Background(), os.Args[1:], os.Stdout, os.Stderr, os.Getenv))
@@ -203,7 +205,8 @@ func importCards(ctx context.Context, db *store.Store, mac registry.MAC, siteID,
 }
 
 // invite membuat undangan sekali pakai (FR-12, FR-53; ADR-0033) dan mencetak tokennya satu kali; server
-// hanya menyimpan hash-nya. Kartu dan kontak opsional langsung di-HMAC per gedung.
+// hanya menyimpan hash-nya. Kartu opsional dibaca dari berkas atau stdin lalu langsung di-HMAC per gedung.
+// Kontak penerima menyusul bersama verifikasi kontak (FR-03).
 func invite(ctx context.Context, args []string, stdout, stderr io.Writer, getenv func(string) string) int {
 	fail := func(err error) int {
 		fmt.Fprintln(stderr, "anastrophe-registry:", err)
@@ -212,10 +215,8 @@ func invite(ctx context.Context, args []string, stdout, stderr io.Writer, getenv
 	fs := flag.NewFlagSet("invite", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	site := fs.String("site", "", "UUID gedung")
-	cardTech := fs.String("card-tech", "", "teknologi kartu terdaftar (opsional)")
-	cardID := fs.String("card-id", "", "identitas kartu terdaftar dalam hex (opsional)")
-	zones := fs.String("zones", "", "nama zona dipisah ; bila tidak diikat ke kartu")
-	contact := fs.String("contact", "", "email atau telepon penerima (opsional, di-HMAC)")
+	cardFile := fs.String("card-file", "", "berkas berisi <tech>:<hex> kartu terdaftar, atau - untuk stdin (opsional)")
+	zones := fs.String("zones", "", "nama zona dipisah ; untuk undangan tanpa kartu")
 	ttlDays := fs.Int("ttl", 7, "masa berlaku dalam hari (1–30)")
 	linkBase := fs.String("link-base", "", "awalan tautan, mis. https://<domain>/i/ (domain belum ditentukan)")
 	operator := fs.String("operator", "", "pegangan operator untuk audit (kode staf, bukan nama atau email)")
@@ -224,6 +225,11 @@ func invite(ctx context.Context, args []string, stdout, stderr io.Writer, getenv
 	}
 	if *ttlDays < 1 || *ttlDays > 30 {
 		return fail(errors.New("--ttl harus 1–30 hari"))
+	}
+	// Review akhir M5: zona undangan berkartu selalu dari registri kartu; --zones yang diabaikan diam-diam
+	// bisa memberi zona lebih luas daripada maksud operator.
+	if *cardFile != "" && strings.TrimSpace(*zones) != "" {
+		return fail(errors.New("--zones tidak berlaku untuk undangan berkartu: zona diambil dari registri kartu"))
 	}
 	dsn := getenv("ANASTROPHE_DATABASE_URL")
 	if dsn == "" {
@@ -247,28 +253,17 @@ func invite(ctx context.Context, args []string, stdout, stderr io.Writer, getenv
 		return fail(errors.New("zona tidak dikenal di kebijakan gedung"))
 	}
 	inv := store.Invitation{SiteID: siteID, ZonesBitmap: bitmap, TTL: time.Duration(*ttlDays) * 24 * time.Hour}
-	if *cardTech != "" || *cardID != "" || *contact != "" {
+	if *cardFile != "" {
 		mac, err := registry.NewDevMAC(getenv("ANASTROPHE_DEV_REGISTRY_KEY"))
 		if err != nil {
-			return fail(errors.New("ANASTROPHE_DEV_REGISTRY_KEY wajib diisi untuk kartu atau kontak (32 byte hex, sama dengan API)"))
+			return fail(errors.New("ANASTROPHE_DEV_REGISTRY_KEY wajib diisi untuk undangan berkartu (32 byte hex, sama dengan API)"))
 		}
-		if *cardTech != "" || *cardID != "" {
-			identity, err := registry.ParseCardIdentity(*cardTech, *cardID)
-			if err != nil {
-				return fail(errors.New("teknologi atau panjang identitas kartu tidak valid"))
-			}
-			if inv.CardHMAC, err = mac.MAC(ctx, siteID, identity.MACInput()); err != nil {
-				return fail(err)
-			}
+		identity, err := readCardIdentity(*cardFile, os.Stdin, stderr)
+		if err != nil {
+			return fail(err)
 		}
-		if *contact != "" {
-			normalized, err := registry.NormalizeContact(*contact)
-			if err != nil {
-				return fail(errors.New("kontak penerima tidak valid"))
-			}
-			if inv.ContactHMAC, err = mac.MAC(ctx, siteID, registry.ContactMACInput(normalized)); err != nil {
-				return fail(err)
-			}
+		if inv.CardHMAC, err = mac.MAC(ctx, siteID, identity.MACInput()); err != nil {
+			return fail(err)
 		}
 	}
 	token, expiresAt, err := db.CreateInvitation(ctx, inv, *operator, time.Now())
@@ -287,6 +282,32 @@ func invite(ctx context.Context, args []string, stdout, stderr io.Writer, getenv
 	fmt.Fprintf(stdout, "berlaku sampai: %s\n", expiresAt.UTC().Format(time.RFC3339))
 	fmt.Fprintln(stdout, "Token hanya dicetak sekali; server menyimpan hash-nya saja.")
 	return 0
+}
+
+// readCardIdentity membaca satu baris <tech>:<hex> dari berkas, atau dari stdin bila path "-". Nilai
+// yang ditolak tidak pernah dicetak (CLAUDE.md aturan 6).
+func readCardIdentity(path string, stdin *os.File, stderr io.Writer) (registry.CardIdentity, error) {
+	in := stdin
+	if path != "-" {
+		f, err := os.Open(path)
+		if err != nil {
+			return registry.CardIdentity{}, fmt.Errorf("berkas kartu: %w", err)
+		}
+		defer f.Close()
+		in = f
+	} else if info, err := stdin.Stat(); err == nil && info.Mode()&os.ModeCharDevice != 0 {
+		fmt.Fprint(stderr, "Tempel identitas kartu <tech>:<hex>, lalu Enter: ")
+	}
+	line, err := bufio.NewReader(io.LimitReader(in, 256)).ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return registry.CardIdentity{}, errors.New("identitas kartu tidak bisa dibaca")
+	}
+	tech, id, ok := strings.Cut(strings.TrimSpace(line), ":")
+	identity, err := registry.ParseCardIdentity(tech, id)
+	if !ok || err != nil {
+		return registry.CardIdentity{}, errors.New("identitas kartu harus <tech>:<hex> dengan teknologi dan panjang identitas yang valid")
+	}
+	return identity, nil
 }
 
 // zoneBitmap memetakan nama zona (dipisah ";") ke bit lewat urutan zona di kebijakan gedung.

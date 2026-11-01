@@ -1,0 +1,101 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "action": "escalate",
+  "label": "undangan-plan-close-gate",
+  "request": "Close the invitation plan 2026-11-01-undangan: Task 4 app client plus fix pass for final review I1 (ADR-0035), I2, I3, I4, M1, M5, M8.",
+  "reason_codes": [
+    "confidence_below_review",
+    "safe_to_apply_below_review",
+    "review_escalated",
+    "claim_confidence_low",
+    "claim_confidence_below_auto_accept"
+  ],
+  "review": {
+    "safe_to_apply": 0.46,
+    "composite": 0.70375,
+    "limiting_rubrics": [
+      "test_gap"
+    ],
+    "scores": {
+      "correctness": 1.64,
+      "spec_match": 1.66,
+      "test_gap": 0.41,
+      "blast_radius": 1.9
+    }
+  },
+  "verification": {
+    "verified": 10,
+    "contradicted": 0,
+    "unsupported": 0,
+    "needs_review": 2,
+    "results": [
+      {
+        "claim": "Full Go suite: 10 packages ok",
+        "verdict": "verified",
+        "confidence": 0.94,
+        "action": "auto"
+      },
+      {
+        "claim": "Swift host 260 exit 0; simulator TEST SUCCEEDED 258",
+        "verdict": "verified",
+        "confidence": 1.0,
+        "action": "auto"
+      },
+      {
+        "claim": "I1 tests RED (kartu sudah ada di perangkat ini) then GREEN",
+        "verdict": "verified",
+        "confidence": 0.96,
+        "action": "auto"
+      },
+      {
+        "claim": "I2 test RED (<nil>) then ErrInvitationInvalid",
+        "verdict": "verified",
+        "confidence": 0.97,
+        "action": "auto"
+      },
+      {
+        "claim": "ADR-0035 e2e: PENDING_APPROVAL -> ACTIVE same instance, 1 credential, enrollment.approved audit",
+        "verdict": "verified",
+        "confidence": 0.88,
+        "action": "auto"
+      },
+      {
+        "claim": "e2e CLI: --zones with --card-file exit 2, stdin exit 0, token/card identity 0x in API log",
+        "verdict": "verified",
+        "confidence": 0.89,
+        "action": "auto"
+      },
+      {
+        "claim": "CLI no longer defines --card-id/--card-tech/--contact",
+        "verdict": "verified",
+        "confidence": 0.98,
+        "action": "auto"
+      },
+      {
+        "claim": "Limit-check mutation caught by TestUndanganBatas in store and enroll",
+        "verdict": "verified",
+        "confidence": 0.1,
+        "action": "escalate"
+      },
+      {
+        "claim": "Task 4 e2e: device 1 ACTIVE without physical card; used and random token identical 404",
+        "verdict": "verified",
+        "confidence": 0.6,
+        "action": "review"
+      },
+      {
+        "claim": "check_docs 0 problems",
+        "verdict": "verified",
+        "confidence": 0.91,
+        "action": "auto"
+      }
+    ]
+  },
+  "note": "Klaim mutasi bercofidence rendah karena evidence tidak menyebut nama test HTTP (TestUndanganBatasKartuMenjadiENRLIMIT cocok dengan filter -run TestUndanganBatas). Tidak diajukan ulang (ADR-0018); menunggu tinjauan pengguna.",
+  "usage": {
+    "input_tokens": 6278,
+    "output_tokens": 478
+  }
+}

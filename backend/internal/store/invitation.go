@@ -113,7 +113,9 @@ func (s *Store) EnrollInvitation(ctx context.Context, deviceID string, tokenHash
 // EnrollInvitation membuat card instance PROVISIONING dari undangan: undangan adalah niat eksplisit
 // pengelola, jadi aturan perangkat tambahan ADR-0032 tidak berlaku (SDD §8.2). Undangan dianggap
 // terpakai selama punya instance yang tidak ABANDONED; perangkat yang sama melanjutkan instance-nya
-// (ADR-0034). Tak dikenal, kedaluwarsa, dan terpakai sama-sama ErrInvitationInvalid.
+// (ADR-0034). Undangan berkartu menyetujui instance perangkat itu yang belum selesai untuk kartu yang
+// sama (ADR-0035). Tak dikenal, kedaluwarsa, terpakai, dan kartu yang keluar dari registri sama-sama
+// ErrInvitationInvalid.
 func (t *Tx) EnrollInvitation(ctx context.Context, deviceID string, tokenHash []byte, at time.Time) (CardEnrollment, error) {
 	if !looksLikeUUID(deviceID) {
 		return CardEnrollment{}, ErrNotFound
@@ -142,6 +144,15 @@ func (t *Tx) EnrollInvitation(ctx context.Context, deviceID string, tokenHash []
 	cardID := ""
 	if card != nil {
 		cardID = *card
+		// Review akhir I2: kartu yang tidak lagi ACTIVE di registri dijawab seperti undangan tak berlaku
+		// (SDD §8.1). Urutan kunci: perangkat, undangan, lalu baris kartu.
+		var cardStatus string
+		if err := t.tx.QueryRow(ctx, `SELECT status FROM physical_cards WHERE id = $1 FOR UPDATE`, cardID).Scan(&cardStatus); err != nil {
+			return CardEnrollment{}, err
+		}
+		if cardStatus != "ACTIVE" {
+			return CardEnrollment{}, ErrInvitationInvalid
+		}
 	}
 	if _, err := t.abandonStale(ctx, at, device, cardID, id); err != nil {
 		return CardEnrollment{}, err
@@ -164,18 +175,23 @@ func (t *Tx) EnrollInvitation(ctx context.Context, deviceID string, tokenHash []
 	case !errors.Is(err, pgx.ErrNoRows):
 		return CardEnrollment{}, err
 	}
+	if card != nil {
+		var held, heldStatus string
+		var heldInvitation *string
+		err := t.tx.QueryRow(ctx, `
+			SELECT id::text, status, invitation_id::text FROM card_instances
+			WHERE physical_card_id = $1 AND device_id = $2 AND status = ANY($3)
+			ORDER BY created_at DESC LIMIT 1 FOR UPDATE`, *card, device, activeStatuses).Scan(&held, &heldStatus, &heldInvitation)
+		switch {
+		case err == nil:
+			return t.approveHeldInstance(ctx, device, site, id, held, heldStatus, heldInvitation, at)
+		case !errors.Is(err, pgx.ErrNoRows):
+			return CardEnrollment{}, err
+		}
+	}
 	var active int
 	if err := t.tx.QueryRow(ctx, `SELECT count(*) FROM card_instances WHERE device_id = $1 AND status = ANY($2)`, device, activeStatuses).Scan(&active); err != nil {
 		return CardEnrollment{}, err
-	}
-	if card != nil {
-		var held int
-		if err := t.tx.QueryRow(ctx, `SELECT count(*) FROM card_instances WHERE physical_card_id = $1 AND device_id = $2 AND status = ANY($3)`, *card, device, activeStatuses).Scan(&held); err != nil {
-			return CardEnrollment{}, err
-		}
-		if held > 0 {
-			return CardEnrollment{}, ErrDuplicateEnrollment
-		}
 	}
 	if active >= MaxActiveCardsPerDevice {
 		return CardEnrollment{}, ErrCardLimit
@@ -191,10 +207,42 @@ func (t *Tx) EnrollInvitation(ctx context.Context, deviceID string, tokenHash []
 	}
 	err = t.AppendAudit(ctx, AuditEvent{
 		SiteID: site, Actor: "device:" + device, Action: "enrollment.started", Subject: "card_instance:" + instance,
-		Data: map[string]any{"status": "PROVISIONING", "method": "invitation"}, At: at,
+		Data: map[string]any{"status": "PROVISIONING", "method": "invitation", "invitation": id}, At: at,
 	})
 	if err != nil {
 		return CardEnrollment{}, err
 	}
 	return CardEnrollment{ID: instance, Status: "PROVISIONING"}, nil
+}
+
+// approveHeldInstance menangani perangkat yang sudah memegang instance aktif untuk kartu undangan
+// (ADR-0035). ACTIVE/SUSPENDED tetap duplikat. Instance yang belum selesai menjadi PROVISIONING dan
+// ditautkan ke undangan, dengan audit enrollment.approved; tidak ada instance baru, jadi batas kartu
+// tidak berubah. Instance milik undangan lain dilanjutkan apa adanya tanpa memakai undangan ini.
+func (t *Tx) approveHeldInstance(ctx context.Context, device, site, invitation, instance, status string, linked *string, at time.Time) (CardEnrollment, error) {
+	if status != "PROVISIONING" && status != "PENDING_APPROVAL" {
+		return CardEnrollment{}, ErrDuplicateEnrollment
+	}
+	if linked != nil {
+		if status == "PROVISIONING" {
+			if _, err := t.tx.Exec(ctx, `UPDATE card_instances SET status_changed_at = $2 WHERE id = $1`, instance, at); err != nil {
+				return CardEnrollment{}, err
+			}
+		}
+		return CardEnrollment{ID: instance, Status: status, Resumed: true}, nil
+	}
+	if _, err := t.tx.Exec(ctx, `UPDATE card_instances SET status = 'PROVISIONING', invitation_id = $2, status_changed_at = $3 WHERE id = $1`, instance, invitation, at); err != nil {
+		return CardEnrollment{}, err
+	}
+	if _, err := t.tx.Exec(ctx, `UPDATE invitations SET used_at = $2 WHERE id = $1`, invitation, at); err != nil {
+		return CardEnrollment{}, err
+	}
+	err := t.AppendAudit(ctx, AuditEvent{
+		SiteID: site, Actor: "device:" + device, Action: "enrollment.approved", Subject: "card_instance:" + instance,
+		Data: map[string]any{"method": "invitation", "invitation": invitation, "from": status}, At: at,
+	})
+	if err != nil {
+		return CardEnrollment{}, err
+	}
+	return CardEnrollment{ID: instance, Status: "PROVISIONING", Resumed: true}, nil
 }

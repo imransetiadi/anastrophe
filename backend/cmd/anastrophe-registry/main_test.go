@@ -345,11 +345,58 @@ func TestInviteKartuHarusTerdaftar(t *testing.T) {
 	var out, errOut bytes.Buffer
 	run(ctx, []string{"import", "--site", site, "--file", writeCSV(t, "tech,card_id,holder_contact,zones\niso14443a,04a1b2c3d4e5f6,,Lobi\n"), "--operator", "staf-01"}, &out, &errOut, env(dsn))
 	errOut.Reset()
-	if code := run(ctx, []string{"invite", "--site", site, "--card-tech", "iso14443a", "--card-id", "04ffffffffff01", "--operator", "staf-01"}, &out, &errOut, env(dsn)); code != 2 || !strings.Contains(errOut.String(), "belum terdaftar") {
+	if code := run(ctx, []string{"invite", "--site", site, "--card-file", writeCardFile(t, "iso14443a:04ffffffffff01\n"), "--operator", "staf-01"}, &out, &errOut, env(dsn)); code != 2 || !strings.Contains(errOut.String(), "belum terdaftar") {
 		t.Fatalf("kartu tidak terdaftar: %d %s", code, errOut.String())
 	}
-	if code := run(ctx, []string{"invite", "--site", site, "--card-tech", "iso14443a", "--card-id", "04a1b2c3d4e5f6", "--operator", "staf-01"}, &out, &errOut, env(dsn)); code != 0 {
+	if code := run(ctx, []string{"invite", "--site", site, "--card-file", writeCardFile(t, "iso14443a:04a1b2c3d4e5f6\n"), "--operator", "staf-01"}, &out, &errOut, env(dsn)); code != 0 {
 		t.Fatalf("kartu terdaftar: %d %s", code, errOut.String())
+	}
+}
+
+func writeCardFile(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "kartu.txt")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestInviteIdentitasTidakLewatArgumen(t *testing.T) {
+	// Review akhir I3 (CLAUDE.md aturan 6): identitas kartu dan kontak tidak boleh lewat argumen, karena
+	// argumen tersimpan di riwayat shell dan terlihat di daftar proses. Identitas dibaca dari berkas/stdin.
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	for name, args := range map[string][]string{
+		"card-id": {"--card-tech", "iso14443a", "--card-id", "04a1b2c3d4e5f6"},
+		"contact": {"--contact", "budi@contoh.test"},
+	} {
+		var out, errOut bytes.Buffer
+		full := append([]string{"invite", "--site", site, "--operator", "staf-01"}, args...)
+		if code := run(ctx, full, &out, &errOut, env(dsn)); code != 2 || !strings.Contains(errOut.String(), "not defined") {
+			t.Errorf("%s: kode %d %s", name, code, errOut.String())
+		}
+	}
+	var out, errOut bytes.Buffer
+	code := run(ctx, []string{"invite", "--site", site, "--card-file", writeCardFile(t, "iso14443a:04a1b2\n"), "--operator", "staf-01"}, &out, &errOut, env(dsn))
+	if code != 2 || strings.Contains(errOut.String()+out.String(), "04a1b2") {
+		t.Fatalf("identitas rusak: kode %d, keluaran memuat nilai: %s %s", code, out.String(), errOut.String())
+	}
+}
+
+func TestInviteZonaDenganKartuDitolak(t *testing.T) {
+	// Review akhir M5: zona undangan berkartu selalu diambil dari registri kartu; --zones yang diabaikan
+	// diam-diam bisa memberi zona lebih luas daripada maksud operator.
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	var out, errOut bytes.Buffer
+	run(ctx, []string{"import", "--site", site, "--file", writeCSV(t, "tech,card_id,holder_contact,zones\niso14443a,04a1b2c3d4e5f6,,Lobi;Parkir\n"), "--operator", "staf-01"}, &out, &errOut, env(dsn))
+	errOut.Reset()
+	code := run(ctx, []string{"invite", "--site", site, "--zones", "Lobi", "--card-file", writeCardFile(t, "iso14443a:04a1b2c3d4e5f6\n"), "--operator", "staf-01"}, &out, &errOut, env(dsn))
+	if code != 2 || !strings.Contains(errOut.String(), "zona diambil dari registri") {
+		t.Fatalf("kode %d: %s", code, errOut.String())
 	}
 }
 
@@ -361,7 +408,6 @@ func TestInviteMenolakIsianSalah(t *testing.T) {
 		"zona-tak-dikenal": {"--zones", "Gudang"},
 		"ttl-31":           {"--ttl", "31"},
 		"ttl-0":            {"--ttl", "0"},
-		"kontak-rusak":     {"--contact", "bukan-kontak"},
 		"tanpa-operator":   {"--operator", ""},
 	} {
 		var out, errOut bytes.Buffer
@@ -369,5 +415,29 @@ func TestInviteMenolakIsianSalah(t *testing.T) {
 		if code := run(ctx, full, &out, &errOut, env(dsn)); code != 2 {
 			t.Errorf("%s: kode %d %s", name, code, out.String())
 		}
+	}
+}
+
+func TestBacaIdentitasKartuDariStdin(t *testing.T) {
+	// Review akhir I3: "-" membaca identitas dari stdin (pipe atau tempel interaktif), bukan argumen.
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.WriteString("iso14443a:04A1B2C3D4E5F6\n"); err != nil {
+		t.Fatal(err)
+	}
+	w.Close()
+	var prompt bytes.Buffer
+	identity, err := readCardIdentity("-", r, &prompt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, _ := registry.ParseCardIdentity("iso14443a", "04a1b2c3d4e5f6")
+	if !bytes.Equal(identity.MACInput(), want.MACInput()) {
+		t.Fatal("identitas dari stdin berbeda")
+	}
+	if prompt.Len() != 0 {
+		t.Fatalf("prompt tercetak untuk pipe: %q", prompt.String())
 	}
 }

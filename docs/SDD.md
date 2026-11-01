@@ -29,6 +29,7 @@
 | 2.13 | 2026-11-01 | Catatan implementasi enrolment sebelum akun (§8.4.1), `ENR-NOT-REGISTERED` di diagram, struktur modul `CardIdentity`. |
 | 2.14 | 2026-11-01 | Undangan sekali pakai (ADR-0033): tabel `invitations`, `card_instances.invitation_id`, aturan terpakai dan zona (§8.1). |
 | 2.15 | 2026-11-01 | `POST /enrollments` menerima `invitation` sebagai alternatif `card`; galat `ENR-INVITATION-INVALID` (§8.5, §15). |
+| 2.16 | 2026-11-01 | Undangan berkartu menyetujui instance perangkat itu yang belum selesai (ADR-0035); kartu yang tidak lagi `ACTIVE` membuat undangannya tidak berlaku; kolom `invitations` dan `card_instances.invitation_id` di model data (§8.1). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -562,10 +563,10 @@ devices(id uuid pk, user_id fk, app_attest_key_id text, apns_token text, model t
 physical_cards(id uuid pk, site_id fk, card_id_hmac bytea, holder_contact_hmac bytea, zones_bitmap bigint, acs_card_number text, status text, unique(site_id, card_id_hmac))
 card_ownerships(id uuid pk, physical_card_id fk unique, primary_user_id fk, security_code_hash text, failed_attempts int, locked_until timestamptz, max_members smallint)
 memberships(id uuid pk, ownership_id fk, user_id fk, role text check (role in ('PRIMARY','MEMBER')), removed_at timestamptz)
-card_instances(id uuid pk, membership_id fk, device_id fk, physical_card_id fk null, status text, created_at timestamptz)        -- "Kartu (digital)", maks 8 aktif per device; physical_card_id = kartu registri yang dicocokkan saat enrolment (ADR-0031)
+card_instances(id uuid pk, membership_id fk, device_id fk, physical_card_id fk null, invitation_id fk null, status text, status_changed_at timestamptz, created_at timestamptz)        -- "Kartu (digital)", maks 8 aktif per device; physical_card_id = kartu registri yang dicocokkan saat enrolment (ADR-0031); invitation_id = undangan yang dipakai (ADR-0033)
 credentials(id uuid pk, card_instance_id fk, channel text, cred_id bytea unique, pubkey bytea, cert bytea, not_after timestamptz, last_counter bigint, status text, revoked_at timestamptz, revoke_reason text)
 wallet_passes(id uuid pk, card_instance_id fk, apple_pass_ref text, device_kind text /*iphone|watch*/, status text)   -- R2
-invitations(id uuid pk, site_id fk, physical_card_id fk null, contact_hmac bytea, token_hash bytea, expires_at timestamptz, used_at timestamptz)
+invitations(id uuid pk, site_id fk, physical_card_id fk null, contact_hmac bytea null, token_hash bytea unique, zones_bitmap bigint, expires_at timestamptz, used_at timestamptz null, created_at timestamptz)
 claim_disputes(id uuid pk, physical_card_id fk, reporter_user_id fk, status text, decision text, decided_by fk, decided_at timestamptz)
 denylist_entries(site_id fk, cred_id bytea, revoked_at timestamptz, expires_at timestamptz, primary key(site_id, cred_id))
 admin_users(id uuid pk, org_id fk, idp_subject text, role text, mfa_enrolled bool)
@@ -577,7 +578,7 @@ audit_events(id bigserial pk, chain text /* site:<uuid> | platform (ADR-0024) */
 - Satu PRIMARY per kepemilikan.
 - Registri (ADR-0031): `physical_cards` hanya menyimpan HMAC per gedung (`card_id_hmac`, `holder_contact_hmac` opsional), unik per (gedung, HMAC); kartu `REMOVED` dijawab sama dengan kartu tak dikenal. `acs_card_number` belum disimpan sampai integrasi ACS. Zona sertifikat diambil dari `physical_cards.zones_bitmap` bila card instance tertaut.
 - Sebelum ada akun (ADR-0032, provisional): perangkat pertama untuk sebuah kartu mendapat `PROVISIONING`, perangkat lain `PENDING_APPROVAL` yang disetujui (`PROVISIONING`) atau ditolak (`REJECTED`) operator; kunci diambil berurutan (perangkat, lalu baris kartu).
-- Undangan (ADR-0033): `invitations` menyimpan hash SHA-256 token (32 byte acak, base64url), gedung, kartu terdaftar opsional, zona, masa berlaku 1–30 hari, dan waktu dipakai; `card_instances.invitation_id`. Undangan dianggap terpakai selama punya card instance yang tidak `ABANDONED`. Enrolment lewat undangan selalu `PROVISIONING` (niat eksplisit pengelola) dengan zona dari kartu terdaftar bila diikat, selain itu dari undangan (0 bila tidak diisi).
+- Undangan (ADR-0033): `invitations` menyimpan hash SHA-256 token (32 byte acak, base64url), gedung, kartu terdaftar opsional, zona, masa berlaku 1–30 hari, dan waktu dipakai; `card_instances.invitation_id`. Undangan dianggap terpakai selama punya card instance yang tidak `ABANDONED`. Enrolment lewat undangan selalu `PROVISIONING` (niat eksplisit pengelola) dengan zona dari kartu terdaftar bila diikat, selain itu dari undangan (0 bila tidak diisi). Undangan berkartu menyetujui instance `PENDING_APPROVAL`/`PROVISIONING` milik perangkat itu untuk kartu yang sama, tanpa instance baru, dengan audit `enrollment.approved` yang memuat id undangan (ADR-0035); kartu yang tidak lagi `ACTIVE` membuat undangannya tidak berlaku. Kunci diambil berurutan: perangkat, undangan, lalu baris kartu.
 - Enrolment yang belum selesai (ADR-0034): perangkat yang sama dengan instance `PROVISIONING`/`PENDING_APPROVAL` untuk kartu itu melanjutkan instance tersebut (200, `enrollment_id` sama); `ENR-DUPLICATE` hanya untuk `ACTIVE`/`SUSPENDED`. `PROVISIONING` tanpa kredensial yang melewati 15 menit sejak masuk `PROVISIONING` atau terakhir dilanjutkan menjadi `ABANDONED` (tidak aktif; audit `enrollment.abandoned`), lewat pemeriksaan di transaksi enrolment dan sapuan per jam. Perangkat penuh (8 kartu) mendapat `ENR-LIMIT` untuk kartu terdaftar maupun tidak dikenal.
 - `credentials.not_after ≤ issued_at + policy.cert_validity_days`.
 - `denylist_entries.expires_at = not_after` sertifikat terakhir, sehingga denylist tidak tumbuh tanpa batas.

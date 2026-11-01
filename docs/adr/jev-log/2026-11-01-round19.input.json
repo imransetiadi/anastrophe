@@ -1,0 +1,39 @@
+{
+ "tool": "jev_decide",
+ "label": "D35-undangan-berkartu-menyetujui-instance-belum-selesai",
+ "decision": "A device redeems a valid, unexpired invitation that the operator bound to registered physical card A, while the same device already holds an unfinished card instance for card A (PENDING_APPROVAL, or PROVISIONING without a credential), typically created earlier through the card path. Today the server answers 409 ENR-DUPLICATE, which is a dead end. What should POST /v1/enrollments do in this case?",
+ "candidates": [
+  {
+   "id": "resume_existing",
+   "description": "Return the existing unfinished instance unchanged with HTTP 200 and its current status (PENDING_APPROVAL stays pending until the operator approves via CLI; PROVISIONING continues). The invitation is not consumed and no audit event is written."
+  },
+  {
+   "id": "promote_existing",
+   "description": "Treat the invitation as the operator's approval of the existing instance: in the same transaction set it to PROVISIONING (if it was PENDING_APPROVAL), set invitation_id to this invitation, refresh status_changed_at, set the invitation's used_at, and append an audit event (enrollment.approved, actor device:<id>, data {method: invitation, invitation: <internal id>}). Return HTTP 200 with PROVISIONING. If the instance already belongs to another invitation, keep it and return it unchanged (resume) without consuming the new invitation."
+  },
+  {
+   "id": "supersede_existing",
+   "description": "Mark the existing unfinished instance ABANDONED (audit enrollment.abandoned with reason superseded) and create a new PROVISIONING instance with invitation_id and physical_card_id, consuming the invitation and appending enrollment.started {method: invitation}. Return HTTP 201 with the new enrollment_id."
+  },
+  {
+   "id": "distinct_conflict",
+   "description": "Keep the 409 but with distinct codes: ENR-PENDING-APPROVAL when the existing instance is PENDING_APPROVAL, and a new ENR-IN-PROGRESS when it is PROVISIONING. The invitation is not consumed; the operator must still approve via CLI."
+  }
+ ],
+ "evidence_refs": [
+  "review akhir undangan I1 (probe PostgreSQL)",
+  "backend/internal/store/invitation.go EnrollInvitation",
+  "ADR-0032",
+  "ADR-0033",
+  "ADR-0034",
+  "FR-54",
+  "CLAUDE.md aturan 8"
+ ],
+ "priorities": "1) No dead end: a device that holds an operator-issued invitation for card A must reach a credential without further operator action (ADR-0034's first priority). 2) Operator intent and audit traceability: the audit chain must show how the instance reached PROVISIONING and which invitation authorised it (FR-54). 3) Keep single use, the 8-card limit, and ADR-0032 unchanged for devices without an invitation. 4) Minimal code and API surface; no new error codes unless needed.",
+ "requirements": [
+  "A device holding a PENDING_APPROVAL instance for card A that redeems a valid invitation bound to card A can obtain a credential without any further operator action.",
+  "Every status change of a card instance caused by redeeming the invitation is recorded in the audit chain together with the internal id of the invitation (FR-54).",
+  "After redemption the invitation is linked to at most one non-ABANDONED card instance, and the device's active-card count does not increase."
+ ],
+ "escalate_on_contradiction": true
+}

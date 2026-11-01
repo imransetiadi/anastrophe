@@ -32,5 +32,13 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
 - **Hapus kartu:** penghapusan lokal masih *best-effort*; penghapusan yang terputus setelah 204 pulih lewat `CARD-GONE`; `DELETE` membawa body (RFC 9110).
 - **Perpanjangan:** celah test (cek kanal dan kunci group di renewer, kredensial non-ACTIVE di backend); slot pekerjaan tunggal tidak terikat ke tap; renewer menulis salinan kartu lama; endpoint `:challenge` tanpa autentikasi bisa memperbesar tabel (dibersihkan per jam) dan membedakan status kredensial; drift dokumen (ADR-0023 "paralel", SDD §8.4.2 App Attest, QA TC-DEV-09).
 - **Presentasi:** hitung mundur HCE mulai saat lembar muncul dan angka `coolingDown` tidak berkurang (belum diverifikasi ulang); presentasi tumpang tindih (`heldIntent` dan `connectWaiters`); panjang fragmen BLE memakai panjang tulis `.withResponse`; paritas timing mengasumsikan maksimal 2 kunci per group.
+- **Undangan (review akhir rencana undangan):**
+  - Melanjutkan instance ditolak setelah undangan kedaluwarsa, walau instance masih `PROVISIONING` (M2).
+  - Waktu respons berbeda per jalur (tak dikenal ±122 µs, terpakai ±183 µs); tidak bisa dieksploitasi tanpa token 256 bit, perlu dicatat di TC-ENR-08 (M3).
+  - `UPDATE` saat melanjutkan tanpa penjaga status di `invitation.go` dan `registry.go`, sehingga balapan dengan sapuan per jam bisa memberi 200 untuk instance yang baru `ABANDONED` (M4).
+  - `--link-base` tidak divalidasi (https dan garis miring akhir) (M6).
+  - CLI tidak mencetak id undangan, dan belum ada pencabutan undangan (bersama FR-51) (M7).
+  - Hash idempotency jalur undangan belum diuji (M9).
+  - Test kecil: galat tebusan pertama diabaikan, test bocor CLI hanya memeriksa bentuk base64 (M12).
 - **Test flaky:** `BLETapTests.autentikasiBatalMembatalkanPemindaian` sesekali gagal (pembatalan pemindaian bergantung waktu); lulus 6/6 saat diulang.
 - **Riwayat tap:** judul baris "Ditolak · alasan" dirakit di kode (M8; dikerjakan saat bahasa ketiga ditambahkan); VoiceOver baris Status belum diperiksa dengan Accessibility Inspector.

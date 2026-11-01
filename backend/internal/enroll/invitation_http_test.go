@@ -130,6 +130,19 @@ func TestTokenUndanganTidakBocor(t *testing.T) {
 	}
 }
 
+func TestUndanganBatasKartuMenjadiENRLIMIT(t *testing.T) {
+	// Review akhir I4 (CLAUDE.md aturan 8): batas 8 kartu juga di jalur undangan.
+	f := newFixture(t)
+	for i := 0; i < 8; i++ {
+		f.enroll(t)
+	}
+	token := f.invitation(t, store.Invitation{ZonesBitmap: 1}, f.h.Now())
+	rec := f.do(t, http.MethodPost, "/v1/enrollments", "", map[string]string{"device_id": f.deviceID, "invitation": token})
+	if rec.Code != http.StatusConflict || problemType(t, rec) != "ENR-LIMIT" {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+}
+
 func hexLower(b []byte) string {
 	const digits = "0123456789abcdef"
 	out := make([]byte, 0, len(b)*2)

@@ -1,0 +1,88 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "promote_existing",
+    "escaped": false,
+    "confidence": 0.94,
+    "probabilities": {
+      "resume_existing": 0,
+      "promote_existing": 0.95,
+      "supersede_existing": 0.02,
+      "distinct_conflict": 0,
+      "ask_user": 0,
+      "investigate": 0,
+      "none": 0.03
+    },
+    "contradicted_requirements": []
+  },
+  "requirements_checked": 3,
+  "checks": [
+    {
+      "candidate": "resume_existing",
+      "requirement": 0,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "resume_existing",
+      "requirement": 1,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "resume_existing",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "promote_existing",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "promote_existing",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "promote_existing",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "supersede_existing",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "supersede_existing",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "supersede_existing",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "distinct_conflict",
+      "requirement": 0,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "distinct_conflict",
+      "requirement": 1,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "distinct_conflict",
+      "requirement": 2,
+      "answer": "contradicted"
+    }
+  ],
+  "warnings": [],
+  "usage": {
+    "input_tokens": 3906,
+    "output_tokens": 602
+  }
+}

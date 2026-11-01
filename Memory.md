@@ -12,10 +12,10 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 ## Status terkini
 
 - Branch kerja: `feat/r1-scaffold`, di-push ke GitHub private `imransetiadi/anastrophe` (origin) atas permintaan pengguna; belum di-merge.
-- Suite terakhir: Swift host 253 test (1 dilewati, tanpa gagal), simulator 251 test (1 dilewati), backend Go 10 paket lulus dengan PostgreSQL.
+- Suite terakhir: Swift host 260 test (1 dilewati, tanpa gagal), simulator 258 test (1 dilewati), backend Go 10 paket lulus dengan PostgreSQL.
 - Menunggu keputusan pengguna:
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
-  - Tinjauan 7 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu (`docs/adr/jev-log/*-gate.json`).
+  - Tinjauan 8 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan (`docs/adr/jev-log/*-gate.json`).
   - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
 
@@ -31,6 +31,37 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Hapus kartu | Bukti kepemilikan, kartu ditangguhkan, kartu tanpa kunci | ADR-0026, ADR-0027, ADR-0028, FR-31 |
 | Riwayat tap | Log lokal 30 hari: lima terbaru di detail, "Lihat semua" ke riwayat penuh, store pulih sendiri bila rusak | FR-30, ADR-0029, ADR-0030 |
 | Registri kartu | Enrolment hanya untuk kartu terdaftar (HMAC per gedung), alasan FR-13, perangkat tambahan menunggu operator, enrolment yang belum selesai dilanjutkan, CLI `anastrophe-registry` | FR-11, FR-13, FR-52, ADR-0031, ADR-0032, ADR-0034 |
+| Undangan | Token sekali pakai (32 byte acak, hanya hash yang disimpan), CLI `invite` dengan identitas kartu dari berkas atau stdin, enrolment `{device_id, invitation}`, dan undangan berkartu yang menyetujui enrolment perangkat yang masih menunggu; app mengurai tautan `/i/<token>` | FR-12, FR-53, ADR-0033, ADR-0035 |
+
+## API-2026-11-01-2348 - Enrolment via undangan dan perbaikan review akhirnya (Selesai, commit lokal; gate tereskalasi)
+
+Fokus dari ADR-0033 (JEV 0,89). Temuan review I1 diputuskan JEV sebagai ADR-0035 (`promote_existing`, 0,94, Diterima).
+
+Isi pekerjaan:
+- **Store dan migrasi 0009:** tabel `invitations` (hash SHA-256 token, gedung, kartu opsional, zona, masa berlaku) dan `card_instances.invitation_id`. Pemakaian tunggal dikunci `FOR UPDATE`; undangan dianggap terpakai selama punya instance yang tidak `ABANDONED`.
+- **HTTP:** `POST /v1/enrollments` menerima tepat satu dari `card` atau `invitation`. Undangan tak dikenal, kedaluwarsa, terpakai, atau yang kartunya keluar dari registri dijawab identik 404 `ENR-INVITATION-INVALID`. Hash idempotency memakai hash token.
+- **CLI `anastrophe-registry invite`:** token dicetak sekali. Identitas kartu dibaca dari `--card-file <berkas>|-`, bukan argumen. `--zones` hanya untuk undangan tanpa kartu. `--contact` ditunda sampai FR-03.
+- **App:** `InvitationLink.token(from:)` (`https://<host>/i/<token>`), `createEnrollment(deviceID:invitation:)`, teks ID/EN "Undangan tidak berlaku atau sudah dipakai.", dan argumen lab `-ANLabInvite`.
+- **ADR-0035:** perangkat yang masih `PENDING_APPROVAL`/`PROVISIONING` untuk kartu yang sama melanjutkan instance-nya lewat undangan berkartu, dengan audit `enrollment.approved` yang memuat id undangan. Tidak ada instance baru.
+
+Review akhir (opus): siap merge setelah perbaikan; 0 Critical. Diperbaiki dengan test RED → GREEN dan uji mutasi:
+- I1 (jalan buntu, ADR-0035)
+- I2 (kartu `REMOVED`)
+- I3 (identitas kartu dan kontak di argumen CLI, aturan 6)
+- I4 (batas 8 kartu tanpa test, aturan 8)
+- M1 (token lab berawalan `-`)
+- M5 (`--zones` diabaikan diam-diam)
+- M8 (audit tanpa id undangan, bagian dari ADR-0035)
+
+Bukti:
+- Go `ANASTROPHE_REQUIRE_PG=1 go test ./...` 10 paket lulus, `go vet` bersih.
+- Swift host 260 test, simulator 258 test.
+- `check_docs` 0 masalah.
+- Lab simulator: undangan tanpa kartu fisik → `ACTIVE` dengan 1 kredensial. Token terpakai → teks undangan tak berlaku, dan responsnya identik dengan token acak. Perangkat yang menunggu persetujuan menebus undangan berkartu dari stdin, lalu instance yang sama menjadi `ACTIVE`. Token dan identitas kartu tidak muncul di log API maupun dump database.
+
+`jev_gate` tereskalasi (composite 0,70, `test_gap`); 10 klaim terverifikasi, 2 perlu tinjauan. Minor tertunda (M2, M3, M4, M6, M7, M9, M12) dicatat di [backlog](docs/agentmemory/backlog.md).
+
+Commit unit ini: `792695e`, `8b9da67`, `1334464`, `53195f5`, dan commit ini. Obsidian: `sessions/2026-11-01-undangan.md`, `decisions/ADR-0035…`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
 
 ## API-2026-11-01-2257 - Registri kartu fisik dan enrolment berbasis kartu, beserta perbaikan review (Selesai, commit lokal; gate tereskalasi)
 

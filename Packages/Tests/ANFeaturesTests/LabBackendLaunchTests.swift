@@ -40,6 +40,10 @@ struct LabBackendTargetTests {
         #expect(LabBackendTarget(arguments: base + ["-ANLabInvite", token])?.invitation == token)
         #expect(LabBackendTarget(arguments: base)?.invitation == nil)
         #expect(LabBackendTarget(arguments: base + ["-ANLabInvite", "pendek"]) == nil)
+        #expect(LabBackendTarget(arguments: base + ["-ANLabInvite"]) == nil)
+        // Review akhir M1: alfabet base64url memuat "-", jadi ±1 dari 64 token diawali "-".
+        let dashed = "-" + String(repeating: "A", count: 41) + "w"
+        #expect(LabBackendTarget(arguments: base + ["-ANLabInvite", dashed])?.invitation == dashed)
     }
 
     @Test func isianFormDirapikan() {

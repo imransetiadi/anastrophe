@@ -18,7 +18,7 @@ Kartu yang tidak terbaca (mis. 125 kHz) dan gedung tanpa registri kartu belum pu
 
 - Universal Link produksi (domain dan entitlement Associated Domains belum ada) serta App Clip (P2).
 - Pengiriman undangan lewat email/SMS (penyedia eksternal) dan API admin HTTP (FR-53 lewat portal).
-- Pencocokan kontak undangan dengan akun (butuh FR-03). `contact_hmac` disimpan bila ada, belum ditegakkan.
+- Kontak penerima undangan (butuh FR-03). Kolom `contact_hmac` disiapkan, tetapi CLI belum menerimanya: kontak lewat argumen akan masuk riwayat shell (review akhir I3, CLAUDE.md aturan 6).
 
 ## Anti-goal
 
@@ -45,21 +45,22 @@ Permintaan: `{device_id, invitation}`. `site_id` tidak diperlukan karena diambil
 
 1. Validasi bentuk token (43 karakter base64url); gagal → 400 `REQ-INVALID`.
 2. Dalam transaksi: kunci perangkat; cari undangan lewat hash `FOR UPDATE`.
-   - Tidak ada, kedaluwarsa, atau sudah dipakai → 404 `ENR-INVITATION-INVALID`, dengan body dan status yang sama.
-3. Batas 8 kartu tetap berlaku. Perangkat ini sudah punya card instance aktif untuk kartu yang sama → 409 `ENR-DUPLICATE`.
+   - Tidak ada, kedaluwarsa, sudah dipakai, atau kartunya tidak lagi `ACTIVE` di registri → 404 `ENR-INVITATION-INVALID`, dengan body dan status yang sama.
+3. Perangkat ini sudah memegang card instance untuk kartu undangan: `ACTIVE`/`SUSPENDED` → 409 `ENR-DUPLICATE`; `PENDING_APPROVAL`/`PROVISIONING` → undangan menyetujui instance itu, tanpa instance baru (ADR-0035). Selain itu batas 8 kartu tetap berlaku.
 4. Card instance dibuat `PROVISIONING`. Undangan adalah niat eksplisit pengelola, jadi aturan perangkat tambahan ADR-0032 tidak berlaku (SDD §8.2: undangan → PROVISIONING). `invitation_id` diisi, dan `physical_card_id` bila undangan diikat ke kartu.
-5. `used_at` diisi di transaksi yang sama. Audit `enrollment.started` `{status, method: "invitation"}` berisi id internal saja.
-   - *Keputusan builder (selaras ADR-0034):* perangkat yang sama dengan token yang sama melanjutkan instance-nya yang belum selesai (200). Bila instance undangan menjadi `ABANDONED`, `used_at` dikosongkan lagi sehingga undangan bisa dipakai ulang sampai kedaluwarsa. Perangkat lain dengan token terpakai tetap `ENR-INVITATION-INVALID`.
+5. `used_at` diisi di transaksi yang sama. Audit `enrollment.started` `{status, method: "invitation", invitation}` berisi id internal saja.
+   - *Keputusan builder (selaras ADR-0034):* perangkat yang sama dengan token yang sama melanjutkan instance-nya yang belum selesai (200). Undangan dianggap terpakai selama punya instance yang tidak `ABANDONED`, sehingga undangan yang instance-nya terbengkalai bisa dipakai lagi sampai kedaluwarsa; `used_at` hanya mencatat waktu pakai terakhir. Perangkat lain dengan token terpakai tetap `ENR-INVITATION-INVALID`.
 6. Idempotency: hash memakai hash token, bukan token mentah.
 
 Zona sertifikat: kartu terdaftar bila tertaut, lalu `invitations.zones_bitmap` bila lewat undangan, lalu kebijakan gedung untuk data lama.
 
 ## CLI
 
-`anastrophe-registry invite --site <uuid> [--card-tech <tech> --card-id <hex>] [--zones Lobi;Parkir] [--contact <email|telepon>] [--ttl 7] [--link-base https://…/i/] --operator <nama>`
+`anastrophe-registry invite --site <uuid> [--zones Lobi;Parkir | --card-file <berkas>|-] [--ttl 7] [--link-base https://…/i/] --operator <pegangan>`
 
 - Mencetak token dan tautan **sekali**. Token tidak bisa diambil lagi.
-- Kartu dan kontak opsional langsung di-HMAC per gedung; kartu harus sudah ada di registri.
+- Kartu opsional dibaca dari berkas berisi satu baris `<tech>:<hex>`, atau dari stdin dengan `-`, lalu langsung di-HMAC per gedung. Identitas tidak pernah lewat argumen karena argumen masuk riwayat shell dan daftar proses (review akhir I3). Kartu harus sudah ada di registri.
+- `--zones` hanya untuk undangan tanpa kartu; undangan berkartu memakai zona registri kartu, jadi kombinasi keduanya ditolak (review akhir M5).
 - Audit `invitation.created` `{expires_at, bound_to_card}`.
 
 ## App
@@ -74,7 +75,7 @@ Zona sertifikat: kartu terdaftar bila tertaut, lalu `invitations.zones_bitmap` b
 2. Tak dikenal, kedaluwarsa, dan terpakai dijawab identik.
 3. Token mentah tidak muncul di database, log, audit, idempotency, atau keluaran CLI selain cetakan pertama.
 4. Zona undangan tanpa kartu *fail-closed* (0 bila tidak diisi).
-5. Undangan untuk kartu yang sudah dipegang perangkat lain tetap `PROVISIONING`, sedangkan perangkat yang sama mendapat `ENR-DUPLICATE`.
+5. Undangan untuk kartu yang sudah dipegang perangkat lain tetap `PROVISIONING`. Perangkat yang sama mendapat `ENR-DUPLICATE` bila instance-nya `ACTIVE`/`SUSPENDED`, dan instance yang belum selesai disetujui undangan (ADR-0035).
 
 ## Diserahkan ke builder
 

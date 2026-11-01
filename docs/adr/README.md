@@ -38,3 +38,4 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0032](0032-perangkat-tambahan-menunggu-persetujuan.md) | Sebelum ada akun: perangkat pertama diprovisikan, perangkat tambahan menunggu persetujuan | Diterima (provisional — tinjau ulang saat fondasi akun dibangun) | `pending_for_additional` | 0.71 |
 | [ADR-0033](0033-fokus-enrolment-undangan.md) | Iterasi berikutnya: enrolment via undangan | Diterima | `invitation_enrolment` | 0.89 |
 | [ADR-0034](0034-lanjutkan-enrolment-belum-selesai.md) | Enrolment yang belum selesai dilanjutkan; PROVISIONING tanpa kredensial kedaluwarsa 15 menit | Diterima | `resume_plus_expiry` | 0.81 |
+| [ADR-0035](0035-undangan-berkartu-menyetujui-instance.md) | Undangan berkartu menyetujui instance yang belum selesai milik perangkat yang sama | Diterima | `promote_existing` | 0.94 |
