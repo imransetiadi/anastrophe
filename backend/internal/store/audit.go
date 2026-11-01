@@ -92,8 +92,9 @@ func (t *Tx) AppendAudit(ctx context.Context, e AuditEvent) error {
 		return err
 	}
 	var seq int64
+	var lastAt time.Time
 	prev := make([]byte, 32)
-	err := t.tx.QueryRow(ctx, `SELECT seq, hash FROM audit_events WHERE chain = $1 ORDER BY seq DESC LIMIT 1`, chain).Scan(&seq, &prev)
+	err := t.tx.QueryRow(ctx, `SELECT seq, hash, at FROM audit_events WHERE chain = $1 ORDER BY seq DESC LIMIT 1`, chain).Scan(&seq, &prev, &lastAt)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}
@@ -113,6 +114,11 @@ func (t *Tx) AppendAudit(ctx context.Context, e AuditEvent) error {
 	}
 	data := []byte(text)
 	at := e.At.UTC().Truncate(time.Microsecond) // presisi timestamptz
+	// Waktu pemanggil diambil sebelum menunggu kunci, jadi bisa lebih awal dari baris sebelumnya;
+	// urutan waktu sepanjang seq dijaga tidak mundur.
+	if last := lastAt.UTC(); at.Before(last) {
+		at = last
+	}
 	seq++
 	var site any
 	if e.SiteID != "" {

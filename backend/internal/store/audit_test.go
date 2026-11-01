@@ -253,3 +253,27 @@ func TestAuditHeads(t *testing.T) {
 		}
 	}
 }
+
+func TestAuditWaktuTidakMundur(t *testing.T) {
+	// Review audit minor 3: waktu dari pemanggil bisa lebih awal dari baris sebelumnya
+	// (diambil sebelum menunggu kunci); urutan waktu sepanjang seq tidak boleh mundur.
+	s := freshStore(t)
+	ctx := context.Background()
+	site := newAuditSite(t, s, 1)
+	later, earlier := auditEvent(site, 10), auditEvent(site, 0)
+	for _, e := range []AuditEvent{later, earlier} {
+		if err := s.AppendAudit(ctx, e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events, err := s.AuditEvents(ctx, AuditChain(site))
+	if err != nil || len(events) != 2 {
+		t.Fatalf("events: %v %v", events, err)
+	}
+	if events[1].At.Before(events[0].At) {
+		t.Fatalf("waktu mundur: %v lalu %v", events[0].At, events[1].At)
+	}
+	if n, err := s.VerifyAuditChain(ctx, AuditChain(site)); err != nil || n != 2 {
+		t.Fatalf("verify = %d, %v", n, err)
+	}
+}
