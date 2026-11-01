@@ -1,0 +1,72 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "secret_first_block_add_channel",
+    "escaped": false,
+    "confidence": 0.83,
+    "probabilities": {
+      "enrolment_secret_all": 0.08,
+      "secret_first_then_signature": 0.05,
+      "secret_first_block_add_channel": 0.86,
+      "ask_user": 0,
+      "investigate": 0.01,
+      "none": 0
+    },
+    "contradicted_requirements": []
+  },
+  "requirements_checked": 3,
+  "checks": [
+    {
+      "candidate": "enrolment_secret_all",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "enrolment_secret_all",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "enrolment_secret_all",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "secret_first_then_signature",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "secret_first_then_signature",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "secret_first_then_signature",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "secret_first_block_add_channel",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "secret_first_block_add_channel",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "secret_first_block_add_channel",
+      "requirement": 2,
+      "answer": "supported"
+    }
+  ],
+  "warnings": [],
+  "usage": {
+    "input_tokens": 2913,
+    "output_tokens": 452
+  }
+}

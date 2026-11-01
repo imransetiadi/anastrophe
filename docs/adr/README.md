@@ -42,3 +42,5 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0036](0036-fokus-siklus-hidup-kartu-operator.md) | Fokus berikutnya: siklus hidup kartu oleh operator dan status kartu di app | Diterima | `operator_lifecycle_status` | 0.98 |
 | [ADR-0037](0037-token-baca-status-kartu.md) | App membaca status kartu dengan token baca status | Diterima | `status_read_token` | 0.96 |
 | [ADR-0038](0038-cegah-pembatalan-tindakan-operator.md) | Pemegang kartu tidak boleh membatalkan suspend/revoke operator (terbuka) | Diusulkan — butuh keputusan manusia (eskalasi) | — (escalate) | 0.45 |
+| [ADR-0039](0039-fokus-provisioning-aman.md) | Fokus berikutnya: provisioning kredensial hanya untuk perangkat yang memulai enrolment | Diterima | `secure_provisioning` | 0.92 |
+| [ADR-0040](0040-rahasia-enrolment-kredensial-pertama.md) | Rahasia enrolment untuk kredensial pertama; tambah kanal ke kartu aktif ditolak | Diterima | `secret_first_block_add_channel` | 0.83 |

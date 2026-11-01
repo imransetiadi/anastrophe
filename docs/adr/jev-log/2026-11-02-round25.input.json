@@ -1,0 +1,34 @@
+{
+ "tool": "jev_decide",
+ "label": "D40b-mekanisme-provisioning-aman (bukti baru)",
+ "decision": "How should POST /v1/enrollments/{id}/credentials prove that the request comes from the device that started the enrolment (ADR-0039)? (Re-submitted once with new evidence: the app never adds a channel to an ACTIVE instance.)",
+ "candidates": [
+  {
+   "id": "enrolment_secret_all",
+   "description": "The app generates a 32-byte provisioning secret per enrolment and sends its SHA-256 in POST /v1/enrollments. The server stores the hash on the instance at creation and replaces it when the same device gets the instance back through an enrolment call. Every provisioning call, first credential or additional channel, must present the secret (Authorization: Bearer); missing or wrong answers the same 404 ENR-NOT-FOUND as an unknown id. The app keeps the secret for the instance's lifetime."
+  },
+  {
+   "id": "secret_first_then_signature",
+   "description": "The enrolment secret (as above) authorises only the first credential of a PROVISIONING instance; adding a channel to an ACTIVE instance requires a possession signature from an existing credential key of that instance (challenge nonce, message 'ANP1-ADD-CHANNEL' ‖ cred_id ‖ nonce ‖ channel), implemented now on server and app."
+  },
+  {
+   "id": "secret_first_block_add_channel",
+   "description": "The enrolment secret (as above) authorises only the first credential of a PROVISIONING instance; adding a channel to an ACTIVE instance is refused (409 ENR-CHANNEL-EXISTS style) until a signed add-channel flow is designed when the product needs it. The app discards the secret once the first credential is stored."
+  }
+ ],
+ "evidence_refs": [
+  "round24 (eskalasi 0,43)",
+  "BARU: satu-satunya pemanggil submitCredentialKey adalah provisioning lab kredensial pertama; FR-05 satu kanal per kartu",
+  "ADR-0034 (ABANDONED 15 menit)",
+  "ADR-0035",
+  "ADR-0037 (pelajaran idempotency)",
+  "CLAUDE.md aturan 5"
+ ],
+ "priorities": "1) Knowing a cred_id, the card instance id, the device id or reader data must not allow provisioning. 2) No Face ID or passcode prompts outside actions the user started, and no raw secret persisted on the server (including idempotency rows). 3) Same-device resume (ADR-0034) and invitation promotion (ADR-0035) keep working. 4) Minimal API and app change; do not build flows the product does not use yet.",
+ "requirements": [
+  "An attacker who knows a cred_id, the card instance id and the device id, but has no data stored only on the enrolling device, cannot obtain a credential through POST /v1/enrollments/{id}/credentials.",
+  "Resuming an unfinished enrolment (ADR-0034) or promoting a pending one (ADR-0035) still lets the legitimate device provision its first credential.",
+  "No raw secret is stored on the server, including idempotency rows."
+ ],
+ "escalate_on_contradiction": true
+}
