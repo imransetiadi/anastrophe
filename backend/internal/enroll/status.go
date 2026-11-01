@@ -13,9 +13,9 @@ import (
 	"github.com/imransetiadi/anastrophe/backend/internal/store"
 )
 
-// parseStatusTokenHash membaca field opsional status_token_hash (base64 dari SHA-256, ADR-0037).
-// Field yang tidak ada → nil, true; ada tetapi bukan 32 byte → nil, false.
-func parseStatusTokenHash(field *string) ([]byte, bool) {
+// parseHashField membaca field hash opsional (base64 dari SHA-256): status_token_hash (ADR-0037) dan
+// provisioning_key_hash (ADR-0040). Field yang tidak ada → nil, true; ada tetapi bukan 32 byte → nil, false.
+func parseHashField(field *string) ([]byte, bool) {
 	if field == nil {
 		return nil, true
 	}

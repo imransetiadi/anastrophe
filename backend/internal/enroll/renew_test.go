@@ -392,6 +392,7 @@ func TestPerpanjanganInstanceLamaMemakaiKebijakan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	f.armProvisioning(t, id)
 	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	pub, _ := key.PublicKey.ECDH()
 	rec := f.do(t, http.MethodPost, "/v1/enrollments/"+id+"/credentials", "prov-lama", map[string]string{"channel": "ble", "public_key": base64.StdEncoding.EncodeToString(pub.Bytes())})

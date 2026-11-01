@@ -228,6 +228,8 @@ type Enrollment struct {
 	ZonesBitmap uint64
 	// CertValidityDays dari sites.policy (ADR-0010: 1–30); 0 = pakai default.
 	CertValidityDays int
+	// ProvisioningKeyHash: SHA-256 rahasia enrolment (ADR-0040); nil setelah kredensial pertama.
+	ProvisioningKeyHash []byte
 }
 
 // Credential yang diterbitkan untuk satu kanal.
@@ -263,12 +265,13 @@ func (t *Tx) EnrollmentForUpdate(ctx context.Context, id string) (Enrollment, er
 		       s.policy ->> 'zones_bitmap',
 		       s.policy ->> 'cert_validity_days',
 		       pc.zones_bitmap,
-		       inv.zones_bitmap
+		       inv.zones_bitmap,
+		       ci.provisioning_key_hash
 		FROM card_instances ci JOIN sites s ON s.id = ci.site_id
 		LEFT JOIN physical_cards pc ON pc.id = ci.physical_card_id
 		LEFT JOIN invitations inv ON inv.id = ci.invitation_id
 		WHERE ci.id = $1
-		FOR UPDATE OF ci`, id).Scan(&e.ID, &e.Status, &e.DeviceID, &e.SiteID, &e.SiteName, &e.SiteCode, &zones, &bitmap, &validity, &cardBitmap, &invitationBitmap)
+		FOR UPDATE OF ci`, id).Scan(&e.ID, &e.Status, &e.DeviceID, &e.SiteID, &e.SiteName, &e.SiteCode, &zones, &bitmap, &validity, &cardBitmap, &invitationBitmap, &e.ProvisioningKeyHash)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Enrollment{}, ErrNotFound
 	}
@@ -493,7 +496,8 @@ func (t *Tx) HasActiveCredential(ctx context.Context, cardInstanceID, channel st
 // SaveCredential menyimpan kredensial dan mengaktifkan card instance (hanya dari
 // PROVISIONING atau ACTIVE). Indeks unik parsial menolak kredensial aktif kedua per kanal.
 func (t *Tx) SaveCredential(ctx context.Context, c Credential) error {
-	tag, err := t.tx.Exec(ctx, `UPDATE card_instances SET status = 'ACTIVE' WHERE id = $1 AND status IN ('PROVISIONING', 'ACTIVE')`, c.CardInstanceID)
+	// Rahasia enrolment hanya untuk kredensial pertama (ADR-0040), jadi hash-nya dihapus di sini.
+	tag, err := t.tx.Exec(ctx, `UPDATE card_instances SET status = 'ACTIVE', provisioning_key_hash = NULL WHERE id = $1 AND status IN ('PROVISIONING', 'ACTIVE')`, c.CardInstanceID)
 	if err != nil {
 		return err
 	}

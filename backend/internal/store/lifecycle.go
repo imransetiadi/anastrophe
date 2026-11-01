@@ -199,6 +199,28 @@ func (t *Tx) InitStatusTokenHash(ctx context.Context, cardInstanceID string, has
 	return err
 }
 
+// SetProvisioningKeyHash memasang SHA-256 rahasia enrolment pada card instance (ADR-0040), menimpa
+// yang lama. Dipanggil dalam transaksi enrolment untuk instance PROVISIONING atau PENDING_APPROVAL
+// yang dikembalikan kepada perangkat itu (baru, dilanjutkan, atau dipromosikan).
+func (t *Tx) SetProvisioningKeyHash(ctx context.Context, cardInstanceID string, hash []byte) error {
+	if len(hash) != 32 {
+		return ErrInvalidTokenHash
+	}
+	tag, err := t.tx.Exec(ctx, `UPDATE card_instances SET provisioning_key_hash = $2 WHERE id = $1`, cardInstanceID, hash)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// InTx menjalankan fn dalam satu transaksi; galat dari fn membatalkan semuanya.
+func (s *Store) InTx(ctx context.Context, fn func(tx *Tx) error) error {
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error { return fn(&Tx{tx: tx}) })
+}
+
 // CardStatusByToken mengembalikan status card instance bila hash token cocok (ADR-0037). Id tak dikenal,
 // instance tanpa token, dan token salah sama-sama ErrNotFound.
 func (s *Store) CardStatusByToken(ctx context.Context, cardInstanceID string, tokenHash []byte) (string, error) {

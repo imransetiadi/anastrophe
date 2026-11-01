@@ -220,7 +220,8 @@ func TestProvisioningTidakMenimpaHashTokenStatus(t *testing.T) {
 	rec := f.do(t, http.MethodPost, "/v1/enrollments/"+card.enrollmentID+"/credentials", "prov-kanal-kedua", map[string]string{
 		"channel": "nfcHCE", "public_key": base64.StdEncoding.EncodeToString(mustPub(t, key)), "status_token_hash": attackerHash,
 	})
-	if rec.Code != http.StatusOK {
+	// ADR-0040: kanal kedua untuk kartu aktif kini ditolak seluruhnya, jadi hash tidak mungkin diganti.
+	if rec.Code != http.StatusNotFound {
 		t.Fatalf("provisioning kanal kedua: %d %s", rec.Code, rec.Body)
 	}
 	if got := statusValue(t, f.cardStatus(t, card.enrollmentID, header)); got != "ACTIVE" {

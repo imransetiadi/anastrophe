@@ -105,7 +105,7 @@ func (h *Handler) renewCredential(w http.ResponseWriter, r *http.Request, credID
 	if err := json.Unmarshal(body, &raw); err == nil {
 		nonce, errNonce = base64.StdEncoding.DecodeString(raw.Nonce)
 		sig, errSig = base64.StdEncoding.DecodeString(raw.Signature)
-		tokenHash, tokenOK = parseStatusTokenHash(raw.StatusTokenHash)
+		tokenHash, tokenOK = parseHashField(raw.StatusTokenHash)
 	} else {
 		errNonce = err
 	}

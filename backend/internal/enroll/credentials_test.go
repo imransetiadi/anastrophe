@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -59,6 +60,9 @@ type fixture struct {
 	groupID  []byte
 	mac      *registry.DevMAC
 	nextCard *int
+	// secrets: rahasia enrolment per id instance (ADR-0040). Fixture berperan sebagai klien yang
+	// benar: do() mengirim hash saat enrolment dan rahasia saat provisioning.
+	secrets map[string][]byte
 }
 
 func newFixture(t *testing.T) fixture {
@@ -117,6 +121,7 @@ func newFixtureWithPool(t *testing.T, poolParams string) fixture {
 	f := fixture{
 		mac:      mac,
 		nextCard: new(int),
+		secrets:  map[string][]byte{},
 		dsn:      dsn,
 		h:        h,
 		handler:  httpapi.New(httpapi.Config{}, httpapi.Deps{Routes: h.Register}),
@@ -179,15 +184,99 @@ func (f fixture) handlerConfig(t *testing.T, channels []string) {
 
 func (f fixture) do(t *testing.T, method, path, idempotencyKey string, body any) *httptest.ResponseRecorder {
 	t.Helper()
+	var secret []byte
+	if method == http.MethodPost && path == "/v1/enrollments" {
+		body, secret = withProvisioningHash(t, body, idempotencyKey)
+	}
+	rec := f.request(t, method, path, idempotencyKey, body, f.provisioningHeaders(method, path))
+	if secret != nil && rec.Code < 300 {
+		var out struct {
+			EnrollmentID string `json:"enrollment_id"`
+		}
+		if json.Unmarshal(rec.Body.Bytes(), &out) == nil && out.EnrollmentID != "" {
+			f.secrets[out.EnrollmentID] = secret
+		}
+	}
+	return rec
+}
+
+// provisioningHeaders membawa rahasia enrolment instance untuk provisioning (ADR-0040).
+func (f fixture) provisioningHeaders(method, path string) map[string]string {
+	headers := map[string]string{}
+	if id, ok := strings.CutPrefix(path, "/v1/enrollments/"); ok && method == http.MethodPost {
+		if id, ok = strings.CutSuffix(id, "/credentials"); ok && f.secrets[id] != nil {
+			headers["Authorization"] = "Bearer " + base64.RawURLEncoding.EncodeToString(f.secrets[id])
+		}
+	}
+	return headers
+}
+
+// armProvisioning memasang rahasia enrolment untuk instance yang dibuat langsung lewat store.
+func (f fixture) armProvisioning(t *testing.T, id string) {
+	t.Helper()
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(secret)
+	if err := f.store.InTx(context.Background(), func(tx *store.Tx) error { return tx.SetProvisioningKeyHash(context.Background(), id, sum[:]) }); err != nil {
+		t.Fatal(err)
+	}
+	f.secrets[id] = secret
+}
+
+// request mengirim permintaan apa adanya, tanpa perilaku klien otomatis do().
+func (f fixture) request(t *testing.T, method, path, idempotencyKey string, body any, headers map[string]string) *httptest.ResponseRecorder {
+	t.Helper()
 	raw, _ := json.Marshal(body)
 	req := httptest.NewRequest(method, path, bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
 	if idempotencyKey != "" {
 		req.Header.Set("Idempotency-Key", idempotencyKey)
 	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
 	rec := httptest.NewRecorder()
 	f.handler.ServeHTTP(rec, req)
 	return rec
+}
+
+// withProvisioningHash menambahkan hash rahasia enrolment ke body enrolment berbentuk map yang belum
+// membawanya (ADR-0040). Dengan Idempotency-Key, rahasia diturunkan dari key agar retry membawa body
+// yang sama, seperti klien sungguhan.
+func withProvisioningHash(t *testing.T, body any, idempotencyKey string) (any, []byte) {
+	t.Helper()
+	secret := make([]byte, 32)
+	if idempotencyKey != "" {
+		sum := sha256.Sum256([]byte("fixture-secret\n" + idempotencyKey))
+		secret = sum[:]
+	} else if _, err := rand.Read(secret); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(secret)
+	hash := base64.StdEncoding.EncodeToString(sum[:])
+	switch b := body.(type) {
+	case map[string]any:
+		if _, set := b["provisioning_key_hash"]; set {
+			return body, nil
+		}
+		out := map[string]any{"provisioning_key_hash": hash}
+		for k, v := range b {
+			out[k] = v
+		}
+		return out, secret
+	case map[string]string:
+		if _, set := b["provisioning_key_hash"]; set {
+			return body, nil
+		}
+		out := map[string]string{"provisioning_key_hash": hash}
+		for k, v := range b {
+			out[k] = v
+		}
+		return out, secret
+	}
+	return body, nil
 }
 
 func (f fixture) doRaw(t *testing.T, path, idempotencyKey, body string) *httptest.ResponseRecorder {
@@ -195,6 +284,9 @@ func (f fixture) doRaw(t *testing.T, path, idempotencyKey, body string) *httptes
 	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", idempotencyKey)
+	for k, v := range f.provisioningHeaders(http.MethodPost, path) {
+		req.Header.Set(k, v)
+	}
 	rec := httptest.NewRecorder()
 	f.handler.ServeHTTP(rec, req)
 	return rec
@@ -383,6 +475,8 @@ func TestStatusKartuTidakBolehDiprovisikan(t *testing.T) {
 
 func TestSatuKredensialPerKanal(t *testing.T) {
 	// Temuan review I2: kunci lain untuk kanal yang sama tidak boleh mendapat sertifikat kedua.
+	// ADR-0040: rahasia enrolment hanya untuk kredensial pertama, jadi kanal mana pun sesudahnya
+	// ditolak seperti id tak dikenal.
 	f := newFixture(t)
 	id := f.enroll(t)
 	path := "/v1/enrollments/" + id + "/credentials"
@@ -390,14 +484,14 @@ func TestSatuKredensialPerKanal(t *testing.T) {
 		t.Fatalf("pertama: %d %s", rec.Code, rec.Body)
 	}
 	rec := f.do(t, http.MethodPost, path, "c-2", map[string]string{"channel": "ble", "public_key": base64.StdEncoding.EncodeToString(phoneKey(t))})
-	if rec.Code != http.StatusConflict || problemType(t, rec) != "ENR-CHANNEL-EXISTS" {
+	if rec.Code != http.StatusNotFound || problemType(t, rec) != "ENR-NOT-FOUND" {
 		t.Fatalf("kedua: %d %s", rec.Code, rec.Body)
 	}
-	if rec := f.do(t, http.MethodPost, path, "c-3", map[string]string{"channel": "nfcHCE", "public_key": base64.StdEncoding.EncodeToString(phoneKey(t))}); rec.Code != http.StatusOK {
-		t.Fatalf("kanal lain harus boleh: %d %s", rec.Code, rec.Body)
+	if rec := f.do(t, http.MethodPost, path, "c-3", map[string]string{"channel": "nfcHCE", "public_key": base64.StdEncoding.EncodeToString(phoneKey(t))}); rec.Code != http.StatusNotFound {
+		t.Fatalf("kanal lain untuk kartu aktif: %d %s", rec.Code, rec.Body)
 	}
-	if n, _ := f.store.CredentialCount(context.Background(), id); n != 2 {
-		t.Fatalf("kredensial = %d, ingin 2", n)
+	if n, _ := f.store.CredentialCount(context.Background(), id); n != 1 {
+		t.Fatalf("kredensial = %d, ingin 1", n)
 	}
 }
 

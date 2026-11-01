@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -100,6 +101,8 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 			ID   string `json:"id"`
 		} `json:"card"`
 		Invitation *string `json:"invitation"`
+		// ProvisioningKeyHash: SHA-256 rahasia enrolment dari app (ADR-0040).
+		ProvisioningKeyHash *string `json:"provisioning_key_hash"`
 	}
 	body, ok := readBody(w, r)
 	if !ok {
@@ -109,11 +112,15 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteProblem(w, problem("REQ-INVALID", http.StatusBadRequest))
 		return
 	}
+	provisioningHash, ok := parseHashField(req.ProvisioningKeyHash)
+	if !ok {
+		httpapi.WriteProblem(w, problem("REQ-INVALID", http.StatusBadRequest))
+		return
+	}
 	// requestKey masuk hash idempotency: HMAC kartu atau hash token, tidak pernah nilai mentah,
 	// karena baris idempotency tersimpan di database (aturan 6).
 	var requestKey string
 	var inTx func(ctx context.Context, tx *store.Tx) (store.CardEnrollment, error)
-	var direct func(ctx context.Context) (store.CardEnrollment, error)
 	if req.Invitation != nil {
 		tokenHash, err := store.InvitationTokenHash(*req.Invitation)
 		if err != nil {
@@ -123,9 +130,6 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 		requestKey = "invitation:" + hex.EncodeToString(tokenHash)
 		inTx = func(ctx context.Context, tx *store.Tx) (store.CardEnrollment, error) {
 			return tx.EnrollInvitation(ctx, req.DeviceID, tokenHash, h.Now())
-		}
-		direct = func(ctx context.Context) (store.CardEnrollment, error) {
-			return h.Store.EnrollInvitation(ctx, req.DeviceID, tokenHash, h.Now())
 		}
 	} else {
 		identity, err := registry.ParseCardIdentity(req.Card.Tech, req.Card.ID)
@@ -145,9 +149,6 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 		requestKey = siteID + "\n" + hex.EncodeToString(cardHMAC)
 		inTx = func(ctx context.Context, tx *store.Tx) (store.CardEnrollment, error) {
 			return tx.EnrollCard(ctx, req.DeviceID, siteID, cardHMAC, h.Now())
-		}
-		direct = func(ctx context.Context) (store.CardEnrollment, error) {
-			return h.Store.EnrollCard(ctx, req.DeviceID, siteID, cardHMAC, h.Now())
 		}
 	}
 	enroll := func(result store.CardEnrollment, err error) (int, []byte, error) {
@@ -175,6 +176,18 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 		}
 		return http.StatusCreated, out, err
 	}
+	// ADR-0040: instance yang dikembalikan kepada perangkat ini dan masih menunggu kredensial pertama
+	// (baru, dilanjutkan, atau dipromosikan) memakai rahasia enrolment terbaru, dalam transaksi yang sama.
+	armed := func(ctx context.Context, tx *store.Tx) (store.CardEnrollment, error) {
+		result, err := inTx(ctx, tx)
+		if err == nil && provisioningHash != nil && (result.Status == "PROVISIONING" || result.Status == "PENDING_APPROVAL") {
+			err = tx.SetProvisioningKeyHash(ctx, result.ID, provisioningHash)
+		}
+		return result, err
+	}
+	if provisioningHash != nil {
+		requestKey += "\n" + base64.StdEncoding.EncodeToString(provisioningHash)
+	}
 	// SDD §8.5: POST mutasi menerima Idempotency-Key; dengan key, ketuk ganda tidak memakan
 	// dua jatah dari batas 8 kartu.
 	var status int
@@ -187,10 +200,16 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 		}
 		hash := sha256.Sum256([]byte(r.URL.Path + "\n" + req.DeviceID + "\n" + requestKey))
 		status, resp, err = h.Store.Idempotent(r.Context(), key, hash[:], func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
-			return enroll(inTx(ctx, tx))
+			return enroll(armed(ctx, tx))
 		})
 	} else {
-		status, resp, err = enroll(direct(r.Context()))
+		var result store.CardEnrollment
+		txErr := h.Store.InTx(r.Context(), func(tx *store.Tx) error {
+			var err error
+			result, err = armed(r.Context(), tx)
+			return err
+		})
+		status, resp, err = enroll(result, txErr)
 	}
 	h.writeResult(w, status, resp, err, "create enrollment failed")
 }
@@ -235,9 +254,18 @@ func (h *Handler) issueCredential(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.PathValue("id")
+	if encoded, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
+		if secret, err := base64.RawURLEncoding.DecodeString(encoded); err == nil && len(secret) == 32 {
+			sum := sha256.Sum256(secret)
+			req.SecretHash = sum[:]
+		}
+	}
 	// Hash atas isi yang sudah dinormalkan, bukan byte mentah: urutan kunci JSON dari klien
 	// (mis. dictionary Swift) bisa berbeda antar-retry.
 	material := r.URL.Path + "\n" + req.Channel + "\n" + base64.StdEncoding.EncodeToString(req.PublicKey)
+	if req.SecretHash != nil {
+		material += "\n" + hex.EncodeToString(req.SecretHash)
+	}
 	if req.StatusTokenHash != nil {
 		// Hanya bila ada, agar hash permintaan klien lama tidak berubah (ADR-0037).
 		material += "\n" + base64.StdEncoding.EncodeToString(req.StatusTokenHash)
@@ -265,6 +293,8 @@ type credentialRequest struct {
 	PublicKey []byte
 	// StatusTokenHash: SHA-256 token baca status dari app (ADR-0037), opsional untuk klien lama.
 	StatusTokenHash []byte
+	// SecretHash: SHA-256 rahasia enrolment dari header Authorization (ADR-0040); nil bila tidak ada.
+	SecretHash []byte
 }
 
 // parseCredentialRequest memvalidasi isi permintaan sebelum menyentuh database.
@@ -291,7 +321,7 @@ func parseCredentialRequest(body []byte) (credentialRequest, *httpapi.Problem) {
 		p := problem("ENR-INVALID-KEY", http.StatusBadRequest)
 		return credentialRequest{}, &p
 	}
-	tokenHash, ok := parseStatusTokenHash(raw.StatusTokenHash)
+	tokenHash, ok := parseHashField(raw.StatusTokenHash)
 	if !ok {
 		p := problem("REQ-INVALID", http.StatusBadRequest)
 		return credentialRequest{}, &p
@@ -311,12 +341,18 @@ func (h *Handler) issue(ctx context.Context, tx *store.Tx, enrollmentID string, 
 	if err != nil {
 		return 0, nil, err
 	}
-	// SDD §8.2: hanya kartu yang sedang diprovisikan (atau aktif untuk kanal baru) yang
-	// boleh mendapat sertifikat.
+	// ADR-0040: rahasia enrolment diperiksa sebelum status apa pun diungkap; rahasia hilang atau salah
+	// dijawab sama dengan id tak dikenal.
+	if len(enrollment.ProvisioningKeyHash) != 32 || len(req.SecretHash) != 32 ||
+		subtle.ConstantTimeCompare(enrollment.ProvisioningKeyHash, req.SecretHash) != 1 {
+		return problemBody("ENR-NOT-FOUND", http.StatusNotFound)
+	}
 	if enrollment.Status == "PENDING_APPROVAL" {
 		return problemBody("ENR-PENDING-APPROVAL", http.StatusConflict) // ADR-0032: menunggu operator
 	}
-	if enrollment.Status != "PROVISIONING" && enrollment.Status != "ACTIVE" {
+	// Hanya kredensial pertama: kanal baru untuk kartu aktif ditolak sampai ada alur tambah kanal
+	// bertanda tangan (ADR-0040).
+	if enrollment.Status != "PROVISIONING" {
 		return problemBody("ENR-NOT-PROVISIONABLE", http.StatusConflict)
 	}
 	exists, err := tx.HasActiveCredential(ctx, enrollment.ID, req.Channel)
