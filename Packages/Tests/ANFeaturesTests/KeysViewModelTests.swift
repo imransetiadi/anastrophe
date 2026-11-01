@@ -74,5 +74,18 @@ struct KeysViewModelTests {
         let (model, card) = try await nearExpiryModel(online: false, hoursLeft: 5 * 24)
         #expect(model.renewalNotice(for: card) == nil)
     }
+
+    @Test func riwayatLebihDariTigaPuluhHariDipangkas() async throws {
+        // Review Focus 3 (FR-30): hanya 30 hari terakhir yang tampil dan disimpan.
+        let services = AppServices.inMemory()
+        let card = Card(id: UUID(), name: "Lobi", siteName: "Menara A", zones: [], status: .active, credentials: [:], notAfter: nil)
+        try await services.cards.add(card)
+        try await services.tapHistory.append(TapEntry(cardID: card.id, date: .now.addingTimeInterval(-31 * 86_400), channel: .ble, granted: true, denyReason: nil))
+        try await services.tapHistory.append(TapEntry(cardID: card.id, date: .now.addingTimeInterval(-86_400), channel: .ble, granted: false, denyReason: .suspended))
+        let model = KeysViewModel(services: services)
+        await model.load()
+        #expect(model.history(for: card).count == 1)
+        #expect(try await services.tapHistory.entries(for: card.id, since: .distantPast).count == 1)
+    }
 }
 

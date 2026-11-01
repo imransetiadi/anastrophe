@@ -1,4 +1,5 @@
 import ANCore
+import ANStorage
 import Foundation
 import SwiftUI
 import Testing
@@ -21,7 +22,7 @@ final class SpyLauncher: PresentationLaunching {
 @MainActor
 func services(launcher: SpyLauncher) -> AppServices {
     let base = AppServices.inMemory()
-    return AppServices(cards: base.cards, keys: base.keys, records: base.records, availability: { [:] }, launcher: launcher, foreground: ForegroundState(), authenticator: ImmediateAuthenticator())
+    return AppServices(cards: base.cards, keys: base.keys, records: base.records, availability: { [:] }, launcher: launcher, foreground: ForegroundState(), authenticator: ImmediateAuthenticator(), tapHistory: InMemoryTapHistoryStore())
 }
 
 @MainActor

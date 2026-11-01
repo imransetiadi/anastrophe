@@ -149,6 +149,15 @@ struct RemoveCardServiceTests {
         #expect(try await services.cards.all().count == 1)
     }
 
+    @Test func hapusKartuMenghapusRiwayat() async throws {
+        // Review Focus 2 (FR-30/FR-31): riwayat tap ikut terhapus bersama kartunya.
+        let services = AppServices.inMemory()
+        let card = try await labCard(in: services)
+        try await services.tapHistory.append(TapEntry(cardID: card.id, date: .now, channel: .ble, granted: true, denyReason: nil))
+        try await services.removeCard(card)
+        #expect(try await services.tapHistory.entries(for: card.id, since: .distantPast).isEmpty)
+    }
+
     @Test func hapusKartuButuhAutentikasi() async throws {
         let denied = AppServices.inMemory(events: [.waitingForReader], authenticator: DenyingAuthenticator())
         let card = try await labCard(in: denied)

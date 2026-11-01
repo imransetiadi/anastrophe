@@ -53,6 +53,8 @@ public final class AppServices {
     let connectivity: any ConnectivityStatus
     /// Autentikasi untuk aksi sensitif di luar presentasi (hapus kartu, FR-31).
     let authenticator: any UserAuthenticator
+    /// Riwayat tap lokal 30 hari (FR-30).
+    let tapHistory: any TapHistoryStore
     /// Store kartu tidak bisa dibuka; UI memberi tahu alih-alih menampilkan daftar kosong.
     public let storageFailed: Bool
     #if DEBUG
@@ -76,6 +78,7 @@ public final class AppServices {
         cardsRevision: CardsRevision = CardsRevision(),
         connectivity: any ConnectivityStatus = FixedConnectivity(isOnline: true),
         authenticator: any UserAuthenticator,
+        tapHistory: any TapHistoryStore,
         storageFailed: Bool = false
     ) {
         self.cards = cards
@@ -87,6 +90,7 @@ public final class AppServices {
         self.cardsRevision = cardsRevision
         self.connectivity = connectivity
         self.authenticator = authenticator
+        self.tapHistory = tapHistory
         self.storageFailed = storageFailed
     }
 
@@ -101,6 +105,7 @@ public final class AppServices {
             launcher: ScriptedPresentationLauncher(events: [.cancelled], finishes: true),
             foreground: ForegroundState(),
             authenticator: UnavailableAuthenticator(),
+            tapHistory: InMemoryTapHistoryStore(),
             storageFailed: true
         )
     }
@@ -131,17 +136,19 @@ public final class AppServices {
         let config = localConfig(nfcEmulationEntitled: nfcEmulationEntitled)
         let cards = try SwiftDataCardStore(directory: URL.applicationSupportDirectory.appending(path: "Anastrophe/Cards"))
         let revision = CardsRevision()
+        let tapHistory = try SwiftDataTapHistoryStore(directory: URL.applicationSupportDirectory.appending(path: "Anastrophe/TapHistory"))
         let launcher = LivePresentationLauncher(keys: keys, records: records, cards: cards, counters: KeychainCounterStore(store: secrets), foreground: foreground, config: config, nfcEmulationEntitled: nfcEmulationEntitled, onCardsChanged: { revision.bump() })
         return AppServices(
             cards: cards,
             keys: keys,
             records: records,
             availability: { await liveAvailability(config: config, nfcEmulationEntitled: nfcEmulationEntitled, bluetoothPoweredOn: launcher.bluetoothPoweredOn) },
-            launcher: launcher,
+            launcher: RecordingLauncher(base: launcher, history: tapHistory),
             foreground: foreground,
             cardsRevision: revision,
             connectivity: LiveConnectivity(onChange: { Task { @MainActor in revision.bump() } }),
-            authenticator: LAUserAuthenticator()
+            authenticator: LAUserAuthenticator(),
+            tapHistory: tapHistory
         )
     }
 
@@ -155,15 +162,17 @@ public final class AppServices {
         let secrets = InMemorySecretStore()
         let keys = DeviceKeyStore(store: secrets, factory: SoftwareKeyFactory())
         let directory = FileManager.default.temporaryDirectory.appending(path: "anastrophe-\(UUID().uuidString)")
+        let tapHistory = InMemoryTapHistoryStore()
         return AppServices(
             cards: (try? SwiftDataCardStore(directory: directory)) ?? EmptyCardStore(),
             keys: keys,
             records: KeychainCredentialRecordStore(store: secrets),
             availability: { [.ble: .available, .nfcHCE: .notEligible] },
-            launcher: ScriptedPresentationLauncher(events: events),
+            launcher: RecordingLauncher(base: ScriptedPresentationLauncher(events: events), history: tapHistory),
             foreground: ForegroundState(),
             connectivity: connectivity,
-            authenticator: authenticator
+            authenticator: authenticator,
+            tapHistory: tapHistory
         )
     }
 
@@ -179,6 +188,7 @@ public final class AppServices {
         }
         defer { context?.laContext.invalidate() }
         try await remover.remove(card: card, context: context)
+        try? await tapHistory.removeAll(for: card.id)  // FR-30: riwayat ikut terhapus
     }
 
     private static func liveAvailability(config: RemoteConfig, nfcEmulationEntitled: Bool, bluetoothPoweredOn: Bool?) async -> [ChannelKind: ChannelAvailability] {
@@ -436,6 +446,9 @@ extension AppServices {
             Card(id: UUID(), name: "Kantor Lt. 12", siteName: "Graha Mitra", zones: ["Lantai 12"], status: .suspended, credentials: [.ble: Data(repeating: 0x03, count: 16)], notAfter: nil),
         ]
         for card in samples { try? await services.cards.add(card) }
+        // Riwayat contoh untuk kartu pertama (FR-30).
+        try? await services.tapHistory.append(TapEntry(cardID: samples[0].id, date: .now.addingTimeInterval(-3_600), channel: .ble, granted: true, denyReason: nil))
+        try? await services.tapHistory.append(TapEntry(cardID: samples[0].id, date: .now.addingTimeInterval(-2 * 86_400), channel: .ble, granted: false, denyReason: .zoneNotAllowed))
         return services
     }
 }

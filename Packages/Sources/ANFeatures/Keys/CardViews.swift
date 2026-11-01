@@ -89,6 +89,7 @@ struct CardDetailView: View {
     var notice: RenewalNotice?
     var onDelete: (() -> Void)?
     var isDeleting = false
+    var history: [TapEntry] = []
     let onUse: () -> Void
     @State private var confirmsDelete = false
 
@@ -130,6 +131,18 @@ struct CardDetailView: View {
                         .foregroundStyle(ANColor.mutedForeground)
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
+                }
+            }
+            // FR-30: riwayat tap lokal 30 hari, hanya di perangkat.
+            Section(localized("detail.history")) {
+                if history.isEmpty {
+                    Text(localized("detail.history.empty"))
+                        .font(.footnote)
+                        .foregroundStyle(ANColor.mutedForeground)
+                } else {
+                    ForEach(history.prefix(20)) { entry in
+                        TapHistoryRow(entry: entry)
+                    }
                 }
             }
             if onDelete != nil {
@@ -179,5 +192,38 @@ struct CardDetailView: View {
         case .bluetoothUnauthorized: localized("card.reason.bluetooth_denied")
         case .noChannel: localized("card.reason.no_channel")
         }
+    }
+}
+
+/// Satu baris riwayat: hasil (ikon + teks, tidak hanya warna) dan waktu.
+struct TapHistoryRow: View {
+    let entry: TapEntry
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: entry.granted ? "checkmark.circle.fill" : "xmark.circle.fill")
+                .foregroundStyle(entry.granted ? ANColor.success : ANColor.destructive)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(entry.date.formatted(date: .abbreviated, time: .shortened))
+                    .font(.footnote)
+                    .foregroundStyle(ANColor.mutedForeground)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var title: String {
+        guard !entry.granted else { return localized("detail.history.granted") }
+        let reason: String = switch entry.denyReason ?? .unknown {
+        case .expired: localized("history.reason.expired")
+        case .suspended: localized("history.reason.suspended")
+        case .revoked: localized("history.reason.revoked")
+        case .outsideSchedule: localized("history.reason.outside_schedule")
+        case .zoneNotAllowed: localized("history.reason.zone_not_allowed")
+        case .unknown: localized("history.reason.unknown")
+        }
+        return "\(localized("detail.history.denied")) · \(reason)"
     }
 }

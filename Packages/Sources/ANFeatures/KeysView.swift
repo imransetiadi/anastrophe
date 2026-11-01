@@ -35,7 +35,7 @@ public struct KeysView: View {
                 .navigationTitle(localized("keys.title"))
                 .navigationDestination(for: Card.ID.self) { id in
                     if let card = model.cards.first(where: { $0.id == id }) {
-                        CardDetailView(card: card, presentability: model.presentability(of: card), notice: model.renewalNotice(for: card), onDelete: { delete(card) }, isDeleting: deleting == card.id) { use(card) }
+                        CardDetailView(card: card, presentability: model.presentability(of: card), notice: model.renewalNotice(for: card), onDelete: { delete(card) }, isDeleting: deleting == card.id, history: model.history(for: card)) { use(card) }
                             #if DEBUG
                             .toolbar {
                                 ToolbarItem(placement: .primaryAction) {

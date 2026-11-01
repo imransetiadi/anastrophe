@@ -20,6 +20,9 @@ public final class KeysViewModel {
     public private(set) var availability: [ChannelKind: ChannelAvailability] = [:]
     public private(set) var isLoading = true
     public private(set) var isOnline = true
+    /// Riwayat tap 30 hari per kartu (FR-30), terbaru dulu.
+    private var histories: [Card.ID: [TapEntry]] = [:]
+    static let historyRetention: TimeInterval = 30 * 86_400
     /// Kartu yang record-nya punya backend penerbit (dibaca sekali saat dimuat, bukan per render).
     private var renewable: Set<Card.ID> = []
     private let services: AppServices
@@ -42,6 +45,13 @@ public final class KeysViewModel {
         }.map(\.id))
         availability = await services.availability()
         isOnline = services.connectivity.isOnline
+        let cutoff = Date.now.addingTimeInterval(-Self.historyRetention)
+        try? await services.tapHistory.purge(before: cutoff)
+        var loaded: [Card.ID: [TapEntry]] = [:]
+        for card in reconciled {
+            loaded[card.id] = (try? await services.tapHistory.entries(for: card.id, since: cutoff)) ?? []
+        }
+        histories = loaded
         isLoading = false
     }
 
@@ -65,6 +75,10 @@ public final class KeysViewModel {
     public func renewalNotice(for card: Card, now: Date = .now) -> RenewalNotice? {
         guard card.displayStatus(now: now) == .needsRenewal, presentability(of: card).canPresent else { return nil }
         return isOnline ? .renewsOnNextUse : .needsInternet
+    }
+
+    public func history(for card: Card) -> [TapEntry] {
+        histories[card.id] ?? []
     }
 
     public func presentability(of card: Card) -> Presentability {
