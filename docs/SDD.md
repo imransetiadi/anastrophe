@@ -22,6 +22,7 @@
 | 2.6 | 2026-11-01 | Hapus kartu: kartu SUSPENDED bisa dihapus dan 410 `CARD-GONE` (ADR-0027), kartu tanpa kunci dihapus lokal (ADR-0028), `:challenge` memuat `card_instance_id` dan tidak lagi menegakkan kill switch (§8.4.2, §8.5, §15). |
 | 2.7 | 2026-11-01 | Riwayat tap: store yang rusak atau tak termigrasi dibuat ulang, galat lain memakai riwayat sementara di memori tanpa menghapus berkas (ADR-0029, §5.3); detail kartu menampilkan lima tap terbaru dan "Lihat semua" ke riwayat 30 hari (ADR-0030). |
 | 2.8 | 2026-11-01 | Riwayat tap: baris tak terbaca dilewati; entri kartu yang sudah tidak ada dibersihkan saat daftar dimuat dengan daftar kartu yang dibaca ulang tepat sebelum menghapus (galat baca tidak menghapus apa pun); daftar kartu tampil sebelum riwayat selesai dimuat (§5.3). |
+| 2.9 | 2026-11-01 | Registri kartu fisik (ADR-0031): `physical_cards` berisi HMAC per gedung, `card_instances.physical_card_id`, status `REJECTED`, dan aturan perangkat tambahan sebelum akun (ADR-0032) (§8.1). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -555,7 +556,7 @@ devices(id uuid pk, user_id fk, app_attest_key_id text, apns_token text, model t
 physical_cards(id uuid pk, site_id fk, card_id_hmac bytea, holder_contact_hmac bytea, zones_bitmap bigint, acs_card_number text, status text, unique(site_id, card_id_hmac))
 card_ownerships(id uuid pk, physical_card_id fk unique, primary_user_id fk, security_code_hash text, failed_attempts int, locked_until timestamptz, max_members smallint)
 memberships(id uuid pk, ownership_id fk, user_id fk, role text check (role in ('PRIMARY','MEMBER')), removed_at timestamptz)
-card_instances(id uuid pk, membership_id fk, device_id fk, status text, created_at timestamptz)        -- "Kartu (digital)", maks 8 aktif per device
+card_instances(id uuid pk, membership_id fk, device_id fk, physical_card_id fk null, status text, created_at timestamptz)        -- "Kartu (digital)", maks 8 aktif per device; physical_card_id = kartu registri yang dicocokkan saat enrolment (ADR-0031)
 credentials(id uuid pk, card_instance_id fk, channel text, cred_id bytea unique, pubkey bytea, cert bytea, not_after timestamptz, last_counter bigint, status text, revoked_at timestamptz, revoke_reason text)
 wallet_passes(id uuid pk, card_instance_id fk, apple_pass_ref text, device_kind text /*iphone|watch*/, status text)   -- R2
 invitations(id uuid pk, site_id fk, physical_card_id fk null, contact_hmac bytea, token_hash bytea, expires_at timestamptz, used_at timestamptz)
@@ -568,6 +569,8 @@ audit_events(id bigserial pk, chain text /* site:<uuid> | platform (ADR-0024) */
 **Invarian:**
 - Maks 8 `card_instances` berstatus aktif (`PENDING_APPROVAL`, `PROVISIONING`, `ACTIVE`, `SUSPENDED`) per `device_id`, ditegakkan dalam transaksi (`SELECT … FOR UPDATE` pada device) (FR-15).
 - Satu PRIMARY per kepemilikan.
+- Registri (ADR-0031): `physical_cards` hanya menyimpan HMAC per gedung (`card_id_hmac`, `holder_contact_hmac` opsional), unik per (gedung, HMAC); kartu `REMOVED` dijawab sama dengan kartu tak dikenal. `acs_card_number` belum disimpan sampai integrasi ACS. Zona sertifikat diambil dari `physical_cards.zones_bitmap` bila card instance tertaut.
+- Sebelum ada akun (ADR-0032, provisional): perangkat pertama untuk sebuah kartu mendapat `PROVISIONING`, perangkat lain `PENDING_APPROVAL` yang disetujui (`PROVISIONING`) atau ditolak (`REJECTED`) operator; kunci diambil berurutan (perangkat, lalu baris kartu).
 - `credentials.not_after ≤ issued_at + policy.cert_validity_days`.
 - `denylist_entries.expires_at = not_after` sertifikat terakhir, sehingga denylist tidak tumbuh tanpa batas.
 - `sites.policy` (JSON) memuat `zones` (nama zona), `zones_bitmap` (bilangan 64-bit) dan `cert_validity_days` (1–30, default 7 sesuai ADR-0010). Tanpa `zones_bitmap`, sertifikat diterbitkan dengan bitmap 0 (*fail-closed*: tidak membuka zona mana pun).

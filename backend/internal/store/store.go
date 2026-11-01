@@ -155,18 +155,11 @@ func (t *Tx) StartEnrollment(ctx context.Context, deviceID, siteID string, at ti
 func addCardInstance(ctx context.Context, tx pgx.Tx, deviceID, siteID string) (id, device, site string, err error) {
 	id = newUUID()
 	err = func() error {
-		var locked string
 		if !looksLikeUUID(deviceID) || !looksLikeUUID(siteID) {
 			return ErrNotFound
 		}
-		if err := tx.QueryRow(ctx, `SELECT id FROM devices WHERE id = $1 FOR UPDATE`, deviceID).Scan(&locked); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrNotFound
-			}
-			return err
-		}
-		var active int
-		if err := tx.QueryRow(ctx, `SELECT count(*) FROM card_instances WHERE device_id = $1 AND status = ANY($2)`, deviceID, activeStatuses).Scan(&active); err != nil {
+		_, active, err := lockDevice(ctx, tx, deviceID)
+		if err != nil {
 			return err
 		}
 		if active >= MaxActiveCardsPerDevice {
@@ -229,8 +222,8 @@ type Enrollment struct {
 	SiteID   string
 	SiteName string
 	SiteCode []byte
-	// Zones dan ZonesBitmap berasal dari sites.policy. Tanpa kebijakan zona, bitmap = 0
-	// (fail-closed: sertifikat tidak membuka zona mana pun).
+	// Zones dan ZonesBitmap berasal dari kartu terdaftar bila card instance tertaut (FR-52), selain itu
+	// dari sites.policy. Tanpa bitmap, nilainya 0 (fail-closed: sertifikat tidak membuka zona mana pun).
 	Zones       []string
 	ZonesBitmap uint64
 	// CertValidityDays dari sites.policy (ADR-0010: 1–30); 0 = pakai default.
@@ -263,14 +256,17 @@ func (t *Tx) EnrollmentForUpdate(ctx context.Context, id string) (Enrollment, er
 	var e Enrollment
 	var zones []string
 	var bitmap, validity *string
+	var cardBitmap *int64
 	err := t.tx.QueryRow(ctx, `
 		SELECT ci.id, ci.status, ci.device_id, s.id, s.name, s.site_code,
 		       COALESCE(ARRAY(SELECT jsonb_array_elements_text(s.policy -> 'zones')), '{}'),
 		       s.policy ->> 'zones_bitmap',
-		       s.policy ->> 'cert_validity_days'
+		       s.policy ->> 'cert_validity_days',
+		       pc.zones_bitmap
 		FROM card_instances ci JOIN sites s ON s.id = ci.site_id
+		LEFT JOIN physical_cards pc ON pc.id = ci.physical_card_id
 		WHERE ci.id = $1
-		FOR UPDATE OF ci`, id).Scan(&e.ID, &e.Status, &e.DeviceID, &e.SiteID, &e.SiteName, &e.SiteCode, &zones, &bitmap, &validity)
+		FOR UPDATE OF ci`, id).Scan(&e.ID, &e.Status, &e.DeviceID, &e.SiteID, &e.SiteName, &e.SiteCode, &zones, &bitmap, &validity, &cardBitmap)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Enrollment{}, ErrNotFound
 	}
@@ -278,6 +274,9 @@ func (t *Tx) EnrollmentForUpdate(ctx context.Context, id string) (Enrollment, er
 		return Enrollment{}, err
 	}
 	e.applyPolicy(zones, bitmap, validity)
+	if cardBitmap != nil {
+		e.applyCardZones(zones, uint64(*cardBitmap))
+	}
 	return e, nil
 }
 
