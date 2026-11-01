@@ -1,6 +1,7 @@
 // Command anastrophe-registry adalah alat operator untuk registri kartu fisik (FR-52, ADR-0031),
 // persetujuan perangkat tambahan sebelum ada akun (ADR-0032), undangan sekali pakai (ADR-0033),
-// siklus hidup kartu (FR-51, ADR-0036), dan kode gedung untuk enrolment dari app (ADR-0044).
+// siklus hidup kartu (FR-51, ADR-0036), kode gedung untuk enrolment dari app (ADR-0044), dan kebijakan
+// gedung (FR-55, ADR-0049).
 //
 //	ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_REGISTRY_KEY=<32 byte hex> \
 //	  go -C backend run ./cmd/anastrophe-registry import --site <uuid> --file kartu.csv --operator <pegangan>
@@ -10,6 +11,7 @@
 //	go -C backend run ./cmd/anastrophe-registry suspend|resume --card-instance <uuid> --operator <pegangan>
 //	go -C backend run ./cmd/anastrophe-registry revoke --card-instance <uuid> [--reason <kode>] --operator <pegangan>
 //	go -C backend run ./cmd/anastrophe-registry site-code --site <uuid> --operator <pegangan>
+//	go -C backend run ./cmd/anastrophe-registry policy --site <uuid> [--cert-validity-days <1-30>] [--channels ble,nfcHCE|semua] [--operator <pegangan>]
 //
 // CSV: tech,card_id,holder_contact,zones (zones = nama zona dipisah ";", dipetakan lewat kebijakan
 // gedung). Berkas kartu undangan berisi satu baris <tech>:<hex>; "-" membacanya dari stdin. Identitas
@@ -39,7 +41,7 @@ import (
 	"github.com/imransetiadi/anastrophe/backend/internal/store"
 )
 
-const usage = "pemakaian: anastrophe-registry import --site <uuid> --file <csv> --operator <pegangan> | invite --site <uuid> [--zones A;B | --card-file <berkas>|-] [--ttl <hari>] [--link-base <url>] --operator <pegangan> | approve|reject|suspend|resume --card-instance <uuid> --operator <pegangan> | revoke --card-instance <uuid> [--reason <kode>] --operator <pegangan> | list --site <uuid> [--status <STATUS>] | site-code --site <uuid> --operator <pegangan>"
+const usage = "pemakaian: anastrophe-registry import --site <uuid> --file <csv> --operator <pegangan> | invite --site <uuid> [--zones A;B | --card-file <berkas>|-] [--ttl <hari>] [--link-base <url>] --operator <pegangan> | approve|reject|suspend|resume --card-instance <uuid> --operator <pegangan> | revoke --card-instance <uuid> [--reason <kode>] --operator <pegangan> | list --site <uuid> [--status <STATUS>] | site-code --site <uuid> --operator <pegangan> | policy --site <uuid> [--cert-validity-days <1-30>] [--channels ble,nfcHCE|semua] [--operator <pegangan>]"
 
 func main() {
 	os.Exit(run(context.Background(), os.Args[1:], os.Stdout, os.Stderr, os.Getenv))
@@ -99,6 +101,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 		return lifecycle(ctx, args[0], args[1:], stdout, stderr, getenv)
 	case "site-code":
 		return siteCode(ctx, args[1:], stdout, stderr, getenv)
+	case "policy":
+		return policy(ctx, args[1:], stdout, stderr, getenv)
 	case "approve", "reject":
 		fs := flag.NewFlagSet(args[0], flag.ContinueOnError)
 		fs.SetOutput(stderr)
@@ -448,6 +452,83 @@ func siteCode(ctx context.Context, args []string, stdout, stderr io.Writer, gete
 	if replaced {
 		fmt.Fprintln(stderr, "anastrophe-registry: kode lama tidak berlaku lagi; bagikan kode baru ke penghuni")
 	}
+	return 0
+}
+
+// policy membaca kebijakan gedung, atau mengubah masa berlaku sertifikat dan/atau kanal yang diizinkan
+// (FR-55, ADR-0049). Hanya kunci yang diberikan yang berubah; zona dan kunci lain dipertahankan.
+func policy(ctx context.Context, args []string, stdout, stderr io.Writer, getenv func(string) string) int {
+	fail := func(err error) int {
+		fmt.Fprintln(stderr, "anastrophe-registry:", err)
+		return 2
+	}
+	fs := flag.NewFlagSet("policy", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	site := fs.String("site", "", "UUID gedung")
+	days := fs.Int("cert-validity-days", 0, "masa berlaku sertifikat dalam hari (1–30)")
+	channels := fs.String("channels", "", "kanal yang diizinkan, dipisah koma: ble, nfcHCE; atau semua")
+	operator := fs.String("operator", "", "pegangan operator untuk audit (kode staf, bukan nama atau email)")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	visited := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { visited[f.Name] = true })
+	invalid := errors.New("--cert-validity-days harus 1–30 dan --channels hanya ble, nfcHCE, atau semua")
+	var update store.PolicyUpdate
+	if visited["cert-validity-days"] {
+		update.CertValidityDays = days
+	}
+	if visited["channels"] {
+		list := []string{}
+		if strings.TrimSpace(*channels) != "semua" {
+			for _, item := range strings.Split(*channels, ",") {
+				item = strings.TrimSpace(item)
+				if item == "" {
+					return fail(invalid)
+				}
+				list = append(list, item)
+			}
+		}
+		update.Channels = &list
+	}
+	dsn := getenv("ANASTROPHE_DATABASE_URL")
+	if dsn == "" {
+		return fail(errors.New("ANASTROPHE_DATABASE_URL wajib diisi"))
+	}
+	db, err := store.Open(ctx, dsn)
+	if err != nil {
+		return fail(err)
+	}
+	defer db.Close()
+	siteID := strings.ToLower(strings.TrimSpace(*site))
+	var current store.SitePolicy
+	if update.CertValidityDays == nil && update.Channels == nil {
+		current, err = db.SitePolicyOf(ctx, siteID)
+	} else {
+		current, err = db.UpdateSitePolicy(ctx, siteID, *operator, update, time.Now())
+	}
+	switch {
+	case errors.Is(err, store.ErrInvalidOperator):
+		return fail(errors.New("--operator wajib diisi untuk mengubah kebijakan: [A-Za-z0-9._-], maksimal 64 karakter"))
+	case errors.Is(err, store.ErrInvalidPolicy):
+		return fail(invalid)
+	case errors.Is(err, store.ErrNotFound):
+		return fail(errors.New("gedung tidak ditemukan"))
+	case err != nil:
+		return fail(err)
+	}
+	fmt.Fprintf(stdout, "gedung: %s\n", siteID)
+	if current.CertValidityDays == 0 {
+		fmt.Fprintln(stdout, "masa berlaku sertifikat: bawaan (7 hari)")
+	} else {
+		fmt.Fprintf(stdout, "masa berlaku sertifikat: %d hari\n", current.CertValidityDays)
+	}
+	if current.Channels == nil {
+		fmt.Fprintln(stdout, "kanal: semua kanal aktif")
+	} else {
+		fmt.Fprintf(stdout, "kanal: %s\n", strings.Join(current.Channels, ", "))
+	}
+	fmt.Fprintf(stdout, "zona: %d\n", current.ZoneCount)
 	return 0
 }
 

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -716,5 +717,82 @@ func TestSiteCodeArgumenSalah(t *testing.T) {
 		if code := run(context.Background(), c.args, &out, &errOut, env(dsn)); code != 2 || out.Len() != 0 || !strings.Contains(errOut.String(), c.want) {
 			t.Fatalf("%v: exit %d out %q err %q", c.args, code, out.String(), errOut.String())
 		}
+	}
+}
+
+func TestPolicyMembaca(t *testing.T) {
+	// FR-55 (ADR-0049): operator membaca kebijakan gedung tanpa mengubah apa pun.
+	db, dsn := freshStore(t)
+	site := siteWithZones(t, db)
+	var out, errOut bytes.Buffer
+	if code := run(context.Background(), []string{"policy", "--site", site}, &out, &errOut, env(dsn)); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	for _, want := range []string{"gedung: " + site, "masa berlaku sertifikat: bawaan (7 hari)", "kanal: semua kanal aktif", "zona: 3"} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("keluaran tanpa %q:\n%s", want, out.String())
+		}
+	}
+}
+
+func TestPolicyMengubahMasaBerlaku(t *testing.T) {
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	var out, errOut bytes.Buffer
+	if code := run(ctx, []string{"policy", "--site", site, "--cert-validity-days", "3", "--operator", "staf-01"}, &out, &errOut, env(dsn)); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	if !strings.Contains(out.String(), "masa berlaku sertifikat: 3 hari") {
+		t.Fatalf("keluaran: %s", out.String())
+	}
+	got, err := db.SitePolicyOf(ctx, site)
+	if err != nil || got.CertValidityDays != 3 || got.Channels != nil || got.ZoneCount != 3 {
+		t.Fatalf("kebijakan: %+v %v", got, err)
+	}
+}
+
+func TestPolicyKanalDanSemua(t *testing.T) {
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	var out, errOut bytes.Buffer
+	if code := run(ctx, []string{"policy", "--site", site, "--channels", "ble, nfcHCE", "--operator", "staf-01"}, &out, &errOut, env(dsn)); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	if got, _ := db.SitePolicyOf(ctx, site); !slices.Equal(got.Channels, []string{"nfcHCE", "ble"}) || !strings.Contains(out.String(), "kanal: nfcHCE, ble") {
+		t.Fatalf("kanal: %+v\n%s", got, out.String())
+	}
+	out.Reset()
+	if code := run(ctx, []string{"policy", "--site", site, "--channels", "semua", "--operator", "staf-01"}, &out, &errOut, env(dsn)); code != 0 {
+		t.Fatalf("semua: exit %d: %s", code, errOut.String())
+	}
+	if got, _ := db.SitePolicyOf(ctx, site); got.Channels != nil {
+		t.Fatalf("semua tidak menghapus pembatasan: %+v", got)
+	}
+}
+
+func TestPolicyArgumenSalah(t *testing.T) {
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	for _, c := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"policy", "--site", site, "--cert-validity-days", "0", "--operator", "staf-01"}, "1–30"},
+		{[]string{"policy", "--site", site, "--cert-validity-days", "31", "--operator", "staf-01"}, "1–30"},
+		{[]string{"policy", "--site", site, "--channels", "wallet", "--operator", "staf-01"}, "ble, nfcHCE"},
+		{[]string{"policy", "--site", site, "--channels", "ble,,nfcHCE", "--operator", "staf-01"}, "ble, nfcHCE"},
+		{[]string{"policy", "--site", site, "--cert-validity-days", "3"}, "--operator wajib diisi"},
+		{[]string{"policy", "--cert-validity-days", "3", "--operator", "staf-01"}, "gedung tidak ditemukan"},
+	} {
+		var out, errOut bytes.Buffer
+		if code := run(ctx, c.args, &out, &errOut, env(dsn)); code != 2 || !strings.Contains(errOut.String(), c.want) {
+			t.Fatalf("%v: exit %d err %q", c.args, code, errOut.String())
+		}
+	}
+	if got, err := db.SitePolicyOf(ctx, site); err != nil || got.CertValidityDays != 0 || got.Channels != nil {
+		t.Fatalf("kebijakan berubah: %+v %v", got, err)
 	}
 }
