@@ -43,3 +43,9 @@ Desain dan rencananya ada di `docs/superpowers/specs/2026-11-02-deadlock-enrolme
 
 - Isi dan hash audit tidak berubah; hanya waktu penulisan dalam transaksi yang bergeser.
 - Bila enrolment gagal, transaksi di-rollback, jadi audit yang ditunda ikut hilang bersama perubahannya, sama seperti sebelumnya.
+
+## Catatan implementasi (2026-11-02)
+
+- **Jalur galat:** event yang ditahan tetap ditulis walau enrolment gagal, lalu ikut di-rollback oleh pemanggil saat ini. Pemanggil yang meng-commit perubahan sebelum galat (mis. instance basi sudah `ABANDONED`) tetap mendapat auditnya.
+- **Lanjutan `PENDING_APPROVAL`:** jalur kartu mengunci baris instance yang dilanjutkan di dalam enrolment (dijaga status, diulang sekali bila berubah). Tanpa itu, pemasangan rahasia enrolment sesudah audit ditulis (ADR-0040) bisa menunggu baris yang dipegang `DecideEnrollment` sambil memegang kunci rantai.
+- **Bukti:** TC-DR-05 (QA §11.1).

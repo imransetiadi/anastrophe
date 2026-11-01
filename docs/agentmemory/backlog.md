@@ -27,6 +27,7 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
 | Kebersihan skrip lab (`__pycache__`, `init` menimpa `site.json`, tmp berisi kunci CA) | `__pycache__/` di-ignore; `init` butuh `--force` dan menulis dengan izin 0600; test memakai `addCleanup(shutil.rmtree, ...)` |
 | Penerbitan kredensial lewat id instance dari `:challenge` (prioritas tinggi, review akhir siklus hidup) | ADR-0040: provisioning wajib rahasia enrolment dan hanya untuk instance `PROVISIONING` (`TestProvisioningTanpaRahasiaIdentik`; lab: 404 tanpa rahasia) |
 | Minor siklus hidup M1/M3/M4/M5b/M6/M8, provisioning M1/M2/M4/M5/M6, undangan M4/M6/M7(id)/M9 | Rencana perbaikan minor (ADR-0042): update dijaga status, urutan kunci perpanjangan, denylist dari sertifikat terpanjang + purge, pembaruan kartu terarah, jam `ContinuousClock`, parameter rahasia wajib, CLI id undangan dan `--link-base` `/i/` |
+| Deadlock 40P01 enrolment–sapuan per jam (pra-ada, review perbaikan minor), termasuk audit `abandonStale` lintas gedung | ADR-0051: audit enrolment dan sapuan ditahan lalu ditulis di akhir transaksi, berurutan per rantai; lanjutan `PENDING_APPROVAL` dikunci di dalam enrolment (`TestEnrolmentKartuTidakMemegangKunciAuditSaatMenunggu`, `TestSapuanMenulisAuditBerurutanPerRantai`, TC-DR-05). `DecideEnrollment` sudah mengunci baris sebelum audit, jadi tidak ikut siklus |
 
 ## Terbuka
 
@@ -42,7 +43,6 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
   - Perpanjangan dan `KeysViewModel.load` masih menulis ulang seluruh kartu, sehingga perubahan status dari penyegar bisa terbalik sampai penyegaran berikutnya (review perbaikan minor 5).
   - Purge denylist belum memberi margin toleransi jam reader ±5 menit; belum berdampak sebelum Site Sync ada (review perbaikan minor 4).
   - Belum ada indeks `denylist_entries.expires_at` (review perbaikan minor 9).
-- **Enrolment dan sapuan per jam (pra-ada, review perbaikan minor):** deadlock 40P01 bisa terjadi bila enrolment mengambil kunci audit gedung lalu menunggu baris yang dipegang sapuan; usulan perbaikan: tulis audit `enrollment.abandoned` di akhir transaksi setelah semua kunci baris diambil. Pola serupa pada `DecideEnrollment` dan audit `abandonStale` lintas gedung.
 - **Provisioning (sisa):** penolakan operator yang bersamaan dengan perangkat melanjutkan instance menunggu dijawab `ENR-DUPLICATE` (review perbaikan minor 7); rahasia dan hash-nya sama-sama `Data`, jadi tertukar di pemanggil tetap terkompilasi; bawaan `update(id:)` non-atomik bisa terpakai diam-diam oleh store pembungkus baru (review perbaikan minor 9).
 - **Test konkurensi:** tiga test baru memakai jeda 300 ms; di runner lambat bisa lulus tanpa menguji balapan (tidak pernah gagal palsu); ganti dengan polling `pg_stat_activity` (review perbaikan minor 8).
 - **Undangan (sisa):**
