@@ -119,6 +119,23 @@ func advertisement(rssi: Int, id: UUID = UUID()) -> BLEReaderAdvertisement {
     BLEReaderAdvertisement(id: id, groupID: Data(repeating: 0xA1, count: 8), rssi: rssi)
 }
 
+@Suite("Hook prepare BLE (ADR-0023)")
+struct BLEPrepareHookTests {
+    @Test func prepareDipanggilSetelahAutentikasiSebelumProvider() async {
+        let log = LockedBox<[String]>([])
+        var events = await BLEHarness(advertisements: []).coordinator(log: log).tap().makeAsyncIterator()
+        _ = await events.rest()
+        #expect(log.value == ["prepare", "provider"])
+    }
+
+    @Test func prepareTidakDipanggilBilaAutentikasiGagal() async {
+        let log = LockedBox<[String]>([])
+        var events = await BLEHarness(advertisements: [], authSucceeds: false).coordinator(log: log).tap().makeAsyncIterator()
+        _ = await events.rest()
+        #expect(log.value.isEmpty)
+    }
+}
+
 struct BLEHarness {
     let clock = ManualClock()
     let credential: ANP1TestCredential
@@ -135,13 +152,17 @@ struct BLEHarness {
         self.authGate = authGate
     }
 
-    func coordinator() -> BLETapCoordinator<ManualClock> {
+    func coordinator(log: LockedBox<[String]>? = nil) -> BLETapCoordinator<ManualClock> {
         let credential = credential, foreground = foreground
         return BLETapCoordinator(
             central: central,
             authenticator: FakeAuthenticator(succeeds: authSucceeds, gate: authGate),
             authenticationReason: "Gunakan kartu",
-            makeProvider: { _ in credential.provider() },
+            makeProvider: { _ in
+                log?.withLock { $0.append("provider") }
+                return credential.provider()
+            },
+            prepare: { _ in log?.withLock { $0.append("prepare") } },
             isForeground: { foreground.value },
             clock: clock
         )

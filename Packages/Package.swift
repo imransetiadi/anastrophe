@@ -46,7 +46,7 @@ let package = Package(
         .testTarget(name: "ANChannelBLETests", dependencies: ["ANChannelBLE", "ANCrypto", "ANProtocol", "ANTestSupport"]),
         .testTarget(name: "ANStorageTests", dependencies: ["ANStorage", "ANCrypto"]),
         .testTarget(name: "ANNetworkingTests", dependencies: ["ANNetworking"]),
-        .testTarget(name: "ANFeaturesTests", dependencies: ["ANFeatures", "ANCore", "ANCrypto", "ANStorage", "ANNetworking"]),
+        .testTarget(name: "ANFeaturesTests", dependencies: ["ANFeatures", "ANCore", "ANCrypto", "ANStorage", "ANNetworking", "ANTestSupport"]),
     ],
     swiftLanguageModes: [.v6]
 )

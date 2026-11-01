@@ -103,9 +103,10 @@ public final class AppServices {
         let records = KeychainCredentialRecordStore(store: secrets)
         let foreground = ForegroundState()
         let config = localConfig(nfcEmulationEntitled: nfcEmulationEntitled)
-        let launcher = LivePresentationLauncher(keys: keys, records: records, counters: KeychainCounterStore(store: secrets), foreground: foreground, config: config, nfcEmulationEntitled: nfcEmulationEntitled)
+        let cards = try SwiftDataCardStore(directory: URL.applicationSupportDirectory.appending(path: "Anastrophe/Cards"))
+        let launcher = LivePresentationLauncher(keys: keys, records: records, cards: cards, counters: KeychainCounterStore(store: secrets), foreground: foreground, config: config, nfcEmulationEntitled: nfcEmulationEntitled)
         return AppServices(
-            cards: try SwiftDataCardStore(directory: URL.applicationSupportDirectory.appending(path: "Anastrophe/Cards")),
+            cards: cards,
             keys: keys,
             records: records,
             availability: { await liveAvailability(config: config, nfcEmulationEntitled: nfcEmulationEntitled, bluetoothPoweredOn: launcher.bluetoothPoweredOn) },
@@ -205,6 +206,8 @@ private final class Selection: @unchecked Sendable {
 private final class LivePresentationLauncher: PresentationLaunching {
     private let selection = Selection()
     private let makeProvider: @Sendable (AuthorizedContext) throws -> any ANP1CredentialProvider
+    private let prepare: @Sendable (AuthorizedContext) async -> Void
+    private let scheduler: RenewalScheduler<ContinuousClock>
     private let foreground: ForegroundState
     private let config: RemoteConfig
     private let nfcEmulationEntitled: Bool
@@ -214,7 +217,9 @@ private final class LivePresentationLauncher: PresentationLaunching {
     private var hce: HCEPresentmentCoordinator?
     #endif
 
-    init(keys: any CredentialKeyStore, records: any CredentialRecordStore, counters: any CounterStore, foreground: ForegroundState, config: RemoteConfig, nfcEmulationEntitled: Bool) {
+    init(keys: any CredentialKeyStore, records: any CredentialRecordStore, cards: any CardStore, counters: any CounterStore, foreground: ForegroundState, config: RemoteConfig, nfcEmulationEntitled: Bool) {
+        let scheduler = RenewalScheduler(renewer: CredentialRenewer(keys: keys, records: records, cards: cards), clock: ContinuousClock())
+        self.scheduler = scheduler
         self.foreground = foreground
         self.config = config
         self.nfcEmulationEntitled = nfcEmulationEntitled
@@ -229,16 +234,21 @@ private final class LivePresentationLauncher: PresentationLaunching {
                 counters: counters
             )
         }
+        // ADR-0023: perpanjangan memakai konteks autentikasi tap yang sama.
+        prepare = { [selection] context in
+            guard let (card, channel) = selection.current else { return }
+            await scheduler.beforePresentation(card: card, channel: channel, context: context)
+        }
     }
 
     func start(card: Card, channel: ChannelKind) async -> AsyncStream<PresentmentEvent> {
         selection.current = (card, channel)
         switch channel {
         case .ble:
-            return await bleCoordinator().tap()
+            return observed(await bleCoordinator().tap())
         case .nfcHCE:
             #if os(iOS)
-            return await hceCoordinator().present()
+            return observed(await hceCoordinator().present())
             #else
             return Self.finished(.cancelled)
             #endif
@@ -252,6 +262,20 @@ private final class LivePresentationLauncher: PresentationLaunching {
         #if os(iOS)
         await hce?.cancel()
         #endif
+    }
+
+    /// Meneruskan event tap, lalu menjalankan perpanjangan yang tertunda setelah aliran selesai.
+    /// Perpanjangan berjalan di task terpisah agar tidak ikut dibatalkan saat aliran berakhir.
+    private func observed(_ upstream: AsyncStream<PresentmentEvent>) -> AsyncStream<PresentmentEvent> {
+        let scheduler = scheduler
+        return AsyncStream { continuation in
+            let forwarding = Task {
+                for await event in upstream { continuation.yield(event) }
+                continuation.finish()
+                Task { @MainActor in await scheduler.afterPresentation() }
+            }
+            continuation.onTermination = { _ in forwarding.cancel() }
+        }
     }
 
     /// Status radio Bluetooth bila central sudah dibuat.
@@ -273,6 +297,7 @@ private final class LivePresentationLauncher: PresentationLaunching {
             authenticator: LAUserAuthenticator(),
             authenticationReason: localized("present.auth_reason"),
             makeProvider: makeProvider,
+            prepare: prepare,
             isForeground: { foreground.isActive }
         )
         ble = coordinator
@@ -290,7 +315,8 @@ private final class LivePresentationLauncher: PresentationLaunching {
             alertMessage: localized("present.hold_near_reader"),
             authenticationReason: localized("present.auth_reason"),
             makeSession: { try await LiveCardEmulationSession() },
-            makeProvider: makeProvider
+            makeProvider: makeProvider,
+            prepare: prepare
         )
         hce = coordinator
         return coordinator

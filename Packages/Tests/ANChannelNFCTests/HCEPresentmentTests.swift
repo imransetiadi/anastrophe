@@ -94,7 +94,7 @@ struct Harness {
         self.providerAvailable = providerAvailable
     }
 
-    func coordinator() -> HCEPresentmentCoordinator {
+    func coordinator(log: LockedBox<[String]>? = nil) -> HCEPresentmentCoordinator {
         let session = session, sessionsMade = sessionsMade, credential = credential, providerAvailable = providerAvailable, sessionQueue = sessionQueue
         return HCEPresentmentCoordinator(
             gate: NFCGate(capabilities: capabilities, entitled: true),
@@ -108,9 +108,11 @@ struct Harness {
                 return sessionQueue?.withLock { $0.isEmpty ? nil : $0.removeFirst() } ?? session
             },
             makeProvider: { _ in
+                log?.withLock { $0.append("provider") }
                 guard providerAvailable else { throw ANError.keyUnavailable }
                 return credential.provider()
             },
+            prepare: { _ in log?.withLock { $0.append("prepare") } },
             clock: clock
         )
     }
@@ -121,6 +123,24 @@ extension AsyncStream<PresentmentEvent>.Iterator {
         var events: [PresentmentEvent] = []
         while let event = await next() { events.append(event) }
         return events
+    }
+}
+
+@Suite("Hook prepare HCE (ADR-0023)")
+struct HCEPrepareHookTests {
+    @Test func prepareDipanggilSetelahAutentikasiSebelumProvider() async {
+        let log = LockedBox<[String]>([])
+        // Provider gagal setelah tercatat, sehingga aliran selesai tanpa sesi.
+        var events = await Harness(providerAvailable: false).coordinator(log: log).present().makeAsyncIterator()
+        while await events.next() != nil {}
+        #expect(log.value == ["prepare", "provider"])
+    }
+
+    @Test func prepareTidakDipanggilBilaAutentikasiGagal() async {
+        let log = LockedBox<[String]>([])
+        var events = await Harness(authSucceeds: false).coordinator(log: log).present().makeAsyncIterator()
+        while await events.next() != nil {}
+        #expect(log.value.isEmpty)
     }
 }
 

@@ -23,6 +23,8 @@ public actor HCEPresentmentCoordinator {
     private let authenticationReason: String
     private let makeSession: @Sendable () async throws -> any CardEmulationSession
     private let makeProvider: @Sendable (AuthorizedContext) throws -> any ANP1CredentialProvider
+    /// Dipanggil setelah autentikasi sukses, sebelum provider dibuat (perpanjangan, ADR-0023).
+    private let prepare: @Sendable (AuthorizedContext) async -> Void
     private let clock: any Clock<Duration>
     private var running: Task<Void, Never>?
 
@@ -40,6 +42,7 @@ public actor HCEPresentmentCoordinator {
         authenticationReason: String,
         makeSession: @escaping @Sendable () async throws -> any CardEmulationSession,
         makeProvider: @escaping @Sendable (AuthorizedContext) throws -> any ANP1CredentialProvider,
+        prepare: @escaping @Sendable (AuthorizedContext) async -> Void = { _ in },
         clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.gate = gate
@@ -50,6 +53,7 @@ public actor HCEPresentmentCoordinator {
         self.authenticationReason = authenticationReason
         self.makeSession = makeSession
         self.makeProvider = makeProvider
+        self.prepare = prepare
         self.clock = clock
     }
 
@@ -73,8 +77,14 @@ public actor HCEPresentmentCoordinator {
     private func run(_ out: AsyncStream<PresentmentEvent>.Continuation) async {
         let holder = IntentHolder()
         guard await gate.availability(.nfcHCE, config: config) == .available,
-              let context = try? await authenticator.authenticate(reason: authenticationReason),
-              let provider = try? makeProvider(context),
+              let context = try? await authenticator.authenticate(reason: authenticationReason)
+        else {
+            finish(out, with: .cancelled, releasing: holder)
+            return
+        }
+        // Sebelum assertion presentasi diambil, jadi jendela 15 dtk tidak terpakai (ADR-0023).
+        await prepare(context)
+        guard let provider = try? makeProvider(context),
               await acquireIntent(out, into: holder),
               let session = try? await makeSession()
         else {

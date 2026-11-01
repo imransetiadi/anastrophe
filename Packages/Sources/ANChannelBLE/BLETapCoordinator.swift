@@ -26,6 +26,8 @@ public actor BLETapCoordinator<C: Clock> where C.Duration == Duration {
     private let authenticator: any UserAuthenticator
     private let authenticationReason: String
     private let makeProvider: @Sendable (AuthorizedContext) throws -> any ANP1CredentialProvider
+    /// Dipanggil setelah autentikasi sukses, sebelum provider dibuat (perpanjangan, ADR-0023).
+    private let prepare: @Sendable (AuthorizedContext) async -> Void
     private let isForeground: @Sendable () -> Bool
     private let clock: C
     private let rssiThreshold: Int
@@ -37,6 +39,7 @@ public actor BLETapCoordinator<C: Clock> where C.Duration == Duration {
         authenticator: any UserAuthenticator,
         authenticationReason: String,
         makeProvider: @escaping @Sendable (AuthorizedContext) throws -> any ANP1CredentialProvider,
+        prepare: @escaping @Sendable (AuthorizedContext) async -> Void = { _ in },
         isForeground: @escaping @Sendable () -> Bool,
         clock: C,
         rssiThreshold: Int = BLEReaderSelector.defaultThreshold
@@ -45,6 +48,7 @@ public actor BLETapCoordinator<C: Clock> where C.Duration == Duration {
         self.authenticator = authenticator
         self.authenticationReason = authenticationReason
         self.makeProvider = makeProvider
+        self.prepare = prepare
         self.isForeground = isForeground
         self.clock = clock
         self.rssiThreshold = rssiThreshold
@@ -72,10 +76,13 @@ public actor BLETapCoordinator<C: Clock> where C.Duration == Duration {
         // tercapai. Child task ini otomatis dibatalkan bila autentikasi gagal atau app ke
         // background; connect tetap hanya setelah autentikasi berhasil.
         async let scanned = central.scan(ScanWindow(threshold: rssiThreshold, settle: Self.scanSettle, maximum: Self.scanDuration))
-        guard let context = try? await authenticator.authenticate(reason: authenticationReason),
-              let provider = try? makeProvider(context),
-              isForeground(), !Task.isCancelled
-        else { return finish(out, with: .cancelled) }
+        guard let context = try? await authenticator.authenticate(reason: authenticationReason) else {
+            return finish(out, with: .cancelled)
+        }
+        await prepare(context)
+        guard let provider = try? makeProvider(context), isForeground(), !Task.isCancelled else {
+            return finish(out, with: .cancelled)
+        }
 
         out.yield(.waitingForReader)
         let advertisements: [BLEReaderAdvertisement]
@@ -216,8 +223,9 @@ extension BLETapCoordinator where C == ContinuousClock {
         authenticator: any UserAuthenticator,
         authenticationReason: String,
         makeProvider: @escaping @Sendable (AuthorizedContext) throws -> any ANP1CredentialProvider,
+        prepare: @escaping @Sendable (AuthorizedContext) async -> Void = { _ in },
         isForeground: @escaping @Sendable () -> Bool
     ) {
-        self.init(central: central, authenticator: authenticator, authenticationReason: authenticationReason, makeProvider: makeProvider, isForeground: isForeground, clock: ContinuousClock())
+        self.init(central: central, authenticator: authenticator, authenticationReason: authenticationReason, makeProvider: makeProvider, prepare: prepare, isForeground: isForeground, clock: ContinuousClock())
     }
 }
