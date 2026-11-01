@@ -91,7 +91,7 @@ go -C backend run ./cmd/anastrophe-devseed -lab-dir ../scripts/anp1/.lab   # men
 # devseed juga mendaftarkan kartu lab ke registri (-lab-card, default iso14443a:04a1b2c3d4e5f6)
 ANASTROPHE_DEV_SOFTWARE_CA=1 go -C backend run ./cmd/anastrophe-api
 xcrun simctl launch booted app.anastrophe -ANLabBackend http://127.0.0.1:8080 \
-  -ANLabDevice <device_id> -ANLabSite <site_id>
+  -ANLabDevice <device_id> -ANLabSite <site_id>   # opsional: -ANLabCard <tech>:<hex>, default sama dengan devseed
 ```
 
 Catatan alur lab:
