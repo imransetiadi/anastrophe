@@ -7,7 +7,7 @@
 //	  go -C backend run ./cmd/anastrophe-registry import --site <uuid> --file kartu.csv --operator <pegangan>
 //	go -C backend run ./cmd/anastrophe-registry approve|reject --card-instance <uuid> --operator <pegangan>
 //	go -C backend run ./cmd/anastrophe-registry invite --site <uuid> [--zones A;B | --card-file <berkas>|-] --operator <pegangan>
-//	go -C backend run ./cmd/anastrophe-registry list --site <uuid> [--status ACTIVE]
+//	go -C backend run ./cmd/anastrophe-registry list --site <uuid> [--status ACTIVE] [--channel ble|nfcHCE] [--id <awalan>]
 //	go -C backend run ./cmd/anastrophe-registry suspend|resume --card-instance <uuid> --operator <pegangan>
 //	go -C backend run ./cmd/anastrophe-registry revoke --card-instance <uuid> [--reason <kode>] --operator <pegangan>
 //	go -C backend run ./cmd/anastrophe-registry site-code --site <uuid> --operator <pegangan>

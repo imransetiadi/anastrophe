@@ -89,5 +89,10 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
   - **Tolak lebih awal (butuh perubahan spec/ADR):** server bisa menolak enrolment bila kanal efektif gedung kosong, sesudah bukti kartu atau token, untuk menghindari slot/undangan tertahan.
   - **E2e belum dijalankan:** jalur pembatasan non-kosong (`--channels ble`) belum diuji e2e; sudah tercakup test unit.
   - **Perpanjangan:** perpanjangan tetap menerbitkan sertifikat untuk kanal yang kemudian dilarang gedung (ADR-0023; butuh keputusan sendiri).
+- **Filter daftar kartu (minor review akhir, ADR-0050):**
+  - CLI mengulang validasi awalan id store hanya untuk memilih pesan galat; lebih baik `CardInstanceFilter.Validate()` sebelum membuka database.
+  - Aturan status kredensial (ACTIVE/SUSPENDED) tertulis dua kali di query (kolom KANAL dan filter `--channel`).
+  - Bantuan `--channel` menyebut "kredensial aktif" padahal mencakup SUSPENDED.
+  - Awalan id belum divalidasi posisinya sebagai UUID: tanda hubung salah tempat menghasilkan daftar kosong, bukan galat yang jelas.
 - **Test flaky:** `BLETapTests.autentikasiBatalMembatalkanPemindaian` sesekali gagal (pembatalan pemindaian bergantung waktu); lulus 6/6 saat diulang.
 - **Riwayat tap:** judul baris "Ditolak · alasan" dirakit di kode (M8; dikerjakan saat bahasa ketiga ditambahkan); VoiceOver baris Status belum diperiksa dengan Accessibility Inspector.

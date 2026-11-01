@@ -389,3 +389,29 @@ func TestFilterKanalAbaikanKredensialDicabut(t *testing.T) {
 		t.Fatalf("awalan: %v", got)
 	}
 }
+
+func TestFilterDaftarStatusSuspendedDanAND(t *testing.T) {
+	// Review akhir #1 dan #2 (ADR-0050): kredensial SUSPENDED ikut kanal, dan --status benar-benar digabung
+	// AND dengan --channel dan --id.
+	s := freshStore(t)
+	site, _ := registrySite(t, s)
+	_, bleID, _ := activeCardOn(t, s, site, "A", "ble")
+	_, hceID, _ := activeCardOn(t, s, site, "B", "nfcHCE")
+	if err := s.SuspendCard(context.Background(), bleID, "staf-01", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name string
+		f    CardInstanceFilter
+		want []string
+	}{
+		{"SUSPENDED dihitung", CardInstanceFilter{Channel: "ble"}, []string{bleID}},
+		{"status+kanal", CardInstanceFilter{Status: "ACTIVE", Channel: "ble"}, []string{}},
+		{"status+awalan", CardInstanceFilter{Status: "SUSPENDED", IDPrefix: hceID[:8]}, []string{}},
+		{"ketiganya", CardInstanceFilter{Status: "SUSPENDED", Channel: "ble", IDPrefix: bleID[:13]}, []string{bleID}},
+	} {
+		if got := filteredIDs(t, s, site, c.f); !slices.Equal(got, c.want) {
+			t.Fatalf("%s: %v, ingin %v", c.name, got, c.want)
+		}
+	}
+}
