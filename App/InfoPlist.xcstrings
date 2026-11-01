@@ -1,0 +1,74 @@
+{
+  "sourceLanguage": "id",
+  "strings": {
+    "CFBundleDisplayName": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anastrophe"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anastrophe"
+          }
+        }
+      }
+    },
+    "NFCReaderUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anastrophe reads your access card to verify that you own it."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anastrophe membaca kartu akses Anda untuk memverifikasi kepemilikan."
+          }
+        }
+      }
+    },
+    "NSBluetoothAlwaysUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anastrophe uses Bluetooth to open doors that have Bluetooth readers."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anastrophe memakai Bluetooth untuk membuka pintu yang memakai pembaca Bluetooth."
+          }
+        }
+      }
+    },
+    "NSFaceIDUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anastrophe uses Face ID so only you can use your access cards."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anastrophe memakai Face ID agar hanya Anda yang bisa memakai kartu akses Anda."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

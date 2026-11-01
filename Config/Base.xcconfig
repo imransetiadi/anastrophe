@@ -1,0 +1,19 @@
+// Konfigurasi build target Anastrophe (rencana R1 Task 1).
+// Nilai per developer (DEVELOPMENT_TEAM) ada di Local.xcconfig yang di-ignore git.
+
+// Entitlement emulasi kartu (HCE/SE) hanya dipakai setelah Apple menyetujui
+// entitlement NFC & SE (PRD D1). Tanpa persetujuan itu provisioning profile gagal dibuat.
+AN_NFC_EMULATION = NO
+AN_ENTITLEMENTS_NO = App/Anastrophe.entitlements
+AN_ENTITLEMENTS_YES = App/Anastrophe-NFCEmulation.entitlements
+CODE_SIGN_ENTITLEMENTS = $(AN_ENTITLEMENTS_$(AN_NFC_EMULATION))
+// Kode app hanya menyentuh API CardSession/CredentialSession bila entitlement ada (TC-ELG-03).
+AN_SWIFT_CONDITION_NO =
+AN_SWIFT_CONDITION_YES = AN_NFC_EMULATION
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) $(AN_SWIFT_CONDITION_$(AN_NFC_EMULATION))
+
+// Lingkungan App Attest, disisipkan ke file entitlements.
+AN_APPATTEST_ENVIRONMENT = development
+AN_APPATTEST_ENVIRONMENT[config=Release] = production
+
+#include? "Local.xcconfig"

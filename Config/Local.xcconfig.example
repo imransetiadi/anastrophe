@@ -1,0 +1,3 @@
+// Salin menjadi Config/Local.xcconfig (di-ignore git), lalu isi Team ID Anda.
+// Kapabilitas NFC butuh Apple Developer Program berbayar (bukan tim Personal).
+DEVELOPMENT_TEAM = XXXXXXXXXX

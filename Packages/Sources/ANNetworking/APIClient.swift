@@ -1,0 +1,63 @@
+import ANCore
+import Foundation
+
+/// Transport HTTP di balik protokol agar bisa di-mock. Topologi backend
+/// (ADR-0014) belum diputuskan, jadi base URL datang dari konfigurasi build.
+public protocol HTTPTransport: Sendable {
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse)
+}
+
+extension URLSession: HTTPTransport {
+    public func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        let (data, response) = try await data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw ANError.internalError }
+        return (data, http)
+    }
+}
+
+/// Klien REST `/v1` (SDD §8.5). **Kontrak masih draf** hingga rencana backend
+/// (ADR-0014). Pinning dan App Attest menyusul di rencana itu.
+public struct APIClient: Sendable {
+    static let decoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }()
+
+    private let baseURL: URL
+    private let transport: any HTTPTransport
+
+    public init(baseURL: URL, transport: any HTTPTransport = URLSession.shared) {
+        self.baseURL = baseURL
+        self.transport = transport
+    }
+
+    /// `GET /v1/config` → kanal yang diizinkan untuk wilayah/akun ini (FR-04).
+    public func fetchConfig() async throws -> RemoteConfig {
+        let data = try await perform(URLRequest(url: baseURL.appending(path: "v1/config")))
+        return try Self.decoder.decode(RemoteConfig.self, from: data)
+    }
+
+    /// `POST /v1/enrollments/{id}/credentials`: kirim kunci publik kanal, terima sertifikat (FR-16).
+    public func submitCredentialKey(enrollmentID: String, channel: ChannelKind, publicKey: Data, idempotencyKey: UUID) async throws -> ProvisionedCredential {
+        var request = URLRequest(url: baseURL.appending(path: "v1/enrollments/\(enrollmentID)/credentials"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(idempotencyKey.uuidString, forHTTPHeaderField: "Idempotency-Key")
+        request.httpBody = try JSONEncoder().encode(["channel": channel.rawValue, "public_key": publicKey.base64EncodedString()])
+        return try ProvisionedCredential.decode(try await perform(request))
+    }
+
+    /// Respons 2xx → body; RFC 9457 → error domain atau `ProblemDetails`.
+    private func perform(_ request: URLRequest) async throws -> Data {
+        let (data, response) = try await transport.send(request)
+        guard (200..<300).contains(response.statusCode) else {
+            let contentType = response.value(forHTTPHeaderField: "Content-Type") ?? ""
+            guard contentType.hasPrefix("application/problem+json"),
+                  let problem = try? Self.decoder.decode(ProblemDetails.self, from: data)
+            else { throw ANError.internalError }
+            throw problem.domainError ?? problem
+        }
+        return data
+    }
+}

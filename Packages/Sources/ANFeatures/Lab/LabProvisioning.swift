@@ -1,0 +1,59 @@
+#if DEBUG
+import ANCore
+import ANNetworking
+import ANStorage
+import Foundation
+import Security
+
+/// Provisioning kredensial lab untuk uji M1 tanpa backend (DEBUG saja; tidak ada
+/// di build Release). Pasangannya: `scripts/anp1/lab_ca.py`.
+///
+/// 1. `begin` membuat kunci kredensial dan `cred_id`; tampilkan keduanya ke penguji.
+/// 2. Penguji menjalankan `lab_ca.py issue --cred-id … --pubkey …`.
+/// 3. `complete` mengimpor JSON hasilnya sebagai kartu aktif.
+enum LabProvisioning {
+    static func begin(keys: any CredentialKeyStore) throws -> (credentialID: Data, publicKey: Data) {
+        var bytes = [UInt8](repeating: 0, count: 16)
+        guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else { throw ANError.internalError }
+        let credentialID = Data(bytes)
+        return (credentialID, try keys.createKey(for: credentialID))
+    }
+
+    static func complete(json: Data, keys: any CredentialKeyStore, records: any CredentialRecordStore, cards: any CardStore) async throws -> Card {
+        guard let provisioned = try? ProvisionedCredential.decode(json),
+              [.ble, .nfcHCE].contains(provisioned.channel),
+              (try? keys.hasKey(for: provisioned.credentialID)) == true
+        else { throw ANError.invalidData }
+        let record = CredentialRecord(
+            credentialID: provisioned.credentialID,
+            certificate: provisioned.certificate,
+            notAfter: provisioned.notAfter,
+            groupKeys: provisioned.groupKeys
+        )
+        _ = try record.material(suspended: false)  // kunci reader group harus valid
+        let card = Card(
+            id: UUID(),
+            name: provisioned.siteName,
+            siteName: provisioned.siteName,
+            zones: provisioned.zones,
+            status: .active,
+            credentials: [provisioned.channel: provisioned.credentialID],
+            notAfter: provisioned.notAfter
+        )
+        do {
+            try await cards.add(card)
+        } catch {
+            try? keys.deleteKey(for: provisioned.credentialID)  // FR-19: tanpa kredensial yatim
+            throw error
+        }
+        do {
+            try records.save(record)
+        } catch {
+            try? await cards.remove(id: card.id)
+            try? keys.deleteKey(for: provisioned.credentialID)
+            throw error
+        }
+        return card
+    }
+}
+#endif
