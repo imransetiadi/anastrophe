@@ -140,24 +140,50 @@ struct APIClientTests {
                 == Data("ANP1-REVOKE".utf8) + credentialID + Data(repeating: 0x4E, count: 32) + Data("6f1c2a9e-0000-4000-8000-00000000000a".utf8))
     }
 
-    @Test func createEnrollmentMengirimPerangkatDanGedung() async throws {
-        // Endpoint tracer backend R1 (pengganti sementara enrolment kartu fisik).
-        let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"6f1c2a9e-0000-4000-8000-000000000001"}"#)
+    @Test func createEnrollmentMengirimKartu() async throws {
+        // ADR-0031: enrolment membawa identitas kartu (hanya lewat TLS; server menghitung HMAC per gedung).
+        let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"6f1c2a9e-0000-4000-8000-000000000001","status":"PENDING_APPROVAL"}"#)
         let key = UUID()
-        let id = try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", siteID: "site-1", idempotencyKey: key)
-        #expect(id == "6f1c2a9e-0000-4000-8000-000000000001")
+        let card = try #require(CardIdentity("iso14443a:04A1B2C3D4E5F6"))
+        let start = try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", siteID: "site-1", card: card, idempotencyKey: key)
+        #expect(start == EnrollmentStart(enrollmentID: "6f1c2a9e-0000-4000-8000-000000000001", status: .pendingApproval))
         let request = try #require(transport.lastRequest)
         #expect(request.httpMethod == "POST")
         #expect(request.value(forHTTPHeaderField: "Idempotency-Key") == key.uuidString)
         #expect(request.url?.path() == "/v1/enrollments")
-        let body = try JSONSerialization.jsonObject(with: try #require(request.httpBody)) as? [String: String]
-        #expect(body == ["device_id": "dev-1", "site_id": "site-1"])
+        let raw = try #require(request.httpBody)
+        let body = try #require(try JSONSerialization.jsonObject(with: raw) as? [String: Any])
+        #expect(body["device_id"] as? String == "dev-1")
+        #expect(body["site_id"] as? String == "site-1")
+        #expect(body["card"] as? [String: String] == ["tech": "iso14443a", "id": "04a1b2c3d4e5f6"])
+    }
+
+    @Test func createEnrollmentStatusTakDikenalDitolak() async throws {
+        let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"e1","status":"MYSTERY"}"#)
+        let card = try #require(CardIdentity("iso14443a:04a1b2c3d4e5f6"))
+        await #expect(throws: (any Error).self) {
+            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "d", siteID: "s", card: card, idempotencyKey: UUID())
+        }
+    }
+
+    @Test(arguments: [
+        ("ENR-NOT-REGISTERED", 404, ANError.enrollmentRejected(.notRegistered)),
+        ("ENR-SITE-UNSUPPORTED", 404, ANError.enrollmentRejected(.siteUnsupported)),
+        ("ENR-DUPLICATE", 409, ANError.enrollmentRejected(.duplicate)),
+        ("ENR-PENDING-APPROVAL", 409, ANError.enrollmentRejected(.pendingApproval)),
+    ])
+    func galatRegistriMenjadiErrorDomain(code: String, status: Int, expected: ANError) async throws {
+        let transport = FakeTransport(status: status, body: #"{"type":"\#(code)","status":\#(status)}"#, contentType: "application/problem+json")
+        let card = try #require(CardIdentity("iso14443a:04a1b2c3d4e5f6"))
+        await #expect(throws: expected) {
+            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "d", siteID: "s", card: card, idempotencyKey: UUID())
+        }
     }
 
     @Test func createEnrollmentBatasKartu() async {
         let transport = FakeTransport(status: 409, body: #"{"type":"ENR-LIMIT","status":409}"#, contentType: "application/problem+json")
         await #expect(throws: ANError.cardLimitReached) {
-            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", siteID: "site-1", idempotencyKey: UUID())
+            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", siteID: "site-1", card: CardIdentity("iso14443a:04a1b2c3d4e5f6")!, idempotencyKey: UUID())
         }
     }
 

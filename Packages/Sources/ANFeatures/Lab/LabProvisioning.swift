@@ -24,13 +24,14 @@ enum LabProvisioning {
         return try await store(provisioned, keys: keys, records: records, cards: cards)
     }
 
-    /// Alur lab lewat backend dev (cmd/anastrophe-devseed + anastrophe-api): enrolment tracer,
+    /// Alur lab lewat backend dev (cmd/anastrophe-devseed + anastrophe-api): enrolment kartu terdaftar,
     /// provisioning kredensial, lalu kunci dipindah ke `cred_id` dari server. Gagal di mana pun
     /// tidak menyisakan kunci, record, atau kartu (FR-19).
     static func provisionViaBackend(
         api: APIClient,
         deviceID: String,
         siteID: String,
+        card: CardIdentity,
         channel: ChannelKind,
         keys: any CredentialKeyStore,
         records: any CredentialRecordStore,
@@ -47,7 +48,10 @@ enum LabProvisioning {
         let (localID, publicKey) = try begin(keys: keys)
         var movedTo: Data?
         do {
-            let enrollmentID = try await api.createEnrollment(deviceID: deviceID, siteID: siteID, idempotencyKey: UUID())
+            let start = try await api.createEnrollment(deviceID: deviceID, siteID: siteID, card: card, idempotencyKey: UUID())
+            // ADR-0032: perangkat tambahan menunggu operator; tidak ada provisioning sampai disetujui.
+            guard start.status == .provisioning else { throw ANError.enrollmentRejected(.pendingApproval) }
+            let enrollmentID = start.enrollmentID
             let provisioned = try await api.submitCredentialKey(enrollmentID: enrollmentID, channel: channel, publicKey: publicKey, idempotencyKey: UUID())
             guard provisioned.channel == channel else { throw ANError.invalidData }
             try keys.moveKey(from: localID, to: provisioned.credentialID)

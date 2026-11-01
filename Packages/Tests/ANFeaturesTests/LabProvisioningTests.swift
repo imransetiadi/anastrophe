@@ -26,6 +26,9 @@ func labJSON(credentialID: Data, channel: ChannelKind = .ble) throws -> Data {
     ))
 }
 
+/// Identitas kartu lab untuk enrolment lewat registri (ADR-0031).
+let labTestCard = CardIdentity("iso14443a:04a1b2c3d4e5f6")!
+
 /// Transport palsu yang menjawab berurutan, mencatat permintaan.
 final class SequenceTransport: HTTPTransport, @unchecked Sendable {
     private let lock = NSLock()
@@ -69,15 +72,30 @@ struct LabBackendProvisioningTests {
         let serverCredID = Data(repeating: 0x5E, count: 16)
         let transport = SequenceTransport([
             configBody(),
-            (201, #"{"enrollment_id":"6f1c2a9e-0000-4000-8000-000000000001"}"#, "application/json"),
+            (201, #"{"enrollment_id":"6f1c2a9e-0000-4000-8000-000000000001","status":"PROVISIONING"}"#, "application/json"),
             (200, provisionedBody(credentialID: serverCredID), "application/json"),
         ])
-        let card = try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", channel: .ble, keys: keys, records: records, cards: cards)
+        let card = try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", card: labTestCard, channel: .ble, keys: keys, records: records, cards: cards)
         #expect(card.status == .active)
         #expect(card.credentials[.ble] == serverCredID)
         #expect(try keys.hasKey(for: serverCredID))
         #expect(try records.record(for: serverCredID) != nil)
         #expect(transport.paths == ["/v1/config", "/v1/enrollments", "/v1/enrollments/6f1c2a9e-0000-4000-8000-000000000001/credentials"])
+    }
+
+    @Test func provisionViaBackendBerhentiSaatMenungguPersetujuan() async throws {
+        // ADR-0032: perangkat tambahan menunggu operator; tanpa provisioning dan tanpa kunci,
+        // record, atau kartu yang tersisa (FR-19).
+        let secrets = InMemorySecretStore()
+        let keys = DeviceKeyStore(store: secrets, factory: SoftwareKeyFactory())
+        let cards = try SwiftDataCardStore(directory: temporaryDirectory())
+        let transport = SequenceTransport([configBody(), (201, #"{"enrollment_id":"e1","status":"PENDING_APPROVAL"}"#, "application/json")])
+        await #expect(throws: ANError.enrollmentRejected(.pendingApproval)) {
+            try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: self.base, transport: transport), deviceID: "dev", siteID: "site", card: labTestCard, channel: .ble, keys: keys, records: self.records, cards: cards)
+        }
+        #expect(transport.paths == ["/v1/config", "/v1/enrollments"])
+        #expect(secrets.storedKeyCount == 0)
+        #expect(try await cards.all().isEmpty)
     }
 
     @Test func provisionViaBackendMenyimpanRenewalURL() async throws {
@@ -86,10 +104,10 @@ struct LabBackendProvisioningTests {
         let serverCredID = Data(repeating: 0x5F, count: 16)
         let transport = SequenceTransport([
             configBody(),
-            (201, #"{"enrollment_id":"e1"}"#, "application/json"),
+            (201, #"{"enrollment_id":"e1","status":"PROVISIONING"}"#, "application/json"),
             (200, provisionedBody(credentialID: serverCredID, notBefore: "2026-11-01T00:00:00Z"), "application/json"),
         ])
-        _ = try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", channel: .ble, keys: keys, records: records, cards: cards)
+        _ = try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", card: labTestCard, channel: .ble, keys: keys, records: records, cards: cards)
         let record = try #require(try records.record(for: serverCredID))
         #expect(record.renewalURL == base)
         #expect(record.notBefore == Date(timeIntervalSince1970: 1_793_491_200))
@@ -98,11 +116,11 @@ struct LabBackendProvisioningTests {
 
     @Test(arguments: [
         [configBody(), (409, #"{"type":"ENR-LIMIT","status":409}"#, "application/problem+json")],
-        [configBody(), (201, #"{"enrollment_id":"e1"}"#, "application/json"), (400, #"{"type":"ENR-INVALID-KEY","status":400}"#, "application/problem+json")],
+        [configBody(), (201, #"{"enrollment_id":"e1","status":"PROVISIONING"}"#, "application/json"), (400, #"{"type":"ENR-INVALID-KEY","status":400}"#, "application/problem+json")],
         // Review lab M2: jaringan putus setelah enrolment (transport habis → URLError).
-        [configBody(), (201, #"{"enrollment_id":"e1"}"#, "application/json")],
+        [configBody(), (201, #"{"enrollment_id":"e1","status":"PROVISIONING"}"#, "application/json")],
         // Review lab M2: gagal setelah kunci dipindah (kunci reader group tidak valid).
-        [configBody(), (201, #"{"enrollment_id":"e1"}"#, "application/json"),
+        [configBody(), (201, #"{"enrollment_id":"e1","status":"PROVISIONING"}"#, "application/json"),
          (200, provisionedBody(credentialID: Data(repeating: 0x5E, count: 16), groupKey: Data([0x04] + [UInt8](repeating: 0x04, count: 64)).base64EncodedString()), "application/json")],
     ])
     func provisionViaBackendGagalTidakMenyisakanKunci(replies: [(Int, String, String)]) async throws {
@@ -112,7 +130,7 @@ struct LabBackendProvisioningTests {
         let cards = try SwiftDataCardStore(directory: temporaryDirectory())
         let transport = SequenceTransport(replies.map { (status: $0.0, body: $0.1, contentType: $0.2) })
         await #expect(throws: (any Error).self) {
-            try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", channel: .ble, keys: keys, records: records, cards: cards)
+            try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", card: labTestCard, channel: .ble, keys: keys, records: records, cards: cards)
         }
         #expect(secrets.storedKeyCount == 0)
         #expect(try await cards.all().isEmpty)
@@ -125,11 +143,11 @@ struct LabBackendProvisioningTests {
         let cards = try SwiftDataCardStore(directory: temporaryDirectory())
         let transport = SequenceTransport([
             configBody(["ble", "nfcHCE"]),
-            (201, #"{"enrollment_id":"e1"}"#, "application/json"),
+            (201, #"{"enrollment_id":"e1","status":"PROVISIONING"}"#, "application/json"),
             (200, provisionedBody(credentialID: Data(repeating: 0x5E, count: 16), channel: "nfcHCE"), "application/json"),
         ])
         await #expect(throws: ANError.invalidData) {
-            try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", channel: .ble, keys: keys, records: records, cards: cards)
+            try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", card: labTestCard, channel: .ble, keys: keys, records: records, cards: cards)
         }
         #expect(secrets.storedKeyCount == 0)
         #expect(try await cards.all().isEmpty)
@@ -143,7 +161,7 @@ struct LabBackendProvisioningTests {
         let cards = try SwiftDataCardStore(directory: temporaryDirectory())
         let transport = SequenceTransport([configBody(["ble"])])
         await #expect(throws: ANError.channelUnavailable(.regionBlocked)) {
-            try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", channel: .nfcHCE, keys: keys, records: records, cards: cards)
+            try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", card: labTestCard, channel: .nfcHCE, keys: keys, records: records, cards: cards)
         }
         #expect(transport.paths == ["/v1/config"])
         #expect(secrets.storedKeyCount == 0)
@@ -160,7 +178,7 @@ struct LabBackendProvisioningTests {
         }
         let transport = SequenceTransport([])
         await #expect(throws: ANError.cardLimitReached) {
-            try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", channel: .ble, keys: keys, records: records, cards: cards)
+            try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", card: labTestCard, channel: .ble, keys: keys, records: records, cards: cards)
         }
         #expect(transport.paths.isEmpty)
         #expect(secrets.storedKeyCount == 0)

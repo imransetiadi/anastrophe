@@ -17,6 +17,10 @@ public struct ProblemDetails: Decodable, Error, Equatable, Sendable {
     var domainError: (any Error)? {
         switch type {
         case "ENR-LIMIT": ANError.cardLimitReached
+        case "ENR-NOT-REGISTERED": ANError.enrollmentRejected(.notRegistered)
+        case "ENR-SITE-UNSUPPORTED": ANError.enrollmentRejected(.siteUnsupported)
+        case "ENR-DUPLICATE": ANError.enrollmentRejected(.duplicate)
+        case "ENR-PENDING-APPROVAL": ANError.enrollmentRejected(.pendingApproval)
         default: nil
         }
     }

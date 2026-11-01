@@ -10,9 +10,14 @@ struct LabBackendTarget: Equatable, Sendable {
     let baseURL: URL
     let deviceID: String
     let siteID: String
+    /// Kartu fisik yang terdaftar di registri gedung lab (ADR-0031).
+    let card: CardIdentity
+
+    /// Kartu lab bawaan, sama dengan default `anastrophe-devseed -lab-card`.
+    static let defaultCard = CardIdentity("iso14443a:04a1b2c3d4e5f6")!
 
     /// Isian form lab; nil bila URL bukan http(s) dengan host atau salah satu ID kosong.
-    init?(url: String, deviceID: String, siteID: String) {
+    init?(url: String, deviceID: String, siteID: String, card: CardIdentity = LabBackendTarget.defaultCard) {
         func trimmed(_ value: String) -> String { value.trimmingCharacters(in: .whitespacesAndNewlines) }
         guard let baseURL = URL(string: trimmed(url)),
               ["http", "https"].contains(baseURL.scheme?.lowercased() ?? ""),
@@ -22,9 +27,11 @@ struct LabBackendTarget: Equatable, Sendable {
         self.baseURL = baseURL
         self.deviceID = trimmed(deviceID)
         self.siteID = trimmed(siteID)
+        self.card = card
     }
 
-    /// `-ANLabBackend <url> -ANLabDevice <id> -ANLabSite <id>`; nil bila salah satu tidak ada.
+    /// `-ANLabBackend <url> -ANLabDevice <id> -ANLabSite <id> [-ANLabCard <tech>:<hex>]`; nil bila salah satu
+    /// tidak ada atau kartu tidak valid.
     init?(arguments: [String]) {
         func value(_ flag: String) -> String? {
             guard let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1),
@@ -33,7 +40,12 @@ struct LabBackendTarget: Equatable, Sendable {
             return arguments[index + 1]
         }
         guard let url = value("-ANLabBackend"), let device = value("-ANLabDevice"), let site = value("-ANLabSite") else { return nil }
-        self.init(url: url, deviceID: device, siteID: site)
+        var card = Self.defaultCard
+        if arguments.contains("-ANLabCard") {
+            guard let text = value("-ANLabCard"), let parsed = CardIdentity(text) else { return nil }
+            card = parsed
+        }
+        self.init(url: url, deviceID: device, siteID: site, card: card)
     }
 }
 
@@ -113,7 +125,7 @@ extension AppServices {
         do {
             _ = try await LabProvisioning.provisionViaBackend(
                 api: APIClient(baseURL: target.baseURL, transport: transport),
-                deviceID: target.deviceID, siteID: target.siteID, channel: channel,
+                deviceID: target.deviceID, siteID: target.siteID, card: target.card, channel: channel,
                 keys: keys, records: records, cards: cards
             )
             return localized("lab.imported")
@@ -121,6 +133,8 @@ extension AppServices {
             return localized("lab.limit")
         } catch ANError.channelUnavailable {
             return localized("lab.backend.channel_disabled")
+        } catch ANError.enrollmentRejected(let reason) {
+            return EnrollmentMessages.text(for: ANError.enrollmentRejected(reason)) ?? localized("lab.backend.failed")
         } catch let problem as ProblemDetails {
             return "\(localized("lab.backend.failed")) (\(problem.type))"
         } catch let error as URLError {

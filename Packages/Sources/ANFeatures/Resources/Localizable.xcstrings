@@ -593,6 +593,86 @@
         }
       }
     },
+    "enroll.error.duplicate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This card is already on this iPhone."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu ini sudah ada di iPhone ini."
+          }
+        }
+      }
+    },
+    "enroll.error.limit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can have up to 8 cards per iPhone."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Maksimal 8 kartu per iPhone."
+          }
+        }
+      }
+    },
+    "enroll.error.not_registered": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This card isn't registered at your building."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu ini belum terdaftar di gedung Anda."
+          }
+        }
+      }
+    },
+    "enroll.error.pending_approval": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for approval from the building manager."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menunggu persetujuan pengelola gedung."
+          }
+        }
+      }
+    },
+    "enroll.error.site_unsupported": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This building doesn't support Anastrophe yet."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gedung ini belum mendukung Anastrophe."
+          }
+        }
+      }
+    },
     "history.reason.expired": {
       "localizations": {
         "en": {

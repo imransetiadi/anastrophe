@@ -25,6 +25,14 @@ struct LabBackendTargetTests {
         #expect(LabBackendTarget(arguments: arguments) == nil)
     }
 
+    @Test func kartuLabDariArgumen() {
+        // ADR-0031: enrolment lab memakai identitas kartu yang sama dengan devseed -lab-card.
+        let base = ["Anastrophe", "-ANLabBackend", "http://127.0.0.1:8080", "-ANLabDevice", "d1", "-ANLabSite", "s1"]
+        #expect(LabBackendTarget(arguments: base + ["-ANLabCard", "iso15693:e004010203040506"])?.card.hex == "e004010203040506")
+        #expect(LabBackendTarget(arguments: base)?.card == LabBackendTarget.defaultCard)
+        #expect(LabBackendTarget(arguments: base + ["-ANLabCard", "iso14443a:zz"]) == nil)
+    }
+
     @Test func isianFormDirapikan() {
         // ID biasanya ditempel dari terminal, sering dengan spasi atau baris baru di ujung.
         let target = LabBackendTarget(url: " http://127.0.0.1:8080\n", deviceID: " d1\n", siteID: "s1 ")
@@ -46,7 +54,7 @@ struct LabBackendLaunchTests {
         services.configureLabBackend(arguments: arguments)
         let transport = SequenceTransport([
             configBody(),
-            (201, #"{"enrollment_id":"e1"}"#, "application/json"),
+            (201, #"{"enrollment_id":"e1","status":"PROVISIONING"}"#, "application/json"),
             (200, provisionedBody(credentialID: Data(repeating: 0x5E, count: 16)), "application/json"),
         ])
         #expect(await services.runPendingLabBackendProvisioning(transport: transport) == localized("lab.imported"))
@@ -120,7 +128,7 @@ struct LabBackendLaunchTests {
         let services = AppServices.inMemory()
         let transport = SequenceTransport([
             configBody(),
-            (201, #"{"enrollment_id":"e1"}"#, "application/json"),
+            (201, #"{"enrollment_id":"e1","status":"PROVISIONING"}"#, "application/json"),
             (400, #"{"type":"ENR-INVALID-KEY","status":400}"#, "application/problem+json"),
         ])
         let message = await services.provisionFromLabBackend(target, channel: .ble, transport: transport)
