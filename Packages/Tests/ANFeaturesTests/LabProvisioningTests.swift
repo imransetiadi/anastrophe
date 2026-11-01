@@ -114,6 +114,23 @@ struct LabBackendProvisioningTests {
         #expect(body == ["device_id": "dev", "invitation": token])
     }
 
+    @Test func provisionViaBackendMenyimpanTokenStatus() async throws {
+        // ADR-0037: token disimpan di bawah id card instance server; server hanya menerima hash-nya.
+        let cards = try SwiftDataCardStore(directory: temporaryDirectory())
+        let tokens = KeychainStatusTokenStore(store: InMemorySecretStore())
+        let transport = SequenceTransport([
+            configBody(),
+            (201, #"{"enrollment_id":"e1","status":"PROVISIONING"}"#, "application/json"),
+            (200, provisionedBody(credentialID: Data(repeating: 0x5D, count: 16)), "application/json"),
+        ])
+        _ = try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", card: labTestCard, channel: .ble,
+                                                          keys: keys, records: records, cards: cards, statusTokens: tokens)
+        let token = try #require(try tokens.token(forCard: "e1"))
+        let raw = try #require(transport.bodies[2])
+        let body = try #require(try JSONSerialization.jsonObject(with: raw) as? [String: String])
+        #expect(body["status_token_hash"] == StatusToken.hash(token).base64EncodedString())
+    }
+
     @Test func provisionViaBackendMenyimpanRenewalURL() async throws {
         // ADR-0023: record mengingat backend penerbit dan awal masa berlaku untuk perpanjangan.
         let cards = try SwiftDataCardStore(directory: temporaryDirectory())

@@ -32,6 +32,45 @@ struct CredentialRenewerTests {
         (201, #"{"nonce":"\#(nonce.base64EncodedString())","expires_at":"2026-11-05T00:02:00Z"}"#, "application/json")
     }
 
+    /// Record dengan id card instance server, seperti hasil provisioning lewat backend.
+    func setUpWithServerCard() throws -> (Card, SwiftDataCardStore) {
+        let (card, cards, _, record) = try setUp(renewalURL: backend)
+        try records.save(CredentialRecord(credentialID: credentialID, certificate: record.certificate, notAfter: record.notAfter, groupKeys: record.groupKeys,
+                                          notBefore: record.notBefore, renewalURL: backend, serverCardID: "srv-1"))
+        return (card, cards)
+    }
+
+    var renewedReply: (status: Int, body: String, contentType: String) {
+        (200, provisionedBody(credentialID: credentialID, notAfter: "2026-11-12T00:00:00Z", notBefore: "2026-11-05T00:00:00Z"), "application/json")
+    }
+
+    @Test func perpanjanganTanpaTokenMembuatTokenStatus() async throws {
+        // ADR-0037: kartu lama tanpa token mendapat token lewat perpanjangan bertanda tangan.
+        let (card, cards) = try setUpWithServerCard()
+        try await cards.add(card)
+        let tokens = KeychainStatusTokenStore(store: InMemorySecretStore())
+        let transport = SequenceTransport([challengeReply, renewedReply])
+        _ = try await CredentialRenewer(keys: keys, records: records, cards: cards, statusTokens: tokens, transport: transport).renew(card: card, channel: .ble, context: context)
+        let token = try #require(try tokens.token(forCard: "srv-1"))
+        let raw = try #require(transport.bodies[1])
+        let body = try #require(try JSONSerialization.jsonObject(with: raw) as? [String: String])
+        #expect(body["status_token_hash"] == StatusToken.hash(token).base64EncodedString())
+    }
+
+    @Test func perpanjanganDenganTokenTidakMengirimHash() async throws {
+        let (card, cards) = try setUpWithServerCard()
+        try await cards.add(card)
+        let tokens = KeychainStatusTokenStore(store: InMemorySecretStore())
+        let existing = Data(repeating: 0x31, count: 32)
+        try tokens.save(existing, forCard: "srv-1")
+        let transport = SequenceTransport([challengeReply, renewedReply])
+        _ = try await CredentialRenewer(keys: keys, records: records, cards: cards, statusTokens: tokens, transport: transport).renew(card: card, channel: .ble, context: context)
+        let raw = try #require(transport.bodies[1])
+        let body = try #require(try JSONSerialization.jsonObject(with: raw) as? [String: String])
+        #expect(body["status_token_hash"] == nil)
+        #expect(try tokens.token(forCard: "srv-1") == existing)
+    }
+
     @Test func perpanjanganMemperbaruiRecordDanKartu() async throws {
         let (card, cards, publicKey, _) = try setUp(renewalURL: backend)
         try await cards.add(card)

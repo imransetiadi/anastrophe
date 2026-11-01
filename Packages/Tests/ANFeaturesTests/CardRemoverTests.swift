@@ -34,6 +34,16 @@ struct CardRemoverTests {
         CardRemover(keys: keys, records: records, cards: cards, transport: transport)
     }
 
+    @Test func hapusKartuMenghapusTokenStatus() async throws {
+        // ADR-0037: token baca status ikut terhapus bersama kartu.
+        let (card, cards, _) = try await setUp(backend: true)
+        let tokens = KeychainStatusTokenStore(store: InMemorySecretStore())
+        try tokens.save(Data(repeating: 0x31, count: 32), forCard: cardID)
+        let transport = SequenceTransport([challengeReply, (204, "", "application/json")])
+        try await CardRemover(keys: keys, records: records, cards: cards, statusTokens: tokens, transport: transport).remove(card: card, context: context)
+        #expect(try tokens.token(forCard: cardID) == nil)
+    }
+
     @Test func hapusMencabutLaluMenghapusLokal() async throws {
         let (card, cards, publicKey) = try await setUp(backend: true)
         let transport = SequenceTransport([challengeReply, (204, "", "application/json")])

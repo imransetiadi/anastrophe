@@ -169,6 +169,48 @@ struct APIClientTests {
         #expect(body == ["device_id": "dev-1", "invitation": token])
     }
 
+    @Test func submitCredentialKeyMengirimHashTokenStatus() async throws {
+        // ADR-0037: app hanya mengirim SHA-256 token baca status, bukan tokennya.
+        let hash = Data(repeating: 0x5A, count: 32)
+        let transport = FakeTransport(status: 200, body: provisionedJSON)
+        _ = try await APIClient(baseURL: base, transport: transport)
+            .submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04]), statusTokenHash: hash, idempotencyKey: UUID())
+        let raw = try #require(transport.lastRequest?.httpBody)
+        let body = try #require(try JSONSerialization.jsonObject(with: raw) as? [String: String])
+        #expect(body["status_token_hash"] == hash.base64EncodedString())
+    }
+
+    @Test func renewCredentialMengirimHashTokenStatus() async throws {
+        let hash = Data(repeating: 0x5B, count: 32)
+        let transport = FakeTransport(status: 200, body: provisionedJSON)
+        _ = try await APIClient(baseURL: base, transport: transport)
+            .renewCredential(credentialID: Data(repeating: 0xC1, count: 16), nonce: Data(repeating: 1, count: 32), signature: Data(repeating: 2, count: 64), statusTokenHash: hash, idempotencyKey: UUID())
+        let raw = try #require(transport.lastRequest?.httpBody)
+        let body = try #require(try JSONSerialization.jsonObject(with: raw) as? [String: String])
+        #expect(body["status_token_hash"] == hash.base64EncodedString())
+    }
+
+    @Test func cardStatusMengirimBearerBase64URL() async throws {
+        // Token dengan byte yang menjadi "+" dan "/" di base64 standar: header wajib base64url tanpa padding.
+        let token = Data([0xFB, 0xFF, 0xBF] + [UInt8](repeating: 0xFF, count: 29))
+        let transport = FakeTransport(status: 200, body: #"{"status":"SUSPENDED"}"#)
+        let status = try await APIClient(baseURL: base, transport: transport).cardStatus(cardID: "6f1c2a9e-0000-4000-8000-000000000001", token: token)
+        #expect(status == "SUSPENDED")
+        let request = try #require(transport.lastRequest)
+        #expect(request.httpMethod == "GET")
+        #expect(request.url?.path() == "/v1/cards/6f1c2a9e-0000-4000-8000-000000000001/status")
+        let header = try #require(request.value(forHTTPHeaderField: "Authorization"))
+        #expect(header == "Bearer " + token.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: ""))
+        #expect(!header.contains("+") && !header.contains("/") && !header.contains("="))
+    }
+
+    @Test func cardStatusTidakDitemukanMenjadiProblem() async throws {
+        let transport = FakeTransport(status: 404, body: #"{"type":"CARD-NOT-FOUND","status":404}"#, contentType: "application/problem+json")
+        await #expect(throws: ProblemDetails(type: "CARD-NOT-FOUND", title: nil, status: 404)) {
+            try await APIClient(baseURL: base, transport: transport).cardStatus(cardID: "c1", token: Data(repeating: 1, count: 32))
+        }
+    }
+
     @Test func createEnrollmentStatusTakDikenalDitolak() async throws {
         let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"e1","status":"MYSTERY"}"#)
         let card = try #require(CardIdentity("iso14443a:04a1b2c3d4e5f6"))

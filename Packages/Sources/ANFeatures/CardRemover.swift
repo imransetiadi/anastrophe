@@ -11,12 +11,15 @@ struct CardRemover: Sendable {
     let keys: any CredentialKeyStore
     let records: any CredentialRecordStore
     let cards: any CardStore
+    /// Token baca status kartu ikut dihapus (ADR-0037).
+    let statusTokens: (any StatusTokenStore)?
     let transport: any HTTPTransport
 
-    init(keys: any CredentialKeyStore, records: any CredentialRecordStore, cards: any CardStore, transport: any HTTPTransport = URLSession.shared) {
+    init(keys: any CredentialKeyStore, records: any CredentialRecordStore, cards: any CardStore, statusTokens: (any StatusTokenStore)? = nil, transport: any HTTPTransport = URLSession.shared) {
         self.keys = keys
         self.records = records
         self.cards = cards
+        self.statusTokens = statusTokens
         self.transport = transport
     }
 
@@ -50,10 +53,12 @@ struct CardRemover: Sendable {
             }
             guard revoked else { throw lastError ?? ANError.internalError }
         }
+        let serverCardIDs = Set(card.credentials.values.compactMap { try? records.record(for: $0)?.serverCardID })
         for credentialID in card.credentials.values {
             try? keys.deleteKey(for: credentialID)
             try? records.delete(credentialID)
         }
+        for id in serverCardIDs { try? statusTokens?.delete(forCard: id) }
         do {
             try await cards.remove(id: card.id)
         } catch ANError.invalidData {

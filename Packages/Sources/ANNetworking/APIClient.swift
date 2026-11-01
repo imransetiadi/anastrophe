@@ -70,12 +70,15 @@ public struct APIClient: Sendable {
     }
 
     /// `POST /v1/enrollments/{id}/credentials`: kirim kunci publik kanal, terima sertifikat (FR-16).
-    public func submitCredentialKey(enrollmentID: String, channel: ChannelKind, publicKey: Data, idempotencyKey: UUID) async throws -> ProvisionedCredential {
+    public func submitCredentialKey(enrollmentID: String, channel: ChannelKind, publicKey: Data, statusTokenHash: Data? = nil, idempotencyKey: UUID) async throws -> ProvisionedCredential {
         var request = URLRequest(url: baseURL.appending(path: "v1/enrollments/\(enrollmentID)/credentials"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(idempotencyKey.uuidString, forHTTPHeaderField: "Idempotency-Key")
-        request.httpBody = try JSONEncoder().encode(["channel": channel.rawValue, "public_key": publicKey.base64EncodedString()])
+        var body = ["channel": channel.rawValue, "public_key": publicKey.base64EncodedString()]
+        // ADR-0037: hanya hash token baca status yang dikirim; tokennya tetap di perangkat.
+        body["status_token_hash"] = statusTokenHash?.base64EncodedString()
+        request.httpBody = try JSONEncoder().encode(body)
         return try ProvisionedCredential.decode(try await perform(request))
     }
 
@@ -87,12 +90,14 @@ public struct APIClient: Sendable {
     }
 
     /// `POST /v1/credentials/{cred}:renew`: tanda tangan atas nonce → sertifikat baru (FR-45).
-    public func renewCredential(credentialID: Data, nonce: Data, signature: Data, idempotencyKey: UUID) async throws -> ProvisionedCredential {
+    public func renewCredential(credentialID: Data, nonce: Data, signature: Data, statusTokenHash: Data? = nil, idempotencyKey: UUID) async throws -> ProvisionedCredential {
         var request = URLRequest(url: credentialURL(credentialID, action: "renew"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(idempotencyKey.uuidString, forHTTPHeaderField: "Idempotency-Key")
-        request.httpBody = try JSONEncoder().encode(["nonce": nonce.base64EncodedString(), "signature": signature.base64EncodedString()])
+        var body = ["nonce": nonce.base64EncodedString(), "signature": signature.base64EncodedString()]
+        body["status_token_hash"] = statusTokenHash?.base64EncodedString()  // kartu lama tanpa token (ADR-0037)
+        request.httpBody = try JSONEncoder().encode(body)
         return try ProvisionedCredential.decode(try await perform(request))
     }
 
@@ -109,6 +114,19 @@ public struct APIClient: Sendable {
     }
 
     /// `cred_id` dalam hex huruf kecil, diikuti `:aksi` (SDD §8.5).
+    /// `GET /v1/cards/{id}/status` dengan token baca status sebagai bearer (ADR-0037). Tanpa tanda tangan
+    /// kunci kredensial, jadi tidak ada prompt autentikasi.
+    public func cardStatus(cardID: String, token: Data) async throws -> String {
+        var request = URLRequest(url: baseURL.appending(path: "v1/cards/\(cardID)/status"))
+        let encoded = token.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        request.setValue("Bearer \(encoded)", forHTTPHeaderField: "Authorization")
+        struct Reply: Decodable { let status: String }
+        return try Self.decoder.decode(Reply.self, from: try await perform(request)).status
+    }
+
     private func credentialURL(_ credentialID: Data, action: String) -> URL {
         baseURL.appending(path: "v1/credentials/\(credentialID.hexString):\(action)")
     }

@@ -36,7 +36,8 @@ enum LabProvisioning {
         channel: ChannelKind,
         keys: any CredentialKeyStore,
         records: any CredentialRecordStore,
-        cards: any CardStore
+        cards: any CardStore,
+        statusTokens: (any StatusTokenStore)? = nil
     ) async throws -> Card {
         // Batas 8 kartu juga di app (CLAUDE.md aturan 8): jangan buat enrolment server yang
         // kartunya pasti ditolak penyimpanan lokal.
@@ -58,11 +59,18 @@ enum LabProvisioning {
             // ADR-0032: perangkat tambahan menunggu operator; tidak ada provisioning sampai disetujui.
             guard start.status == .provisioning else { throw ANError.enrollmentRejected(.pendingApproval) }
             let enrollmentID = start.enrollmentID
-            let provisioned = try await api.submitCredentialKey(enrollmentID: enrollmentID, channel: channel, publicKey: publicKey, idempotencyKey: UUID())
+            // ADR-0037: token baca status dibuat di perangkat; server hanya menerima hash-nya.
+            let statusToken = statusTokens == nil ? nil : try StatusToken.generate()
+            let provisioned = try await api.submitCredentialKey(enrollmentID: enrollmentID, channel: channel, publicKey: publicKey,
+                                                                statusTokenHash: statusToken.map(StatusToken.hash), idempotencyKey: UUID())
             guard provisioned.channel == channel else { throw ANError.invalidData }
             try keys.moveKey(from: localID, to: provisioned.credentialID)
             movedTo = provisioned.credentialID
-            return try await store(provisioned, keys: keys, records: records, cards: cards, renewalURL: api.baseURL, serverCardID: enrollmentID)
+            let stored = try await store(provisioned, keys: keys, records: records, cards: cards, renewalURL: api.baseURL, serverCardID: enrollmentID)
+            // Token hanya untuk membaca status: gagal menyimpannya tidak menggagalkan kartu, dan
+            // perpanjangan berikutnya membuat token baru.
+            if let statusToken { try? statusTokens?.save(statusToken, forCard: enrollmentID) }
+            return stored
         } catch {
             try? keys.deleteKey(for: localID)
             if let movedTo { try? keys.deleteKey(for: movedTo) }

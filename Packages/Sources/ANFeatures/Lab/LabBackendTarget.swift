@@ -85,7 +85,7 @@ extension AppServices {
         pendingLabDelete = false
         guard let card = try? await cards.all().first else { return nil }
         do {
-            try await CardRemover(keys: keys, records: records, cards: cards, transport: transport)
+            try await CardRemover(keys: keys, records: records, cards: cards, statusTokens: statusTokens, transport: transport)
                 .remove(card: card, context: AuthorizedContext(laContext: LAContext()))
             return localized("lab.deleted")
         } catch let problem as ProblemDetails {
@@ -110,7 +110,7 @@ extension AppServices {
             return localized("lab.renew_failed")
         }
         do {
-            _ = try await CredentialRenewer(keys: keys, records: records, cards: cards, transport: transport)
+            _ = try await CredentialRenewer(keys: keys, records: records, cards: cards, statusTokens: statusTokens, transport: transport)
                 .renew(card: card, channel: channel, context: AuthorizedContext(laContext: LAContext()))
             return localized("lab.renewed")
         } catch let problem as ProblemDetails {
@@ -138,7 +138,7 @@ extension AppServices {
             _ = try await LabProvisioning.provisionViaBackend(
                 api: APIClient(baseURL: target.baseURL, transport: transport),
                 deviceID: target.deviceID, siteID: target.siteID, card: target.card, invitation: target.invitation, channel: channel,
-                keys: keys, records: records, cards: cards
+                keys: keys, records: records, cards: cards, statusTokens: statusTokens
             )
             return localized("lab.imported")
         } catch ANError.cardLimitReached {

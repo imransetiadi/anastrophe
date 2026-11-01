@@ -55,6 +55,8 @@ public final class AppServices {
     let authenticator: any UserAuthenticator
     /// Riwayat tap lokal 30 hari (FR-30).
     let tapHistory: any TapHistoryStore
+    /// Token baca status kartu (ADR-0037), di Keychain yang sama dengan record kredensial.
+    let statusTokens: any StatusTokenStore
     /// Store kartu tidak bisa dibuka; UI memberi tahu alih-alih menampilkan daftar kosong.
     public let storageFailed: Bool
     #if DEBUG
@@ -79,6 +81,7 @@ public final class AppServices {
         connectivity: any ConnectivityStatus = FixedConnectivity(isOnline: true),
         authenticator: any UserAuthenticator,
         tapHistory: any TapHistoryStore,
+        statusTokens: any StatusTokenStore = KeychainStatusTokenStore(store: InMemorySecretStore()),
         storageFailed: Bool = false
     ) {
         self.cards = cards
@@ -91,6 +94,7 @@ public final class AppServices {
         self.connectivity = connectivity
         self.authenticator = authenticator
         self.tapHistory = tapHistory
+        self.statusTokens = statusTokens
         self.storageFailed = storageFailed
     }
 
@@ -138,7 +142,8 @@ public final class AppServices {
         let revision = CardsRevision()
         // ADR-0029: riwayat tidak pernah membuat kartu tak tersedia.
         let tapHistory = SwiftDataTapHistoryStore.openRecovering(directory: URL.applicationSupportDirectory.appending(path: "Anastrophe/TapHistory"))
-        let launcher = LivePresentationLauncher(keys: keys, records: records, cards: cards, counters: KeychainCounterStore(store: secrets), foreground: foreground, config: config, nfcEmulationEntitled: nfcEmulationEntitled, onCardsChanged: { revision.bump() })
+        let statusTokens = KeychainStatusTokenStore(store: secrets)
+        let launcher = LivePresentationLauncher(keys: keys, records: records, cards: cards, statusTokens: statusTokens, counters: KeychainCounterStore(store: secrets), foreground: foreground, config: config, nfcEmulationEntitled: nfcEmulationEntitled, onCardsChanged: { revision.bump() })
         return AppServices(
             cards: cards,
             keys: keys,
@@ -149,7 +154,8 @@ public final class AppServices {
             cardsRevision: revision,
             connectivity: LiveConnectivity(onChange: { Task { @MainActor in revision.bump() } }),
             authenticator: LAUserAuthenticator(),
-            tapHistory: tapHistory
+            tapHistory: tapHistory,
+            statusTokens: statusTokens
         )
     }
 
@@ -173,13 +179,14 @@ public final class AppServices {
             foreground: ForegroundState(),
             connectivity: connectivity,
             authenticator: authenticator,
-            tapHistory: tapHistory
+            tapHistory: tapHistory,
+            statusTokens: KeychainStatusTokenStore(store: secrets)
         )
     }
 
     /// Hapus kartu (FR-31): autentikasi pengguna, cabut di server (ADR-0026), lalu hapus lokal.
     public func removeCard(_ card: Card) async throws {
-        let remover = CardRemover(keys: keys, records: records, cards: cards)
+        let remover = CardRemover(keys: keys, records: records, cards: cards, statusTokens: statusTokens)
         let hasKey = try card.credentials.values.contains { try keys.hasKey(for: $0) }
         var context: AuthorizedContext?
         do {
@@ -287,8 +294,8 @@ private final class LivePresentationLauncher: PresentationLaunching {
     private var hce: HCEPresentmentCoordinator?
     #endif
 
-    init(keys: any CredentialKeyStore, records: any CredentialRecordStore, cards: any CardStore, counters: any CounterStore, foreground: ForegroundState, config: RemoteConfig, nfcEmulationEntitled: Bool, onCardsChanged: @escaping @MainActor () -> Void) {
-        let scheduler = RenewalScheduler(renewer: CredentialRenewer(keys: keys, records: records, cards: cards), clock: ContinuousClock(),
+    init(keys: any CredentialKeyStore, records: any CredentialRecordStore, cards: any CardStore, statusTokens: any StatusTokenStore, counters: any CounterStore, foreground: ForegroundState, config: RemoteConfig, nfcEmulationEntitled: Bool, onCardsChanged: @escaping @MainActor () -> Void) {
+        let scheduler = RenewalScheduler(renewer: CredentialRenewer(keys: keys, records: records, cards: cards, statusTokens: statusTokens), clock: ContinuousClock(),
                                          isForeground: { foreground.isActive }, onRenewed: onCardsChanged)
         self.scheduler = scheduler
         self.foreground = foreground
