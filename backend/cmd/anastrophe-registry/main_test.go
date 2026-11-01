@@ -441,3 +441,152 @@ func TestBacaIdentitasKartuDariStdin(t *testing.T) {
 		t.Fatalf("prompt tercetak untuk pipe: %q", prompt.String())
 	}
 }
+
+// activeInstance membuat card instance ACTIVE dengan satu kredensial BLE di gedung uji.
+func activeInstance(t *testing.T, db *store.Store, site string) string {
+	t.Helper()
+	ctx := context.Background()
+	device, err := db.CreateDevice(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := db.StartEnrollment(ctx, device, site, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	credID := make([]byte, 16)
+	copy(credID, id)
+	pub := append([]byte{0x04}, make([]byte, 64)...)
+	_, _, err = db.Idempotent(ctx, "aktif-"+id, []byte("h"), func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
+		return 200, []byte("{}"), tx.SaveCredential(ctx, store.Credential{CardInstanceID: id, Channel: "ble", CredID: credID, PubKey: pub, Cert: []byte{1}, NotAfter: time.Now().Add(time.Hour)})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+func TestListCardInstance(t *testing.T) {
+	// FR-50 (sebagian): operator mendapat id instance untuk approve/suspend/resume/revoke, tanpa identitas.
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	active := activeInstance(t, db, site)
+	device, _ := db.CreateDevice(ctx)
+	pending, err := db.StartEnrollment(ctx, device, site, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out, errOut bytes.Buffer
+	if code := run(ctx, []string{"list", "--site", site}, &out, &errOut, env(dsn)); code != 0 {
+		t.Fatalf("list: %d %s", code, errOut.String())
+	}
+	text := out.String()
+	if !strings.Contains(text, active) || !strings.Contains(text, pending) || !strings.Contains(text, "ACTIVE") || !strings.Contains(text, "ble") || strings.Contains(strings.ToLower(text), "hmac") {
+		t.Fatalf("keluaran list:\n%s", text)
+	}
+	out.Reset()
+	if code := run(ctx, []string{"list", "--site", site, "--status", "ACTIVE"}, &out, &errOut, env(dsn)); code != 0 || !strings.Contains(out.String(), active) || strings.Contains(out.String(), pending) {
+		t.Fatalf("list ACTIVE: %d\n%s", code, out.String())
+	}
+	errOut.Reset()
+	if code := run(ctx, []string{"list", "--site", site, "--status", "BOGUS"}, &out, &errOut, env(dsn)); code != 2 || !strings.Contains(errOut.String(), "status tidak dikenal") {
+		t.Fatalf("status tak dikenal: %d %s", code, errOut.String())
+	}
+	errOut.Reset()
+	if code := run(ctx, []string{"list", "--site", "00000000-0000-4000-8000-000000000000"}, &out, &errOut, env(dsn)); code != 2 || !strings.Contains(errOut.String(), "gedung tidak ditemukan") {
+		t.Fatalf("gedung tak dikenal: %d %s", code, errOut.String())
+	}
+}
+
+func cardInstanceStatus(t *testing.T, db *store.Store, site, id string) string {
+	t.Helper()
+	list, err := db.ListCardInstances(context.Background(), site, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range list {
+		if c.ID == id {
+			return c.Status
+		}
+	}
+	t.Fatalf("instance %s tidak ada", id)
+	return ""
+}
+
+func TestSuspendResumeRevoke(t *testing.T) {
+	// FR-51: tindakan operator lewat CLI mengubah status instance.
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	id := activeInstance(t, db, site)
+	for _, step := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"suspend", "--card-instance", id, "--operator", "staf-01"}, "SUSPENDED"},
+		{[]string{"resume", "--card-instance", id, "--operator", "staf-01"}, "ACTIVE"},
+		{[]string{"revoke", "--card-instance", id, "--reason", "hilang", "--operator", "staf-01"}, "REVOKED"},
+	} {
+		var out, errOut bytes.Buffer
+		if code := run(ctx, step.args, &out, &errOut, env(dsn)); code != 0 {
+			t.Fatalf("%s: %d %s", step.args[0], code, errOut.String())
+		}
+		if got := cardInstanceStatus(t, db, site, id); got != step.want {
+			t.Fatalf("%s: status %s, ingin %s", step.args[0], got, step.want)
+		}
+		if !strings.Contains(out.String(), id) {
+			t.Fatalf("%s: keluaran tanpa id: %s", step.args[0], out.String())
+		}
+	}
+}
+
+func TestTransisiCLIDitolak(t *testing.T) {
+	// Review Focus 3: transisi ilegal keluar dengan kode 2 dan pesan yang jelas.
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	id := activeInstance(t, db, site)
+	for name, c := range map[string]struct {
+		args []string
+		want string
+	}{
+		"resume-dari-aktif": {[]string{"resume", "--card-instance", id, "--operator", "staf-01"}, "status card instance tidak mengizinkan"},
+		"tak-dikenal":       {[]string{"suspend", "--card-instance", "00000000-0000-4000-8000-000000000000", "--operator", "staf-01"}, "card instance tidak ditemukan"},
+		"tanpa-operator":    {[]string{"suspend", "--card-instance", id}, "--operator wajib diisi"},
+	} {
+		var out, errOut bytes.Buffer
+		if code := run(ctx, c.args, &out, &errOut, env(dsn)); code != 2 || !strings.Contains(errOut.String(), c.want) {
+			t.Errorf("%s: kode %d %s", name, code, errOut.String())
+		}
+	}
+	if got := cardInstanceStatus(t, db, site, id); got != "ACTIVE" {
+		t.Fatalf("status berubah: %s", got)
+	}
+}
+
+func TestRevokeAlasanTidakValid(t *testing.T) {
+	// Spesifikasi: alasan pencabutan berupa kode pendek, bukan teks bebas yang masuk audit append-only.
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	id := activeInstance(t, db, site)
+	var out, errOut bytes.Buffer
+	if code := run(ctx, []string{"revoke", "--card-instance", id, "--reason", "Bukan Kode", "--operator", "staf-01"}, &out, &errOut, env(dsn)); code != 2 || !strings.Contains(errOut.String(), "--reason") {
+		t.Fatalf("kode %d %s", code, errOut.String())
+	}
+	if got := cardInstanceStatus(t, db, site, id); got != "ACTIVE" {
+		t.Fatalf("status berubah: %s", got)
+	}
+}
+
+func TestReasonHanyaUntukRevoke(t *testing.T) {
+	// Pelajaran review undangan M5: flag yang diabaikan diam-diam menyesatkan operator.
+	db, dsn := freshStore(t)
+	site := siteWithZones(t, db)
+	id := activeInstance(t, db, site)
+	var out, errOut bytes.Buffer
+	if code := run(context.Background(), []string{"suspend", "--card-instance", id, "--reason", "hilang", "--operator", "staf-01"}, &out, &errOut, env(dsn)); code != 2 || !strings.Contains(errOut.String(), "not defined") {
+		t.Fatalf("suspend --reason: %d %s", code, errOut.String())
+	}
+}

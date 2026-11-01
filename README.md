@@ -81,6 +81,8 @@ ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_SOFTWARE_CA=1 ANASTROPHE_D
 ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-audit   # verifikasi rantai audit (FR-54); keluar 1 bila ada yang rusak
 ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_REGISTRY_KEY=<32 byte hex> go -C backend run ./cmd/anastrophe-registry import --site <uuid> --file ~/registri/kartu.csv --operator <pegangan>   # registri kartu fisik (FR-52); CSV berisi identitas mentah: simpan di luar repo dan hapus setelah impor; approve|reject --card-instance <uuid> untuk perangkat tambahan (ADR-0032)
 ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-registry invite --site <uuid> [--zones Lobi;Parkir | --card-file <berkas>|-] [--ttl 7] [--link-base https://<domain>/i/] --operator <pegangan>   # undangan sekali pakai (FR-12, ADR-0033); token dicetak sekali; berkas kartu berisi <tech>:<hex> (atau - lalu tempel di stdin), bukan argumen, dan butuh ANASTROPHE_DEV_REGISTRY_KEY; undangan berkartu menyetujui enrolment perangkat yang masih menunggu (ADR-0035)
+ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-registry list --site <uuid> [--status ACTIVE]   # card instance gedung: id, status, asal, kanal (FR-50 sebagian); tanpa identitas kartu
+ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-registry suspend|resume --card-instance <uuid> --operator <pegangan>   # tangguhkan/pulihkan kartu (FR-51, ADR-0036); revoke --card-instance <uuid> [--reason hilang] mencabut dan mengisi denylist
 ```
 
 Lab end-to-end (build DEBUG; kartu diterbitkan backend dev, tanpa `lab_ca.py issue`):

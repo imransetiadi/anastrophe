@@ -1,10 +1,14 @@
 // Command anastrophe-registry adalah alat operator untuk registri kartu fisik (FR-52, ADR-0031),
-// persetujuan perangkat tambahan sebelum ada akun (ADR-0032), dan undangan sekali pakai (ADR-0033).
+// persetujuan perangkat tambahan sebelum ada akun (ADR-0032), undangan sekali pakai (ADR-0033), dan
+// siklus hidup kartu (FR-51, ADR-0036).
 //
 //	ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_REGISTRY_KEY=<32 byte hex> \
 //	  go -C backend run ./cmd/anastrophe-registry import --site <uuid> --file kartu.csv --operator <pegangan>
 //	go -C backend run ./cmd/anastrophe-registry approve|reject --card-instance <uuid> --operator <pegangan>
 //	go -C backend run ./cmd/anastrophe-registry invite --site <uuid> [--zones A;B | --card-file <berkas>|-] --operator <pegangan>
+//	go -C backend run ./cmd/anastrophe-registry list --site <uuid> [--status ACTIVE]
+//	go -C backend run ./cmd/anastrophe-registry suspend|resume --card-instance <uuid> --operator <pegangan>
+//	go -C backend run ./cmd/anastrophe-registry revoke --card-instance <uuid> [--reason <kode>] --operator <pegangan>
 //
 // CSV: tech,card_id,holder_contact,zones (zones = nama zona dipisah ";", dipetakan lewat kebijakan
 // gedung). Berkas kartu undangan berisi satu baris <tech>:<hex>; "-" membacanya dari stdin. Identitas
@@ -26,13 +30,14 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/imransetiadi/anastrophe/backend/internal/registry"
 	"github.com/imransetiadi/anastrophe/backend/internal/store"
 )
 
-const usage = "pemakaian: anastrophe-registry import --site <uuid> --file <csv> --operator <pegangan> | invite --site <uuid> [--zones A;B | --card-file <berkas>|-] [--ttl <hari>] [--link-base <url>] --operator <pegangan> | approve|reject --card-instance <uuid> --operator <pegangan>"
+const usage = "pemakaian: anastrophe-registry import --site <uuid> --file <csv> --operator <pegangan> | invite --site <uuid> [--zones A;B | --card-file <berkas>|-] [--ttl <hari>] [--link-base <url>] --operator <pegangan> | approve|reject|suspend|resume --card-instance <uuid> --operator <pegangan> | revoke --card-instance <uuid> [--reason <kode>] --operator <pegangan> | list --site <uuid> [--status <STATUS>]"
 
 func main() {
 	os.Exit(run(context.Background(), os.Args[1:], os.Stdout, os.Stderr, os.Getenv))
@@ -86,6 +91,10 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 		return 0
 	case "invite":
 		return invite(ctx, args[1:], stdout, stderr, getenv)
+	case "list":
+		return list(ctx, args[1:], stdout, stderr, getenv)
+	case "suspend", "resume", "revoke":
+		return lifecycle(ctx, args[0], args[1:], stdout, stderr, getenv)
 	case "approve", "reject":
 		fs := flag.NewFlagSet(args[0], flag.ContinueOnError)
 		fs.SetOutput(stderr)
@@ -281,6 +290,108 @@ func invite(ctx context.Context, args []string, stdout, stderr io.Writer, getenv
 	}
 	fmt.Fprintf(stdout, "berlaku sampai: %s\n", expiresAt.UTC().Format(time.RFC3339))
 	fmt.Fprintln(stdout, "Token hanya dicetak sekali; server menyimpan hash-nya saja.")
+	return 0
+}
+
+// list mencetak card instance satu gedung untuk operator (FR-50 sebagian): id, status, asal, kanal, dan
+// waktu dibuat. Tidak ada identitas kartu, kontak, id perangkat, maupun token.
+func list(ctx context.Context, args []string, stdout, stderr io.Writer, getenv func(string) string) int {
+	fail := func(err error) int {
+		fmt.Fprintln(stderr, "anastrophe-registry:", err)
+		return 2
+	}
+	fs := flag.NewFlagSet("list", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	site := fs.String("site", "", "UUID gedung")
+	status := fs.String("status", "", "filter status, mis. ACTIVE atau PENDING_APPROVAL")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	dsn := getenv("ANASTROPHE_DATABASE_URL")
+	if dsn == "" {
+		return fail(errors.New("ANASTROPHE_DATABASE_URL wajib diisi"))
+	}
+	db, err := store.Open(ctx, dsn)
+	if err != nil {
+		return fail(err)
+	}
+	defer db.Close()
+	cards, err := db.ListCardInstances(ctx, strings.ToLower(strings.TrimSpace(*site)), strings.ToUpper(strings.TrimSpace(*status)))
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return fail(errors.New("gedung tidak ditemukan"))
+	case errors.Is(err, store.ErrInvalidStatus):
+		return fail(errors.New("status tidak dikenal"))
+	case err != nil:
+		return fail(err)
+	}
+	tw := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "ID\tSTATUS\tASAL\tKANAL\tDIBUAT")
+	for _, c := range cards {
+		channels := strings.Join(c.Channels, ",")
+		if channels == "" {
+			channels = "-"
+		}
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", c.ID, c.Status, c.Origin, channels, c.CreatedAt.UTC().Format(time.RFC3339))
+	}
+	if err := tw.Flush(); err != nil {
+		return fail(err)
+	}
+	return 0
+}
+
+// lifecycle menjalankan suspend, resume, atau revoke untuk satu card instance (FR-51, ADR-0036).
+func lifecycle(ctx context.Context, action string, args []string, stdout, stderr io.Writer, getenv func(string) string) int {
+	fail := func(err error) int {
+		fmt.Fprintln(stderr, "anastrophe-registry:", err)
+		return 2
+	}
+	fs := flag.NewFlagSet(action, flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	id := fs.String("card-instance", "", "UUID card instance")
+	operator := fs.String("operator", "", "pegangan operator untuk audit (kode staf, bukan nama atau email)")
+	reason := "operator"
+	if action == "revoke" {
+		fs.StringVar(&reason, "reason", "operator", "kode alasan pencabutan [a-z_], mis. hilang atau pindah")
+	}
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	dsn := getenv("ANASTROPHE_DATABASE_URL")
+	if dsn == "" {
+		return fail(errors.New("ANASTROPHE_DATABASE_URL wajib diisi"))
+	}
+	db, err := store.Open(ctx, dsn)
+	if err != nil {
+		return fail(err)
+	}
+	defer db.Close()
+	instance := strings.ToLower(strings.TrimSpace(*id))
+	now := time.Now()
+	var verdict string
+	switch action {
+	case "suspend":
+		err, verdict = db.SuspendCard(ctx, instance, *operator, now), "ditangguhkan"
+	case "resume":
+		err, verdict = db.ResumeCard(ctx, instance, *operator, now), "dipulihkan"
+	default:
+		var n int
+		n, err = db.RevokeCardInstance(ctx, instance, reason, *operator, now)
+		verdict = fmt.Sprintf("dicabut (%d kredensial masuk denylist)", n)
+	}
+	switch {
+	case errors.Is(err, store.ErrInvalidOperator):
+		return fail(errors.New("--operator wajib diisi: [A-Za-z0-9._-], maksimal 64 karakter"))
+	case errors.Is(err, store.ErrInvalidReason):
+		return fail(errors.New("--reason harus kode [a-z_], maksimal 32 karakter"))
+	case errors.Is(err, store.ErrNotFound):
+		return fail(errors.New("card instance tidak ditemukan"))
+	case errors.Is(err, store.ErrInvalidTransition):
+		return fail(errors.New("status card instance tidak mengizinkan tindakan ini"))
+	case err != nil:
+		return fail(err)
+	}
+	fmt.Fprintf(stdout, "card instance %s %s\n", instance, verdict)
 	return 0
 }
 
