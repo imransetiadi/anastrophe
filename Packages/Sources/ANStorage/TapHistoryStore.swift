@@ -10,6 +10,8 @@ public protocol TapHistoryStore: Sendable {
     func entries(for cardID: UUID, since: Date) async throws -> [TapEntry]
     func purge(before: Date) async throws
     func removeAll(for cardID: UUID) async throws
+    /// Menghapus entri kartu yang sudah tidak ada di perangkat (M1).
+    func removeAll(except cardIDs: Set<UUID>) async throws
 }
 
 @Model
@@ -63,7 +65,8 @@ public actor SwiftDataTapHistoryStore: TapHistoryStore {
 
     public func entries(for cardID: UUID, since: Date) async throws -> [TapEntry] {
         let descriptor = FetchDescriptor<TapEntity>(predicate: #Predicate { $0.cardID == cardID && $0.date >= since }, sortBy: [SortDescriptor(\.date, order: .reverse)])
-        return try context.fetch(descriptor).map { try $0.entry() }
+        // Baris yang tak terbaca (mis. kanal dari build lain) dilewati, bukan menyembunyikan seluruh riwayat.
+        return try context.fetch(descriptor).compactMap { try? $0.entry() }
     }
 
     public func purge(before: Date) async throws {
@@ -73,6 +76,12 @@ public actor SwiftDataTapHistoryStore: TapHistoryStore {
 
     public func removeAll(for cardID: UUID) async throws {
         try context.delete(model: TapEntity.self, where: #Predicate { $0.cardID == cardID })
+        try context.save()
+    }
+
+    public func removeAll(except cardIDs: Set<UUID>) async throws {
+        let kept = Array(cardIDs)
+        try context.delete(model: TapEntity.self, where: #Predicate { !kept.contains($0.cardID) })
         try context.save()
     }
 }
@@ -121,4 +130,6 @@ public actor InMemoryTapHistoryStore: TapHistoryStore {
     public func purge(before: Date) async throws { items.removeAll { $0.date < before } }
 
     public func removeAll(for cardID: UUID) async throws { items.removeAll { $0.cardID == cardID } }
+
+    public func removeAll(except cardIDs: Set<UUID>) async throws { items.removeAll { !cardIDs.contains($0.cardID) } }
 }
