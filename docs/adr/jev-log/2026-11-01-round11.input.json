@@ -1,0 +1,35 @@
+{
+  "tool": "jev_decide",
+  "label": "D27-hapus-kartu-ditangguhkan",
+  "decision": "Should a card owner be able to delete a SUSPENDED card (FR-31), and when may the app delete a card locally without server confirmation?",
+  "candidates": [
+    {
+      "id": "revoke_suspended",
+      "description": "Challenge allowed for ACTIVE or SUSPENDED credentials (renewal still requires ACTIVE); DELETE accepts ACTIVE or SUSPENDED cards and revokes them; distinct 410 CARD-GONE only for cards already REVOKED/DELETED or unknown; the app deletes locally without confirmation only on that code and tries each credential first."
+    },
+    {
+      "id": "block_suspended",
+      "description": "Keep deletion ACTIVE-only; suspended cards show 'contact the building' and stay."
+    },
+    {
+      "id": "local_only_suspended",
+      "description": "Current behavior: app deletes locally on 409; the server card stays SUSPENDED and keeps its slot."
+    }
+  ],
+  "evidence_refs": [
+    "FR-31",
+    "FR-15",
+    "SDD §8.2",
+    "FR-42",
+    "FR-51",
+    "ADR-0026",
+    "review akhir hapus kartu I1"
+  ],
+  "priorities": "1) FR-31: deleting revokes on the server and frees the slot. 2) Never leave a server credential that could be resumed without its key. 3) Delete locally without confirmation only when the server says the card is gone. 4) Simple, consistent with ADR-0026.",
+  "requirements": [
+    "Deleting a suspended card revokes it on the server and frees the device's card slot.",
+    "The app deletes a card locally without server confirmation only when the server reports the card as already revoked or unknown.",
+    "No resumed card can reactivate a credential whose key the user deleted."
+  ],
+  "escalate_on_contradiction": true
+}

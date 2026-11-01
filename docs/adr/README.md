@@ -30,3 +30,5 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0024](0024-rantai-audit-per-gedung.md) | Rantai hash audit per gedung | Diterima | `per_site_chain` | 0.95 |
 | [ADR-0025](0025-audit-pseudonim-sejak-ditulis.md) | Audit pseudonim sejak ditulis | Diterima | `pseudonymous_at_write` | 0.96 |
 | [ADR-0026](0026-hapus-kartu-bukti-kepemilikan.md) | Hapus kartu dengan bukti kepemilikan kunci | Diterima | `pop_revoke` | 0.98 |
+| [ADR-0027](0027-hapus-kartu-ditangguhkan.md) | Kartu yang ditangguhkan bisa dihapus pemiliknya | Diterima | `revoke_suspended` | 0.94 |
+| [ADR-0028](0028-hapus-kartu-tanpa-kunci.md) | Kartu tanpa kunci dihapus lokal tanpa bukti | Diterima | `local_delete_no_proof` | 1.0 |

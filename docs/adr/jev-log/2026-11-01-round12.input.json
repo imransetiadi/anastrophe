@@ -1,0 +1,33 @@
+{
+  "tool": "jev_decide",
+  "label": "D28-hapus-kartu-tanpa-kunci",
+  "decision": "How should the app handle deleting a card whose credential private key is missing, when a proof of possession is impossible?",
+  "candidates": [
+    {
+      "id": "local_delete_no_proof",
+      "description": "Skip the server step and delete the record and card locally; ask for authentication when the device can authenticate, allow deletion without it when no passcode is set; tell the user honestly what remains on the server."
+    },
+    {
+      "id": "block_until_transfer",
+      "description": "Do not allow deletion without the key; direct the user to device transfer (FR-41)."
+    },
+    {
+      "id": "local_delete_require_auth",
+      "description": "Local deletion but always require authentication; blocked when no passcode is set."
+    }
+  ],
+  "evidence_refs": [
+    "ADR-0009",
+    "ADR-0026",
+    "FR-41",
+    "FR-31",
+    "review akhir hapus kartu I2"
+  ],
+  "priorities": "1) A user can always remove a card that can no longer be used. 2) No access is granted or kept. 3) Respect FR-31 authentication wherever possible. 4) Be honest about the server.",
+  "requirements": [
+    "A card whose key is gone can always be removed from the app, even when the device has no passcode.",
+    "Deleting such a card grants or keeps no access path.",
+    "When the device can authenticate, deletion still asks for authentication."
+  ],
+  "escalate_on_contradiction": true
+}

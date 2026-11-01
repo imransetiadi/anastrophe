@@ -1,0 +1,71 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "label": "D28-hapus-kartu-tanpa-kunci",
+  "recommendation": {
+    "selected": "local_delete_no_proof",
+    "escaped": false,
+    "confidence": 1.0,
+    "probabilities": {
+      "local_delete_no_proof": 1,
+      "block_until_transfer": 0,
+      "local_delete_require_auth": 0,
+      "ask_user": 0,
+      "investigate": 0,
+      "none": 0
+    },
+    "contradicted_requirements": []
+  },
+  "checks": [
+    {
+      "candidate": "local_delete_no_proof",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "local_delete_no_proof",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "local_delete_no_proof",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "block_until_transfer",
+      "requirement": 0,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "block_until_transfer",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "block_until_transfer",
+      "requirement": 2,
+      "answer": "unknown"
+    },
+    {
+      "candidate": "local_delete_require_auth",
+      "requirement": 0,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "local_delete_require_auth",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "local_delete_require_auth",
+      "requirement": 2,
+      "answer": "supported"
+    }
+  ],
+  "usage": {
+    "input_tokens": 2375,
+    "output_tokens": 458
+  },
+  "status": "≥ 0,80 → Diterima (ADR-0018)."
+}

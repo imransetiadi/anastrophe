@@ -1,0 +1,71 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "label": "D27-hapus-kartu-ditangguhkan",
+  "recommendation": {
+    "selected": "revoke_suspended",
+    "escaped": false,
+    "confidence": 0.94,
+    "probabilities": {
+      "revoke_suspended": 0.95,
+      "block_suspended": 0.02,
+      "local_only_suspended": 0,
+      "ask_user": 0.02,
+      "investigate": 0,
+      "none": 0.01
+    },
+    "contradicted_requirements": []
+  },
+  "checks": [
+    {
+      "candidate": "revoke_suspended",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "revoke_suspended",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "revoke_suspended",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "block_suspended",
+      "requirement": 0,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "block_suspended",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "block_suspended",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "local_only_suspended",
+      "requirement": 0,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "local_only_suspended",
+      "requirement": 1,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "local_only_suspended",
+      "requirement": 2,
+      "answer": "contradicted"
+    }
+  ],
+  "usage": {
+    "input_tokens": 2574,
+    "output_tokens": 464
+  },
+  "status": "≥ 0,80 → Diterima (ADR-0018)."
+}
