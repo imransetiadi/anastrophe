@@ -100,5 +100,87 @@ struct KeysViewModelTests {
         await model.load()
         #expect(model.history(for: card).count == 25)
     }
+
+    @Test func daftarTampilSebelumRiwayatSelesai() async throws {
+        // M2: daftar kartu tidak menunggu riwayat (NFR-P03); riwayat menyusul.
+        let base = AppServices.inMemory()
+        let card = Card(id: UUID(), name: "Lobi", siteName: "Menara A", zones: [], status: .active, credentials: [:], notAfter: nil)
+        try await base.cards.add(card)
+        let history = GatedTapHistoryStore()
+        let services = AppServices(cards: base.cards, keys: base.keys, records: base.records, availability: { [:] }, launcher: SpyLauncher(), foreground: ForegroundState(), authenticator: ImmediateAuthenticator(), tapHistory: history)
+        let model = KeysViewModel(services: services)
+        let loading = Task { await model.load() }
+        var requests = history.requested.makeAsyncIterator()
+        _ = await requests.next()
+        #expect(!model.isLoading)
+        #expect(model.cards.map(\.id) == [card.id])
+        await history.open()
+        await loading.value
+    }
+
+    @Test func riwayatYatimDibersihkanSaatMuat() async throws {
+        // M1: riwayat kartu yang sudah tidak ada (hapus terputus) dibersihkan saat daftar dimuat.
+        let services = AppServices.inMemory()
+        let card = Card(id: UUID(), name: "Lobi", siteName: "Menara A", zones: [], status: .active, credentials: [:], notAfter: nil)
+        try await services.cards.add(card)
+        let orphan = UUID()
+        try await services.tapHistory.append(TapEntry(cardID: card.id, date: .now.addingTimeInterval(-60), channel: .ble, granted: true, denyReason: nil))
+        try await services.tapHistory.append(TapEntry(cardID: orphan, date: .now.addingTimeInterval(-60), channel: .ble, granted: true, denyReason: nil))
+        let model = KeysViewModel(services: services)
+        await model.load()
+        #expect(try await services.tapHistory.entries(for: orphan, since: .distantPast).isEmpty)
+        #expect(try await services.tapHistory.entries(for: card.id, since: .distantPast).count == 1)
+    }
+
+    @Test func gagalMuatKartuTidakMenghapusRiwayat() async throws {
+        // Review Focus 1: daftar kosong karena galat bukan berarti semua kartu sudah dihapus.
+        let base = AppServices.inMemory()
+        let history = InMemoryTapHistoryStore()
+        let card = UUID()
+        try await history.append(TapEntry(cardID: card, date: .now.addingTimeInterval(-60), channel: .ble, granted: true, denyReason: nil))
+        let services = AppServices(cards: FailingCardStore(), keys: base.keys, records: base.records, availability: { [:] }, launcher: SpyLauncher(), foreground: ForegroundState(), authenticator: ImmediateAuthenticator(), tapHistory: history)
+        let model = KeysViewModel(services: services)
+        await model.load()
+        #expect(try await history.entries(for: card, since: .distantPast).count == 1)
+    }
 }
 
+/// Store riwayat yang menahan `entries(for:since:)` sampai dibuka, untuk menguji urutan muat.
+actor GatedTapHistoryStore: TapHistoryStore {
+    let requested: AsyncStream<Void>
+    private let signal: AsyncStream<Void>.Continuation
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var isOpen = false
+
+    init() {
+        let (stream, continuation) = AsyncStream.makeStream(of: Void.self)
+        requested = stream
+        signal = continuation
+    }
+
+    func open() {
+        isOpen = true
+        waiters.forEach { $0.resume() }
+        waiters.removeAll()
+    }
+
+    func append(_ entry: TapEntry) async throws {}
+
+    func entries(for cardID: UUID, since: Date) async throws -> [TapEntry] {
+        signal.yield()
+        if !isOpen { await withCheckedContinuation { waiters.append($0) } }
+        return []
+    }
+
+    func purge(before: Date) async throws {}
+    func removeAll(for cardID: UUID) async throws {}
+    func removeAll(except cardIDs: Set<UUID>) async throws {}
+}
+
+/// Store kartu yang selalu gagal dibaca.
+struct FailingCardStore: CardStore {
+    func all() async throws -> [Card] { throw ANError.internalError }
+    func add(_ card: Card) async throws { throw ANError.internalError }
+    func update(_ card: Card) async throws { throw ANError.internalError }
+    func remove(id: UUID) async throws { throw ANError.internalError }
+}

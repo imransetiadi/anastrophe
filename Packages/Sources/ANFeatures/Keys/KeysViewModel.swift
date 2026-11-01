@@ -34,7 +34,8 @@ public final class KeysViewModel {
     public var canAddCard: Bool { CardLimit.canAddCard(currentCount: cards.count) }
 
     public func load() async {
-        let stored = (try? await services.cards.all()) ?? []
+        let loadedCards = try? await services.cards.all()
+        let stored = loadedCards ?? []
         let reconciled = RestoreCheck.reconcile(stored, keys: services.keys).map(expiryFromRecord)
         for (old, new) in zip(stored, reconciled) where old != new {
             try? await services.cards.update(new)
@@ -45,14 +46,19 @@ public final class KeysViewModel {
         }.map(\.id))
         availability = await services.availability()
         isOnline = services.connectivity.isOnline
+        isLoading = false  // daftar tampil dulu (NFR-P03); riwayat menyusul
         let cutoff = Date.now.addingTimeInterval(-Self.historyRetention)
         try? await services.tapHistory.purge(before: cutoff)
+        if loadedCards != nil {
+            // Riwayat kartu yang sudah tidak ada (mis. hapus yang terputus) dibersihkan; daftar kosong
+            // karena galat baca tidak dihitung sebagai "semua kartu dihapus".
+            try? await services.tapHistory.removeAll(except: Set(reconciled.map(\.id)))
+        }
         var loaded: [Card.ID: [TapEntry]] = [:]
         for card in reconciled {
             loaded[card.id] = (try? await services.tapHistory.entries(for: card.id, since: cutoff)) ?? []
         }
         histories = loaded
-        isLoading = false
     }
 
     /// Record kredensial adalah sumber kebenaran masa berlaku (perpanjangan memperbarui record

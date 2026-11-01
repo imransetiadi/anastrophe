@@ -153,9 +153,12 @@ struct RemoveCardServiceTests {
         // Review Focus 2 (FR-30/FR-31): riwayat tap ikut terhapus bersama kartunya.
         let services = AppServices.inMemory()
         let card = try await labCard(in: services)
+        let other = UUID()
         try await services.tapHistory.append(TapEntry(cardID: card.id, date: .now, channel: .ble, granted: true, denyReason: nil))
+        try await services.tapHistory.append(TapEntry(cardID: other, date: .now, channel: .ble, granted: true, denyReason: nil))
         try await services.removeCard(card)
         #expect(try await services.tapHistory.entries(for: card.id, since: .distantPast).isEmpty)
+        #expect(try await services.tapHistory.entries(for: other, since: .distantPast).count == 1)  // kartu lain utuh
     }
 
     @Test func hapusKartuButuhAutentikasi() async throws {
