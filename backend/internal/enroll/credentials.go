@@ -51,6 +51,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	httpapi.Route(mux, http.MethodPost, "/v1/enrollments/{id}/credentials", h.issueCredential)
 	httpapi.Route(mux, http.MethodPost, "/v1/credentials/{action}", h.credentialAction)
 	httpapi.Route(mux, http.MethodDelete, "/v1/cards/{id}", h.deleteCard)
+	httpapi.Route(mux, http.MethodGet, "/v1/cards/{id}/status", h.cardStatus)
 }
 
 // validIdempotencyKey: klien mengirim UUID; batasi ke [A-Za-z0-9_-]{1,128} agar byte aneh
@@ -236,7 +237,12 @@ func (h *Handler) issueCredential(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	// Hash atas isi yang sudah dinormalkan, bukan byte mentah: urutan kunci JSON dari klien
 	// (mis. dictionary Swift) bisa berbeda antar-retry.
-	hash := sha256.Sum256([]byte(r.URL.Path + "\n" + req.Channel + "\n" + base64.StdEncoding.EncodeToString(req.PublicKey)))
+	material := r.URL.Path + "\n" + req.Channel + "\n" + base64.StdEncoding.EncodeToString(req.PublicKey)
+	if req.StatusTokenHash != nil {
+		// Hanya bila ada, agar hash permintaan klien lama tidak berubah (ADR-0037).
+		material += "\n" + base64.StdEncoding.EncodeToString(req.StatusTokenHash)
+	}
+	hash := sha256.Sum256([]byte(material))
 	status, resp, err := h.Store.Idempotent(r.Context(), key, hash[:], func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
 		return h.issue(ctx, tx, id, req)
 	})
@@ -257,13 +263,16 @@ type provisioned struct {
 type credentialRequest struct {
 	Channel   string
 	PublicKey []byte
+	// StatusTokenHash: SHA-256 token baca status dari app (ADR-0037), opsional untuk klien lama.
+	StatusTokenHash []byte
 }
 
 // parseCredentialRequest memvalidasi isi permintaan sebelum menyentuh database.
 func parseCredentialRequest(body []byte) (credentialRequest, *httpapi.Problem) {
 	var raw struct {
-		Channel   string `json:"channel"`
-		PublicKey string `json:"public_key"`
+		Channel         string  `json:"channel"`
+		PublicKey       string  `json:"public_key"`
+		StatusTokenHash *string `json:"status_token_hash"`
 	}
 	if err := json.Unmarshal(body, &raw); err != nil {
 		p := problem("REQ-INVALID", http.StatusBadRequest)
@@ -282,7 +291,12 @@ func parseCredentialRequest(body []byte) (credentialRequest, *httpapi.Problem) {
 		p := problem("ENR-INVALID-KEY", http.StatusBadRequest)
 		return credentialRequest{}, &p
 	}
-	return credentialRequest{Channel: raw.Channel, PublicKey: pub}, nil
+	tokenHash, ok := parseStatusTokenHash(raw.StatusTokenHash)
+	if !ok {
+		p := problem("REQ-INVALID", http.StatusBadRequest)
+		return credentialRequest{}, &p
+	}
+	return credentialRequest{Channel: raw.Channel, PublicKey: pub, StatusTokenHash: tokenHash}, nil
 }
 
 // issue mengembalikan (status, body JSON); error hanya untuk kegagalan infrastruktur.
@@ -337,6 +351,11 @@ func (h *Handler) issue(ctx context.Context, tx *store.Tx, enrollmentID string, 
 		CardInstanceID: enrollment.ID, Channel: req.Channel, CredID: credID, PubKey: pub, Cert: cert, NotAfter: notAfter,
 	}); err != nil {
 		return 0, nil, err
+	}
+	if req.StatusTokenHash != nil {
+		if err := tx.SetStatusTokenHash(ctx, enrollment.ID, req.StatusTokenHash); err != nil {
+			return 0, nil, err
+		}
 	}
 	if err := tx.AppendAudit(ctx, credentialAudit("credential.provisioned", enrollment, credID, req.Channel, notAfter, notBefore)); err != nil {
 		return 0, nil, err
