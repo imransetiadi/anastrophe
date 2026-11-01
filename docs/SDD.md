@@ -39,6 +39,7 @@
 | 2.23 | 2026-11-02 | Review akhir Bantuan: laporan diagnostik memuat status penyimpanan dan "tidak terbaca" saat kartu gagal dibaca; status cara akses tidak menyalahkan iPhone/wilayah untuk penyebab dari build atau program; rujukan bukti Bluetooth (§5.9). |
 | 2.24 | 2026-11-02 | Kebijakan gedung (ADR-0049): `policy.channels` dan masa berlaku lewat CLI `policy`; kanal efektif gedung di lookup kode gedung dan respons enrolment; provisioning menolak kanal di luar kebijakan sesudah rahasia diperiksa; app memilih kanal yang diizinkan (§8.1, §8.5, §15). |
 | 2.25 | 2026-11-02 | Review akhir kebijakan gedung: `policy.channels` yang bukan array tidak lagi menggagalkan lookup/enrolment/hapus kartu (null = tanpa pembatasan, bentuk lain = tidak ada kanal); CLI membaca dengan SQL yang sama dengan server; galat app kanal gedung dibedakan antara penyebab perangkat dan bukan perangkat (§8.1, §15). |
+| 2.26 | 2026-11-02 | CLI `list` dengan filter kanal (`--channel`, kredensial ACTIVE/SUSPENDED) dan pencarian awalan id card instance (`--id`), digabung AND, tanpa pola `LIKE` dari masukan (FR-50, ADR-0050). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
