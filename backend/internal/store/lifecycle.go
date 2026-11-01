@@ -7,6 +7,7 @@ import (
 	"errors"
 	"regexp"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -155,11 +156,39 @@ func (t *Tx) revokeInstance(ctx context.Context, cardID, reason string, now time
 // ListCardInstances mendaftar card instance satu gedung untuk operator, terurut waktu dibuat; status
 // kosong berarti semua.
 func (s *Store) ListCardInstances(ctx context.Context, siteID, status string) ([]CardInstanceSummary, error) {
+	return s.ListCardInstancesFiltered(ctx, siteID, CardInstanceFilter{Status: status})
+}
+
+// ErrInvalidFilter: kanal di luar ble/nfcHCE atau awalan id yang bukan karakter id card instance.
+var ErrInvalidFilter = errors.New("store: filter daftar tidak valid")
+
+// idPrefix: awalan id card instance (UUID huruf kecil); karakter lain ditolak sehingga masukan tidak pernah
+// menjadi pola LIKE (ADR-0050).
+var idPrefix = regexp.MustCompile(`^[0-9a-f-]{1,36}$`)
+
+// CardInstanceFilter menyaring daftar card instance (FR-50); kolom kosong berarti tanpa filter, dan semua
+// filter digabung AND.
+type CardInstanceFilter struct {
+	Status   string
+	Channel  string
+	IDPrefix string
+}
+
+// ListCardInstancesFiltered mendaftar card instance gedung dengan filter status, kanal (kredensial ACTIVE
+// atau SUSPENDED, sama dengan kolom kanal), dan awalan id. Tanpa identitas kartu atau kontak (aturan 6).
+func (s *Store) ListCardInstancesFiltered(ctx context.Context, siteID string, f CardInstanceFilter) ([]CardInstanceSummary, error) {
 	if !looksLikeUUID(siteID) {
 		return nil, ErrNotFound
 	}
-	if status != "" && !slices.Contains(cardStatuses, status) {
+	if f.Status != "" && !slices.Contains(cardStatuses, f.Status) {
 		return nil, ErrInvalidStatus
+	}
+	if f.Channel != "" && !slices.Contains(policyChannels, f.Channel) {
+		return nil, ErrInvalidFilter
+	}
+	prefix := strings.ToLower(f.IDPrefix)
+	if f.IDPrefix != "" && !idPrefix.MatchString(prefix) {
+		return nil, ErrInvalidFilter
 	}
 	var exists bool
 	if err := s.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM sites WHERE id = $1)`, siteID).Scan(&exists); err != nil {
@@ -175,7 +204,9 @@ func (s *Store) ListCardInstances(ctx context.Context, siteID, status string) ([
 		       ci.created_at
 		FROM card_instances ci
 		WHERE ci.site_id = $1 AND ($2 = '' OR ci.status = $2)
-		ORDER BY ci.created_at, ci.id`, siteID, status)
+		  AND ($3 = '' OR EXISTS (SELECT 1 FROM credentials c WHERE c.card_instance_id = ci.id AND c.channel = $3 AND c.status IN ('ACTIVE', 'SUSPENDED')))
+		  AND ($4 = '' OR left(ci.id::text, length($4)) = $4)
+		ORDER BY ci.created_at, ci.id`, siteID, f.Status, f.Channel, prefix)
 	if err != nil {
 		return nil, err
 	}

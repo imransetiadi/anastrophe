@@ -41,7 +41,7 @@ import (
 	"github.com/imransetiadi/anastrophe/backend/internal/store"
 )
 
-const usage = "pemakaian: anastrophe-registry import --site <uuid> --file <csv> --operator <pegangan> | invite --site <uuid> [--zones A;B | --card-file <berkas>|-] [--ttl <hari>] [--link-base <url>] --operator <pegangan> | approve|reject|suspend|resume --card-instance <uuid> --operator <pegangan> | revoke --card-instance <uuid> [--reason <kode>] --operator <pegangan> | list --site <uuid> [--status <STATUS>] | site-code --site <uuid> --operator <pegangan> | policy --site <uuid> [--cert-validity-days <1-30>] [--channels ble,nfcHCE|semua] [--operator <pegangan>]"
+const usage = "pemakaian: anastrophe-registry import --site <uuid> --file <csv> --operator <pegangan> | invite --site <uuid> [--zones A;B | --card-file <berkas>|-] [--ttl <hari>] [--link-base <url>] --operator <pegangan> | approve|reject|suspend|resume --card-instance <uuid> --operator <pegangan> | revoke --card-instance <uuid> [--reason <kode>] --operator <pegangan> | list --site <uuid> [--status <STATUS>] [--channel ble|nfcHCE] [--id <awalan>] | site-code --site <uuid> --operator <pegangan> | policy --site <uuid> [--cert-validity-days <1-30>] [--channels ble,nfcHCE|semua] [--operator <pegangan>]"
 
 func main() {
 	os.Exit(run(context.Background(), os.Args[1:], os.Stdout, os.Stderr, os.Getenv))
@@ -320,6 +320,8 @@ func list(ctx context.Context, args []string, stdout, stderr io.Writer, getenv f
 	fs.SetOutput(stderr)
 	site := fs.String("site", "", "UUID gedung")
 	status := fs.String("status", "", "filter status, mis. ACTIVE atau PENDING_APPROVAL")
+	channel := fs.String("channel", "", "filter kanal kredensial aktif: ble atau nfcHCE")
+	id := fs.String("id", "", "awalan id card instance")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -332,8 +334,14 @@ func list(ctx context.Context, args []string, stdout, stderr io.Writer, getenv f
 		return fail(err)
 	}
 	defer db.Close()
-	cards, err := db.ListCardInstances(ctx, strings.ToLower(strings.TrimSpace(*site)), strings.ToUpper(strings.TrimSpace(*status)))
+	cards, err := db.ListCardInstancesFiltered(ctx, strings.ToLower(strings.TrimSpace(*site)), store.CardInstanceFilter{
+		Status: strings.ToUpper(strings.TrimSpace(*status)), Channel: strings.TrimSpace(*channel), IDPrefix: strings.TrimSpace(*id),
+	})
 	switch {
+	case errors.Is(err, store.ErrInvalidFilter) && strings.TrimSpace(*id) != "" && !validIDPrefix(*id):
+		return fail(errors.New("--id harus awalan id card instance (0-9, a-f, -), maksimal 36 karakter"))
+	case errors.Is(err, store.ErrInvalidFilter):
+		return fail(errors.New("kanal harus ble atau nfcHCE"))
 	case errors.Is(err, store.ErrNotFound):
 		return fail(errors.New("gedung tidak ditemukan"))
 	case errors.Is(err, store.ErrInvalidStatus):
@@ -536,6 +544,20 @@ func policy(ctx context.Context, args []string, stdout, stderr io.Writer, getenv
 	}
 	fmt.Fprintf(stdout, "zona: %d\n", current.ZoneCount)
 	return 0
+}
+
+// validIDPrefix: awalan id yang diterima list (sama dengan store), untuk memilih pesan galat yang tepat.
+func validIDPrefix(s string) bool {
+	s = strings.ToLower(strings.TrimSpace(s))
+	if s == "" || len(s) > 36 {
+		return false
+	}
+	for _, r := range s {
+		if !(r >= '0' && r <= '9' || r >= 'a' && r <= 'f' || r == '-') {
+			return false
+		}
+	}
+	return true
 }
 
 // readCardIdentity membaca satu baris <tech>:<hex> dari berkas, atau dari stdin bila path "-". Nilai

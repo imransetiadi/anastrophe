@@ -321,3 +321,71 @@ func TestStatusKartuDenganToken(t *testing.T) {
 		t.Fatalf("setelah revoke: %q %v", status, err)
 	}
 }
+
+func filteredIDs(t *testing.T, s *Store, site string, f CardInstanceFilter) []string {
+	t.Helper()
+	list, err := s.ListCardInstancesFiltered(context.Background(), site, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := []string{}
+	for _, c := range list {
+		ids = append(ids, c.ID)
+	}
+	return ids
+}
+
+func TestFilterDaftarKanalDanAwalan(t *testing.T) {
+	// FR-50 (ADR-0050): filter kanal dan awalan id digabung AND dengan status.
+	s := freshStore(t)
+	site, _ := registrySite(t, s)
+	_, bleID, _ := activeCardOn(t, s, site, "A", "ble")
+	_, hceID, _ := activeCardOn(t, s, site, "B", "nfcHCE")
+	for _, c := range []struct {
+		name string
+		f    CardInstanceFilter
+		want []string
+	}{
+		{"kanal ble", CardInstanceFilter{Channel: "ble"}, []string{bleID}},
+		{"kanal nfcHCE", CardInstanceFilter{Channel: "nfcHCE"}, []string{hceID}},
+		{"awalan huruf besar", CardInstanceFilter{IDPrefix: strings.ToUpper(hceID[:8])}, []string{hceID}},
+		{"kanal dan awalan lain", CardInstanceFilter{Channel: "ble", IDPrefix: hceID[:8]}, []string{}},
+		{"status dan kanal", CardInstanceFilter{Status: "ACTIVE", Channel: "nfcHCE"}, []string{hceID}},
+		{"id lengkap", CardInstanceFilter{IDPrefix: bleID}, []string{bleID}},
+	} {
+		if got := filteredIDs(t, s, site, c.f); !slices.Equal(got, c.want) {
+			t.Fatalf("%s: %v, ingin %v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestFilterDaftarMenolakPolaLike(t *testing.T) {
+	// Review Focus 1: masukan tidak pernah menjadi pola LIKE.
+	s := freshStore(t)
+	site, _ := registrySite(t, s)
+	ctx := context.Background()
+	for _, bad := range []CardInstanceFilter{
+		{IDPrefix: "%"}, {IDPrefix: "_"}, {IDPrefix: "a%"}, {IDPrefix: "zz"}, {IDPrefix: strings.Repeat("a", 37)}, {IDPrefix: "a b"},
+		{Channel: "wallet"}, {Channel: "BLE "},
+	} {
+		if _, err := s.ListCardInstancesFiltered(ctx, site, bad); !errors.Is(err, ErrInvalidFilter) {
+			t.Fatalf("%+v: %v, ingin ErrInvalidFilter", bad, err)
+		}
+	}
+}
+
+func TestFilterKanalAbaikanKredensialDicabut(t *testing.T) {
+	// Review Focus 3: kanal mengikuti kredensial ACTIVE/SUSPENDED, bukan yang dicabut.
+	s := freshStore(t)
+	site, _ := registrySite(t, s)
+	_, id, _ := activeCardOn(t, s, site, "A", "ble")
+	if _, err := s.RevokeCardInstance(context.Background(), id, "hilang", "staf-01", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if got := filteredIDs(t, s, site, CardInstanceFilter{Channel: "ble"}); len(got) != 0 {
+		t.Fatalf("kartu dicabut masih muncul untuk kanal ble: %v", got)
+	}
+	if got := filteredIDs(t, s, site, CardInstanceFilter{IDPrefix: id[:8]}); !slices.Equal(got, []string{id}) {
+		t.Fatalf("awalan: %v", got)
+	}
+}

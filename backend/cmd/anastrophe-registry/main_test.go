@@ -823,3 +823,50 @@ func TestPolicyTanpaKanalDiperingatkan(t *testing.T) {
 		t.Fatalf("tanpa catatan irisan kanal:\n%s", out.String())
 	}
 }
+
+func TestListFilterKanalDanId(t *testing.T) {
+	// FR-50 (ADR-0050).
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	withBLE := activeInstance(t, db, site)
+	device, err := db.CreateDevice(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pending, err := db.StartEnrollment(ctx, device, site, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out, errOut bytes.Buffer
+	if code := run(ctx, []string{"list", "--site", site, "--channel", "ble"}, &out, &errOut, env(dsn)); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	if !strings.Contains(out.String(), withBLE) || strings.Contains(out.String(), pending) {
+		t.Fatalf("filter kanal:\n%s", out.String())
+	}
+	out.Reset()
+	if code := run(ctx, []string{"list", "--site", site, "--id", strings.ToUpper(pending[:8])}, &out, &errOut, env(dsn)); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	if !strings.Contains(out.String(), pending) || strings.Contains(out.String(), withBLE) {
+		t.Fatalf("filter id:\n%s", out.String())
+	}
+}
+
+func TestListFilterTidakValid(t *testing.T) {
+	db, dsn := freshStore(t)
+	site := siteWithZones(t, db)
+	for _, c := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"list", "--site", site, "--channel", "wallet"}, "kanal harus ble atau nfcHCE"},
+		{[]string{"list", "--site", site, "--id", "%"}, "--id harus awalan id card instance"},
+	} {
+		var out, errOut bytes.Buffer
+		if code := run(context.Background(), c.args, &out, &errOut, env(dsn)); code != 2 || !strings.Contains(errOut.String(), c.want) {
+			t.Fatalf("%v: exit %d err %q", c.args, code, errOut.String())
+		}
+	}
+}
