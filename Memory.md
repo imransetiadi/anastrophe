@@ -11,12 +11,13 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 
 ## Status terkini
 
-- Branch kerja: `feat/r1-scaffold`, satu-satunya branch lokal; belum di-merge dan belum di-push.
-- Suite terakhir: Swift host 235 test (1 dilewati, tanpa gagal) dan simulator 233 test (1 dilewati). Backend Go 7 paket lulus pada iterasi hapus kartu; belum ada perubahan backend sejak itu.
+- Branch kerja: `feat/r1-scaffold`, di-push ke GitHub private `imransetiadi/anastrophe` (origin) atas permintaan pengguna; belum di-merge.
+- Suite terakhir: Swift host 242 test (1 dilewati, tanpa gagal) dan simulator 240 test (1 dilewati). Backend Go 7 paket lulus pada iterasi hapus kartu; belum ada perubahan backend sejak itu.
 - Menunggu keputusan pengguna:
+  - Klarifikasi ADR-0001: kalimat Keputusan kini "meng-clone UID/data sektor" (perubahan pengguna), bertentangan dengan judul dan Konteks ADR itu, CLAUDE.md aturan 1, serta PRD NG1/FR-11. Implementasi tetap mengikuti aturan 1 sampai CLAUDE.md diubah.
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
   - Tinjauan 5 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap (`docs/adr/jev-log/*-gate.json`).
-  - Integrasi branch: merge ke `main` atau push + PR.
+  - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
 
 ### Ringkasan kemampuan
@@ -30,6 +31,29 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Audit | Rantai hash per gedung, append-only, pseudonim sejak ditulis, perintah `anastrophe-audit` | ADR-0024, ADR-0025 |
 | Hapus kartu | Bukti kepemilikan, kartu ditangguhkan, kartu tanpa kunci | ADR-0026, ADR-0027, ADR-0028, FR-31 |
 | Riwayat tap | Log lokal 30 hari: lima terbaru di detail, "Lihat semua" ke riwayat penuh, store pulih sendiri bila rusak | FR-30, ADR-0029, ADR-0030 |
+
+## DOC-2026-11-01-1843 - Minor riwayat tap, fokus registri (ADR-0031/0032), draf spesifikasi registri, push ke GitHub (Sebagian; review akhir minor masih berjalan)
+
+Minor riwayat tap (rencana `docs/superpowers/plans/2026-11-01-riwayat-tap-minor.md`) di commit `e6b0544`, `f899544`, `33e1103`, `97e8216`:
+- Baris riwayat yang tak terbaca dilewati.
+- Entri kartu yang sudah tidak ada dibersihkan saat daftar dimuat, hanya bila kartu berhasil dibaca.
+- Daftar kartu tampil sebelum riwayat selesai dimuat.
+- `switch` pencatat dibuat exhaustive, dengan test urutan simpan-lalu-teruskan dan test batal di background lewat wrapper.
+- Badge status tidak lagi terpotong ("Ac-tive") pada AX5, memakai `AnyLayout` seperti `CardRow`.
+
+Bukti: RED lalu GREEN atau uji mutasi untuk setiap perubahan. Host 242 test (1 dilewati), simulator 240 (`TEST SUCCEEDED`, 1 dilewati). Screenshot AX5 dan ukuran standar sudah diperiksa. M8 diputuskan tidak dikerjakan (ruling di ledger). Review akhir subagent masih berjalan; perbaikannya menyusul di entri berikutnya.
+
+Keputusan JEV:
+- ADR-0031 `registry_enrolment_server` (0,88): iterasi berikutnya adalah registri kartu fisik dan pencocokan enrolment di server.
+- ADR-0032 `pending_for_additional` (0,71, provisional): sebelum ada akun, perangkat pertama mendapat `PROVISIONING` dan perangkat tambahan `PENDING_APPROVAL` (disetujui lewat CLI operator).
+
+Draf spesifikasi: `docs/superpowers/specs/2026-11-01-registri-kartu-design.md`.
+
+ADR-0001: perubahan dari pengguna, disetujui eksplisit, ikut di-commit. Kalimat Keputusan kini berbunyi "meng-clone UID/data sektor kartu fisik", sehingga bertentangan dengan judul dan Konteks ADR itu, CLAUDE.md aturan 1, serta PRD NG1/FR-11. Hal ini masuk daftar klarifikasi.
+
+Push pertama ke GitHub private `imransetiadi/anastrophe`, branch `feat/r1-scaffold`, atas permintaan pengguna. Seluruh riwayat dipindai lebih dulu: tanpa private key, token, `.p8`/`.p12`/`.env`, maupun `Local.xcconfig`.
+
+Obsidian: `sessions/2026-11-01-minor-riwayat-tap-dan-registri.md`, `decisions/ADR-0031-fokus-registri-enrolment-server.md`, `decisions/ADR-0032-perangkat-tambahan-menunggu-persetujuan.md`, dan MOC.
 
 ## IOS-2026-11-01-1820 - Perbaikan review riwayat tap: store pulih sendiri dan "Lihat semua" (Selesai, commit lokal; gate tereskalasi)
 

@@ -1,0 +1,40 @@
+{
+  "tool": "jev_decide",
+  "label": "D31-fokus-iterasi-registri",
+  "decision": "Which work should the next autonomous iteration of the Anastrophe build focus on, given that no user decisions, Apple developer team, iPhone, or reader hardware are available right now?",
+  "candidates": [
+    {
+      "id": "registry_enrolment_server",
+      "description": "Server-side physical-card registry and enrolment matching (FR-11 server side, FR-13 reasons): physical_cards with per-site HMAC of the card identity, operator CLI import that stores only HMACs, POST /v1/enrollments matching with CARD_NOT_REGISTERED and related reasons; roles and ownership follow once accounts exist."
+    },
+    {
+      "id": "account_foundation",
+      "description": "Account foundation (FR-03): users table, Sign in with Apple identity-token verification behind an interface with a dev fake, OTP send/verify behind a pluggable provider with a dev provider, and session tokens; real providers configured later."
+    },
+    {
+      "id": "admin_actions_cli",
+      "description": "Admin credential actions (FR-51 approve/suspend/resume/revoke) and denylist entries in a service layer exercised through an operator CLI, with audit events; the admin HTTP API and RBAC come later when an admin IdP is chosen."
+    },
+    {
+      "id": "hardening_minor_sweep",
+      "description": "Close the deferred minor findings from earlier plans (challenge-table growth and status leak, server channel check, Swift 6 data-race warning, devseed guard, provisioning blocking the list, test gaps), each with a failing test first."
+    }
+  ],
+  "evidence_refs": [
+    "SDD §8.1",
+    "SDD §8.4.1",
+    "FR-03",
+    "FR-11",
+    "FR-13",
+    "FR-51",
+    "CLAUDE.md aturan 1 dan 6",
+    "ledger minor tertunda"
+  ],
+  "priorities": "1) Progress on the R1 pilot critical path (enrolment via physical card, ownership and security code, accounts, admin actions). 2) Completable and verifiable now with automated tests on host, simulator and local PostgreSQL, without hardware, an Apple team, or external providers. 3) Low risk of building on assumptions that a pending user decision or a future provider choice would invalidate. 4) Security and correctness of what already exists.",
+  "requirements": [
+    "Can be completed and verified with automated tests on the host, the simulator, and local PostgreSQL only.",
+    "Does not depend on the pending user decisions ADR-0017 or ADR-0022 or on an external provider choice.",
+    "Moves at least one P0 requirement of the R1 pilot closer to done."
+  ],
+  "escalate_on_contradiction": true
+}

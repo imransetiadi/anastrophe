@@ -1,0 +1,39 @@
+{
+  "tool": "jev_decide",
+  "label": "D32-perangkat-tambahan-sebelum-akun",
+  "decision": "Until accounts, holder contact matching and memberships exist, what should POST /v1/enrollments do when a device presents the identity of a registered physical card, especially when another device already holds an active card instance for that same physical card?",
+  "candidates": [
+    {
+      "id": "allow_any_holder",
+      "description": "Any device presenting a registered card identity gets a PROVISIONING card instance, as the tracer does today; ownership checks arrive with accounts."
+    },
+    {
+      "id": "first_device_only",
+      "description": "The first device to enrol a physical card gets PROVISIONING; other devices get 409 ENR-ALREADY-CLAIMED while an active card instance exists for that card, until memberships exist. The same device may enrol again after deleting its card."
+    },
+    {
+      "id": "pending_for_additional",
+      "description": "The first device gets PROVISIONING; additional devices get a PENDING_APPROVAL card instance that an operator CLI command can approve or reject, until memberships and security codes exist."
+    },
+    {
+      "id": "pending_approval_all",
+      "description": "Every card enrolment becomes PENDING_APPROVAL until accounts and holder matching exist; an operator CLI command approves; the lab seeding approves automatically."
+    }
+  ],
+  "evidence_refs": [
+    "ADR-0004",
+    "ADR-0005",
+    "ADR-0010",
+    "ADR-0023",
+    "SDD §8.4.1",
+    "FR-03",
+    "FR-15"
+  ],
+  "priorities": "1) Never grant access more widely than the SDD target model would (ADR-0004: card possession alone is weak proof; additional holders need the owner's code or an approval). 2) Keep the first enrolment and the lab end-to-end flow usable without accounts or an admin portal. 3) Converge naturally onto the SDD 8.4.1 outcomes when accounts land, so later work only adds checks. 4) Minimal interim code.",
+  "requirements": [
+    "A second device that only had brief physical access to an already-enrolled card cannot obtain an active credential without an additional check.",
+    "The first enrolment of a registered card can complete end to end without accounts or an admin portal.",
+    "The interim outcome maps directly onto one of the SDD 8.4.1 outcomes (PRIMARY, PENDING_APPROVAL, MEMBER_CANDIDATE) so that later account work only adds checks."
+  ],
+  "escalate_on_contradiction": true
+}

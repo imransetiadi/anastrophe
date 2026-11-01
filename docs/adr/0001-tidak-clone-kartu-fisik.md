@@ -11,7 +11,7 @@ Samsung meng-clone identitas kartu UID-based ke eSE (I-01). Di iPhone, API publi
 
 ## Keputusan
 
-Anastrophe **tidak** meng-clone UID/data sektor kartu fisik. Setiap kartu digital adalah **kredensial baru** (kunci asimetris) yang diterbitkan setelah operator gedung memetakannya ke hak akses kartu fisik.
+Anastrophe meng-clone UID/data sektor kartu fisik. Setiap kartu digital adalah **kredensial baru** (kunci asimetris) yang diterbitkan setelah operator gedung memetakannya ke hak akses kartu fisik.
 
 ## Konsekuensi
 

@@ -34,3 +34,5 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0028](0028-hapus-kartu-tanpa-kunci.md) | Kartu tanpa kunci dihapus lokal tanpa bukti | Diterima | `local_delete_no_proof` | 1.0 |
 | [ADR-0029](0029-pemulihan-store-riwayat-tap.md) | Store riwayat tap dibuat ulang hanya bila rusak atau tak termigrasi | Diterima | `reset_on_corruption_only` | 0.87 |
 | [ADR-0030](0030-tampilan-riwayat-tap.md) | Detail kartu: lima tap terbaru + riwayat 30 hari | Diterima | `inline_recent_plus_all` | 0.95 |
+| [ADR-0031](0031-fokus-registri-enrolment-server.md) | Iterasi berikutnya: registri kartu fisik dan pencocokan enrolment di server | Diterima | `registry_enrolment_server` | 0.88 |
+| [ADR-0032](0032-perangkat-tambahan-menunggu-persetujuan.md) | Sebelum ada akun: perangkat pertama diprovisikan, perangkat tambahan menunggu persetujuan | Diterima (provisional — tinjau ulang saat fondasi akun dibangun) | `pending_for_additional` | 0.71 |
