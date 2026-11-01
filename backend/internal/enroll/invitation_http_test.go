@@ -24,11 +24,11 @@ func (f fixture) invitation(t *testing.T, inv store.Invitation, at time.Time) st
 	if inv.TTL == 0 {
 		inv.TTL = 7 * 24 * time.Hour
 	}
-	token, _, err := f.store.CreateInvitation(context.Background(), inv, "staf-01", at)
+	created, err := f.store.CreateInvitation(context.Background(), inv, "staf-01", at)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return token
+	return created.Token
 }
 
 func TestEnrolmentDenganUndangan(t *testing.T) {

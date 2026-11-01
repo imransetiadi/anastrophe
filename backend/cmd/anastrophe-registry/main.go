@@ -27,6 +27,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"slices"
 	"strings"
@@ -235,6 +236,13 @@ func invite(ctx context.Context, args []string, stdout, stderr io.Writer, getenv
 	if *ttlDays < 1 || *ttlDays > 30 {
 		return fail(errors.New("--ttl harus 1–30 hari"))
 	}
+	// Review akhir undangan M6: tautan harus bisa dipakai app (InvitationLink: https, host, /i/<token>).
+	if *linkBase != "" {
+		base, err := url.Parse(*linkBase)
+		if err != nil || base.Scheme != "https" || base.Host == "" || !strings.HasSuffix(*linkBase, "/") {
+			return fail(errors.New("--link-base harus URL https dengan host dan diakhiri /, mis. https://<domain>/i/"))
+		}
+	}
 	// Review akhir M5: zona undangan berkartu selalu dari registri kartu; --zones yang diabaikan diam-diam
 	// bisa memberi zona lebih luas daripada maksud operator.
 	if *cardFile != "" && strings.TrimSpace(*zones) != "" {
@@ -275,7 +283,7 @@ func invite(ctx context.Context, args []string, stdout, stderr io.Writer, getenv
 			return fail(err)
 		}
 	}
-	token, expiresAt, err := db.CreateInvitation(ctx, inv, *operator, time.Now())
+	created, err := db.CreateInvitation(ctx, inv, *operator, time.Now())
 	switch {
 	case errors.Is(err, store.ErrNotRegistered):
 		return fail(errors.New("kartu belum terdaftar di registri gedung"))
@@ -284,11 +292,12 @@ func invite(ctx context.Context, args []string, stdout, stderr io.Writer, getenv
 	case err != nil:
 		return fail(err)
 	}
-	fmt.Fprintf(stdout, "token: %s\n", token)
+	fmt.Fprintf(stdout, "id: %s\n", created.ID)
+	fmt.Fprintf(stdout, "token: %s\n", created.Token)
 	if *linkBase != "" {
-		fmt.Fprintf(stdout, "tautan: %s%s\n", *linkBase, token)
+		fmt.Fprintf(stdout, "tautan: %s%s\n", *linkBase, created.Token)
 	}
-	fmt.Fprintf(stdout, "berlaku sampai: %s\n", expiresAt.UTC().Format(time.RFC3339))
+	fmt.Fprintf(stdout, "berlaku sampai: %s\n", created.ExpiresAt.UTC().Format(time.RFC3339))
 	fmt.Fprintln(stdout, "Token hanya dicetak sekali; server menyimpan hash-nya saja.")
 	return 0
 }

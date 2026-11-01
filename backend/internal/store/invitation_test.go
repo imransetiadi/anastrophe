@@ -19,11 +19,11 @@ func invite(t *testing.T, s *Store, inv Invitation, at time.Time) string {
 	if inv.TTL == 0 {
 		inv.TTL = 7 * 24 * time.Hour
 	}
-	token, _, err := s.CreateInvitation(context.Background(), inv, "staf-01", at)
+	created, err := s.CreateInvitation(context.Background(), inv, "staf-01", at)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return token
+	return created.Token
 }
 
 func redeem(t *testing.T, s *Store, device, token string, at time.Time) (CardEnrollment, error) {
@@ -79,7 +79,7 @@ func TestUndanganKedaluwarsaDitolak(t *testing.T) {
 	if _, err := redeem(t, s, a, token, t0.Add(25*time.Hour)); !errors.Is(err, ErrInvitationInvalid) {
 		t.Fatalf("kedaluwarsa: %v", err)
 	}
-	if _, _, err := s.CreateInvitation(context.Background(), Invitation{SiteID: siteID, TTL: 31 * 24 * time.Hour}, "staf-01", t0); err == nil {
+	if _, err := s.CreateInvitation(context.Background(), Invitation{SiteID: siteID, TTL: 31 * 24 * time.Hour}, "staf-01", t0); err == nil {
 		t.Fatal("masa berlaku > 30 hari seharusnya ditolak")
 	}
 }
@@ -151,7 +151,7 @@ func TestUndanganUntukKartuTerpegang(t *testing.T) {
 func TestUndanganKartuTidakTerdaftarDitolakSaatDibuat(t *testing.T) {
 	s := freshStore(t)
 	siteID, _ := registrySite(t, s, PhysicalCard{CardHMAC: cardHMAC("A")})
-	if _, _, err := s.CreateInvitation(context.Background(), Invitation{SiteID: siteID, CardHMAC: cardHMAC("B"), TTL: time.Hour * 24}, "staf-01", time.Now()); !errors.Is(err, ErrNotRegistered) {
+	if _, err := s.CreateInvitation(context.Background(), Invitation{SiteID: siteID, CardHMAC: cardHMAC("B"), TTL: time.Hour * 24}, "staf-01", time.Now()); !errors.Is(err, ErrNotRegistered) {
 		t.Fatalf("err=%v", err)
 	}
 }

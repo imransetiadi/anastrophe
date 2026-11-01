@@ -39,25 +39,32 @@ func InvitationTokenHash(token string) ([]byte, error) {
 
 // CreateInvitation membuat undangan dan mengembalikan token mentahnya satu kali; yang disimpan hanya
 // hash-nya. Undangan berkartu wajib menunjuk kartu ACTIVE di registri gedung.
-func (s *Store) CreateInvitation(ctx context.Context, inv Invitation, operator string, at time.Time) (string, time.Time, error) {
+// CreatedInvitation adalah hasil CreateInvitation: token mentah dikembalikan satu kali, id untuk audit.
+type CreatedInvitation struct {
+	ID, Token string
+	ExpiresAt time.Time
+}
+
+func (s *Store) CreateInvitation(ctx context.Context, inv Invitation, operator string, at time.Time) (CreatedInvitation, error) {
 	if !operatorName.MatchString(operator) {
-		return "", time.Time{}, ErrInvalidOperator
+		return CreatedInvitation{}, ErrInvalidOperator
 	}
 	if !looksLikeUUID(inv.SiteID) {
-		return "", time.Time{}, ErrNotFound
+		return CreatedInvitation{}, ErrNotFound
 	}
 	if inv.TTL < 24*time.Hour || inv.TTL > 30*24*time.Hour {
-		return "", time.Time{}, errInvalidTTL
+		return CreatedInvitation{}, errInvalidTTL
 	}
 	if (inv.CardHMAC != nil && len(inv.CardHMAC) != 32) || (inv.ContactHMAC != nil && len(inv.ContactHMAC) != 32) {
-		return "", time.Time{}, errInvalidHMAC
+		return CreatedInvitation{}, errInvalidHMAC
 	}
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
-		return "", time.Time{}, err
+		return CreatedInvitation{}, err
 	}
 	hash := sha256.Sum256(raw)
 	expiresAt := at.Add(inv.TTL)
+	var id string
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		var site string
 		if err := tx.QueryRow(ctx, `SELECT id::text FROM sites WHERE id = $1`, inv.SiteID).Scan(&site); err != nil {
@@ -78,7 +85,7 @@ func (s *Store) CreateInvitation(ctx context.Context, inv Invitation, operator s
 			}
 			card = &id
 		}
-		id := newUUID()
+		id = newUUID()
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO invitations (id, site_id, physical_card_id, contact_hmac, token_hash, zones_bitmap, expires_at, created_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
@@ -91,9 +98,9 @@ func (s *Store) CreateInvitation(ctx context.Context, inv Invitation, operator s
 		})
 	})
 	if err != nil {
-		return "", time.Time{}, err
+		return CreatedInvitation{}, err
 	}
-	return base64.RawURLEncoding.EncodeToString(raw), expiresAt, nil
+	return CreatedInvitation{ID: id, Token: base64.RawURLEncoding.EncodeToString(raw), ExpiresAt: expiresAt}, nil
 }
 
 // EnrollInvitation memakai undangan, dalam transaksi sendiri.

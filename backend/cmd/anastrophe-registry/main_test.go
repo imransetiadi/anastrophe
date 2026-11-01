@@ -607,3 +607,49 @@ func TestSuspendRevokeMemperingatkanPendaftaranUlang(t *testing.T) {
 		}
 	}
 }
+
+func TestInviteMencetakIdUndangan(t *testing.T) {
+	// Review akhir undangan M7: operator butuh id undangan untuk mencocokkannya dengan audit.
+	db, dsn := freshStore(t)
+	site := siteWithZones(t, db)
+	var out, errOut bytes.Buffer
+	if code := run(context.Background(), []string{"invite", "--site", site, "--zones", "Lobi", "--operator", "staf-01"}, &out, &errOut, env(dsn)); code != 0 {
+		t.Fatalf("invite: %d %s", code, errOut.String())
+	}
+	var id string
+	for _, line := range strings.Split(out.String(), "\n") {
+		if v, ok := strings.CutPrefix(line, "id: "); ok {
+			id = v
+		}
+	}
+	if len(id) != 36 {
+		t.Fatalf("id undangan tidak tercetak: %s", out.String())
+	}
+	conn, err := pgx.Connect(context.Background(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(context.Background())
+	var n int
+	if err := conn.QueryRow(context.Background(), `SELECT count(*) FROM audit_events WHERE subject = $1`, "invitation:"+id).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("audit untuk id %s = %d (%v)", id, n, err)
+	}
+}
+
+func TestInviteLinkBaseHarusHttpsDenganGarisMiring(t *testing.T) {
+	// Review akhir undangan M6: tautan harus bisa dipakai app (https, /i/<token>).
+	db, dsn := freshStore(t)
+	site := siteWithZones(t, db)
+	for base, want := range map[string]int{
+		"http://contoh.test/i/":  2,
+		"https://contoh.test/i":  2,
+		"https:///i/":            2,
+		"https://contoh.test/i/": 0,
+	} {
+		var out, errOut bytes.Buffer
+		code := run(context.Background(), []string{"invite", "--site", site, "--zones", "Lobi", "--link-base", base, "--operator", "staf-01"}, &out, &errOut, env(dsn))
+		if code != want {
+			t.Errorf("%s: kode %d, ingin %d (%s)", base, code, want, errOut.String())
+		}
+	}
+}
