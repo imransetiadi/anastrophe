@@ -67,7 +67,7 @@ final class RenewalScheduler<C: Clock> where C.Duration == Duration {
         let renewer = renewer, clock = clock, isForeground = isForeground, onRenewed = onRenewed
         let renewal = Task {
             if (try? await renewer.renew(card: card, channel: channel, context: context, shouldSign: { isForeground() && !Task.isCancelled })) != nil {
-                await onRenewed()
+                onRenewed()
             }
             continuation.yield()
         }

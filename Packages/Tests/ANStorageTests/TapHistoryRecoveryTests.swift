@@ -34,7 +34,7 @@ struct TapHistoryRecoveryTests {
         let context = NSManagedObjectContext(.privateQueue)
         context.persistentStoreCoordinator = coordinator
         try context.performAndWait {
-            NSManagedObject(entity: entity, insertInto: context).setValue(1, forKey: "legacy")
+            NSEntityDescription.insertNewObject(forEntityName: "TapEntity", into: context).setValue(1, forKey: "legacy")
             try context.save()
         }
         try coordinator.remove(store)
