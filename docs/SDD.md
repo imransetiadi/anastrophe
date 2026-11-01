@@ -24,6 +24,7 @@
 | 2.8 | 2026-11-01 | Riwayat tap: baris tak terbaca dilewati; entri kartu yang sudah tidak ada dibersihkan saat daftar dimuat dengan daftar kartu yang dibaca ulang tepat sebelum menghapus (galat baca tidak menghapus apa pun); daftar kartu tampil sebelum riwayat selesai dimuat (§5.3). |
 | 2.9 | 2026-11-01 | Registri kartu fisik (ADR-0031): `physical_cards` berisi HMAC per gedung, `card_instances.physical_card_id`, status `REJECTED`, dan aturan perangkat tambahan sebelum akun (ADR-0032) (§8.1). |
 | 2.10 | 2026-11-01 | `POST /enrollments` mewajibkan identitas kartu dan menjawab `{enrollment_id, status}`; galat `ENR-NOT-REGISTERED`, `ENR-SITE-UNSUPPORTED`, `ENR-DUPLICATE`, `ENR-PENDING-APPROVAL` (§8.5, §15). |
+| 2.11 | 2026-11-01 | Perpanjangan memakai zona kartu terdaftar seperti penerbitan pertama (review registri C1, §8.4.2). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -646,7 +647,7 @@ sequenceDiagram
 1. App meminta nonce lewat `POST /v1/credentials/{cred}:challenge`. Nonce 32 B, berlaku 120 dtk, sekali pakai, dan terikat ke satu kredensial. Nonce yang sama dipakai untuk perpanjangan dan hapus kartu (ADR-0026). Challenge diizinkan untuk kredensial dan kartu ACTIVE atau SUSPENDED (ADR-0027); respons memuat `card_instance_id`; kredensial atau kartu yang sudah dicabut dijawab 410 `CARD-GONE`.
 2. App mengirim `POST /v1/credentials/{cred}:renew` (`Idempotency-Key` wajib) berisi nonce dan tanda tangan kunci kredensial (ECDSA P-256, raw r‖s) atas `"ANP1-RENEW"` ‖ `cred_id` ‖ `nonce` sebagai bukti kepemilikan. App Attest assertion menyusul (belum dikirim di tracer). Prefix memisahkan domain pesan dari transcript ANP/1.
 3. Dalam satu transaksi, server memeriksa berurutan: kredensial ada (404 `CRED-NOT-FOUND`); kredensial dan card instance ACTIVE serta kanalnya masih diizinkan kill switch FR-04 (409 `CRED-NOT-RENEWABLE`, termasuk SUSPENDED/REVOKED; kill switch hanya ditegakkan di `:renew`, agar kartu di kanal mati tetap bisa dihapus); nonce valid (400 `CRED-CHALLENGE-INVALID`); tanda tangan valid (400 `CRED-PROOF-INVALID`).
-4. Server menerbitkan sertifikat baru untuk kunci, `cred_id`, dan kanal yang sama, dengan zona dan masa berlaku dari kebijakan gedung saat ini. Nonce ditandai terpakai hanya bila perpanjangan (atau hapus kartu) sukses. Respons memakai kontrak provisioning (termasuk `not_before`).
+4. Server menerbitkan sertifikat baru untuk kunci, `cred_id`, dan kanal yang sama. Zona diambil dari kartu terdaftar bila card instance tertaut (FR-52, sama dengan penerbitan pertama), selain itu dari kebijakan gedung saat ini; masa berlaku dari kebijakan gedung. Nonce ditandai terpakai hanya bila perpanjangan (atau hapus kartu) sukses. Respons memakai kontrak provisioning (termasuk `not_before`).
 
 Kapan app memicu alur ini diatur ADR-0023 (§5.5).
 

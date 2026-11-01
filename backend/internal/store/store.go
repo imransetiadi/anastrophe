@@ -273,11 +273,18 @@ func (t *Tx) EnrollmentForUpdate(ctx context.Context, id string) (Enrollment, er
 	if err != nil {
 		return Enrollment{}, err
 	}
-	e.applyPolicy(zones, bitmap, validity)
+	e.applyZones(zones, bitmap, validity, cardBitmap)
+	return e, nil
+}
+
+// applyZones mengisi zona dan masa berlaku untuk penerbitan maupun perpanjangan: kartu terdaftar
+// menentukan zona bila card instance tertaut (FR-52), selain itu sites.policy. Satu helper untuk
+// EnrollmentForUpdate dan CredentialForRenewal agar keduanya tidak menyimpang (review registri C1).
+func (e *Enrollment) applyZones(zones []string, policyBitmap, validity *string, cardBitmap *int64) {
+	e.applyPolicy(zones, policyBitmap, validity)
 	if cardBitmap != nil {
 		e.applyCardZones(zones, uint64(*cardBitmap))
 	}
-	return e, nil
 }
 
 // applyPolicy mengisi zona dan masa berlaku dari sites.policy (fail-closed: tanpa bitmap = 0).
@@ -417,17 +424,20 @@ func (t *Tx) CredentialForRenewal(ctx context.Context, credID []byte) (Renewable
 	var c RenewableCredential
 	var zones []string
 	var bitmap, validity *string
+	var cardBitmap *int64
 	err := t.tx.QueryRow(ctx, `
 		SELECT c.id, c.channel, c.status, c.cred_id, c.pubkey, ci.id, ci.status, ci.device_id, s.id, s.name, s.site_code,
 		       COALESCE(ARRAY(SELECT jsonb_array_elements_text(s.policy -> 'zones')), '{}'),
 		       s.policy ->> 'zones_bitmap',
-		       s.policy ->> 'cert_validity_days'
+		       s.policy ->> 'cert_validity_days',
+		       pc.zones_bitmap
 		FROM credentials c
 		JOIN card_instances ci ON ci.id = c.card_instance_id
 		JOIN sites s ON s.id = ci.site_id
+		LEFT JOIN physical_cards pc ON pc.id = ci.physical_card_id
 		WHERE c.cred_id = $1
 		FOR NO KEY UPDATE OF c`, credID).Scan(&c.ID, &c.Channel, &c.Status, &c.CredID, &c.PubKey, &c.Site.ID, &c.CardStatus, &c.Site.DeviceID,
-		&c.Site.SiteID, &c.Site.SiteName, &c.Site.SiteCode, &zones, &bitmap, &validity)
+		&c.Site.SiteID, &c.Site.SiteName, &c.Site.SiteCode, &zones, &bitmap, &validity, &cardBitmap)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return RenewableCredential{}, ErrNotFound
 	}
@@ -435,7 +445,7 @@ func (t *Tx) CredentialForRenewal(ctx context.Context, credID []byte) (Renewable
 		return RenewableCredential{}, err
 	}
 	c.Site.Status = c.CardStatus
-	c.Site.applyPolicy(zones, bitmap, validity)
+	c.Site.applyZones(zones, bitmap, validity, cardBitmap)
 	return c, nil
 }
 

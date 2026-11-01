@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -333,3 +334,75 @@ func TestChallengeMemuatIDKartu(t *testing.T) {
 }
 
 func hexString(b []byte) string { return hex.EncodeToString(b) }
+
+// renewZones memperpanjang kredensial lalu mengembalikan bitmap sertifikat dan nama zona di respons.
+func renewZones(t *testing.T, r renewalFixture, key string) (uint64, string) {
+	t.Helper()
+	r.advance(4 * 24 * time.Hour)
+	nonce := r.challenge(t, r.credID)
+	rec := r.renew(t, r.credID, nonce, renewalSignature(t, r.key, r.credID, nonce), key)
+	var body struct {
+		Certificate []byte   `json:"certificate"`
+		Zones       []string `json:"zones"`
+	}
+	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &body) != nil {
+		t.Fatalf("renew: %d %s", rec.Code, rec.Body)
+	}
+	cert, err := certs.Verify(body.Certificate, r.signer.Public())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cert.Zones, strings.Join(body.Zones, ",")
+}
+
+func TestPerpanjanganMemakaiZonaKartuTerdaftar(t *testing.T) {
+	// Review C1: perpanjangan memakai zona kartu terdaftar (FR-52), bukan bitmap kebijakan gedung.
+	cases := []struct {
+		name, policy string
+		card, want   uint64
+		names        string
+	}{
+		{"kartu-0-kebijakan-3", `{"zones": ["Lobi", "Lift A"], "zones_bitmap": 3}`, 0, 0, ""},
+		{"kartu-1-kebijakan-3", `{"zones": ["Lobi", "Lift A"], "zones_bitmap": 3}`, 1, 1, "Lobi"},
+		{"kartu-1-tanpa-bitmap", `{"zones": ["Lobi", "Lift A"]}`, 1, 1, "Lobi"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := newFixture(t)
+			if err := f.store.SetSitePolicy(context.Background(), f.siteID, []byte(c.policy)); err != nil {
+				t.Fatal(err)
+			}
+			f.registerCard(t, labCardHex(*f.nextCard), c.card)
+			zones, names := renewZones(t, f.provision(t), "renew-"+c.name)
+			if zones != c.want || names != c.names {
+				t.Fatalf("zona perpanjangan = %d %q, ingin %d %q", zones, names, c.want, c.names)
+			}
+		})
+	}
+}
+
+func TestPerpanjanganInstanceLamaMemakaiKebijakan(t *testing.T) {
+	// Card instance tracer tanpa kartu terdaftar tetap memakai kebijakan gedung.
+	f := newFixture(t)
+	ctx := context.Background()
+	if err := f.store.SetSitePolicy(ctx, f.siteID, []byte(`{"zones": ["Lobi", "Lift A"], "zones_bitmap": 2}`)); err != nil {
+		t.Fatal(err)
+	}
+	id, err := f.store.StartEnrollment(ctx, f.deviceID, f.siteID, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	pub, _ := key.PublicKey.ECDH()
+	rec := f.do(t, http.MethodPost, "/v1/enrollments/"+id+"/credentials", "prov-lama", map[string]string{"channel": "ble", "public_key": base64.StdEncoding.EncodeToString(pub.Bytes())})
+	var out struct {
+		CredentialID []byte `json:"credential_id"`
+	}
+	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &out) != nil {
+		t.Fatalf("provisioning: %d %s", rec.Code, rec.Body)
+	}
+	zones, names := renewZones(t, renewalFixture{fixture: f, enrollmentID: id, credID: out.CredentialID, key: key}, "renew-lama")
+	if zones != 2 || names != "Lobi,Lift A" {
+		t.Fatalf("zona perpanjangan instance lama = %d %q", zones, names)
+	}
+}
