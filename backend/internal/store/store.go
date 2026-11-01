@@ -230,6 +230,8 @@ type Enrollment struct {
 	CertValidityDays int
 	// ProvisioningKeyHash: SHA-256 rahasia enrolment (ADR-0040); nil setelah kredensial pertama.
 	ProvisioningKeyHash []byte
+	// Channels: kanal yang diizinkan kebijakan gedung (ADR-0049); nil = semua kanal global.
+	Channels []string
 }
 
 // Credential yang diterbitkan untuk satu kanal.
@@ -266,12 +268,13 @@ func (t *Tx) EnrollmentForUpdate(ctx context.Context, id string) (Enrollment, er
 		       s.policy ->> 'cert_validity_days',
 		       pc.zones_bitmap,
 		       inv.zones_bitmap,
-		       ci.provisioning_key_hash
+		       ci.provisioning_key_hash,
+		       `+sitePolicyChannelsSQL+`
 		FROM card_instances ci JOIN sites s ON s.id = ci.site_id
 		LEFT JOIN physical_cards pc ON pc.id = ci.physical_card_id
 		LEFT JOIN invitations inv ON inv.id = ci.invitation_id
 		WHERE ci.id = $1
-		FOR UPDATE OF ci`, id).Scan(&e.ID, &e.Status, &e.DeviceID, &e.SiteID, &e.SiteName, &e.SiteCode, &zones, &bitmap, &validity, &cardBitmap, &invitationBitmap, &e.ProvisioningKeyHash)
+		FOR UPDATE OF ci`, id).Scan(&e.ID, &e.Status, &e.DeviceID, &e.SiteID, &e.SiteName, &e.SiteCode, &zones, &bitmap, &validity, &cardBitmap, &invitationBitmap, &e.ProvisioningKeyHash, &e.Channels)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Enrollment{}, ErrNotFound
 	}

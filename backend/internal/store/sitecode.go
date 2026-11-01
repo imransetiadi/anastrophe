@@ -22,6 +22,8 @@ const joinCodeLength = 8
 type SiteRef struct {
 	ID   string
 	Name string
+	// Channels: kanal yang diizinkan kebijakan gedung (ADR-0049); nil = semua kanal global.
+	Channels []string
 }
 
 // NormalizeJoinCode membaca kode yang diketik penghuni: huruf besar, "-" dan spasi dibuang, O dibaca 0,
@@ -111,7 +113,7 @@ func (s *Store) SiteByJoinCode(ctx context.Context, code string) (SiteRef, error
 		return SiteRef{}, ErrNotFound
 	}
 	var ref SiteRef
-	err := s.pool.QueryRow(ctx, `SELECT id::text, name FROM sites WHERE join_code = $1`, normalized).Scan(&ref.ID, &ref.Name)
+	err := s.pool.QueryRow(ctx, `SELECT s.id::text, s.name, `+sitePolicyChannelsSQL+` FROM sites s WHERE s.join_code = $1`, normalized).Scan(&ref.ID, &ref.Name, &ref.Channels)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return SiteRef{}, ErrNotFound
 	}
