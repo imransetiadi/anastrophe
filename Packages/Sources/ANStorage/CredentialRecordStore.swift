@@ -10,12 +10,18 @@ public struct CredentialRecord: Codable, Equatable, Sendable {
     public let notAfter: Date
     /// Hex `group_id` → [x963 aktif, x963 berikutnya]; format sama dengan `ProvisionedCredential`.
     public let groupKeys: [String: [Data]]
+    /// Awal masa berlaku; nil untuk record lama (kebijakan perpanjangan memakai default 7 hari).
+    public let notBefore: Date?
+    /// Base URL backend penerbit untuk perpanjangan (ADR-0023); nil = tidak diperpanjang.
+    public let renewalURL: URL?
 
-    public init(credentialID: Data, certificate: Data, notAfter: Date, groupKeys: [String: [Data]]) {
+    public init(credentialID: Data, certificate: Data, notAfter: Date, groupKeys: [String: [Data]], notBefore: Date? = nil, renewalURL: URL? = nil) {
         self.credentialID = credentialID
         self.certificate = certificate
         self.notAfter = notAfter
         self.groupKeys = groupKeys
+        self.notBefore = notBefore
+        self.renewalURL = renewalURL
     }
 
     public func material(suspended: Bool) throws -> CredentialMaterial {

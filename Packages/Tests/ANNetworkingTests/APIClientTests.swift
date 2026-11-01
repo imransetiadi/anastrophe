@@ -83,6 +83,42 @@ struct APIClientTests {
         #expect(credential.groupKeys == ["a1a2a3a4a5a6a7a8": [Data([0x04, 0x01]), Data([0x04, 0x02])]])
     }
 
+    @Test func notBeforeOpsionalDiDecode() throws {
+        #expect(try ProvisionedCredential.decode(Data(provisionedJSON.utf8)).notBefore == nil)
+        let withNotBefore = provisionedJSON.replacingOccurrences(of: #""not_after""#, with: #""not_before": "2026-11-01T00:00:00Z", "not_after""#)
+        #expect(try ProvisionedCredential.decode(Data(withNotBefore.utf8)).notBefore == Date(timeIntervalSince1970: 1_793_491_200))
+    }
+
+    @Test func challengeMemakaiHexCredID() async throws {
+        let nonce = Data(repeating: 0x4E, count: 32)
+        let transport = FakeTransport(status: 201, body: #"{"nonce":"\#(nonce.base64EncodedString())","expires_at":"2026-11-01T00:02:00Z"}"#)
+        let challenge = try await APIClient(baseURL: base, transport: transport).renewalChallenge(credentialID: Data(repeating: 0xC1, count: 16))
+        #expect(challenge.nonce == nonce)
+        #expect(challenge.expiresAt == Date(timeIntervalSince1970: 1_793_491_320))
+        let request = try #require(transport.lastRequest)
+        #expect(request.httpMethod == "POST")
+        #expect(request.url?.path(percentEncoded: false) == "/v1/credentials/c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1:challenge")
+    }
+
+    @Test func renewMengirimNonceDanTandaTangan() async throws {
+        let transport = FakeTransport(body: provisionedJSON)
+        let key = UUID()
+        let nonce = Data(repeating: 0x4E, count: 32), signature = Data(repeating: 0x51, count: 64)
+        let renewed = try await APIClient(baseURL: base, transport: transport).renewCredential(credentialID: Data(repeating: 0xC1, count: 16), nonce: nonce, signature: signature, idempotencyKey: key)
+        #expect(renewed.siteName == "Menara A")
+        let request = try #require(transport.lastRequest)
+        #expect(request.url?.path(percentEncoded: false) == "/v1/credentials/c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1:renew")
+        #expect(request.value(forHTTPHeaderField: "Idempotency-Key") == key.uuidString)
+        let body = try JSONSerialization.jsonObject(with: try #require(request.httpBody)) as? [String: String]
+        #expect(body == ["nonce": nonce.base64EncodedString(), "signature": signature.base64EncodedString()])
+    }
+
+    @Test func pesanBuktiKepemilikan() {
+        let challenge = RenewalChallenge(nonce: Data(repeating: 0x4E, count: 32), expiresAt: .now)
+        let credentialID = Data(repeating: 0xC1, count: 16)
+        #expect(challenge.message(credentialID: credentialID) == Data("ANP1-RENEW".utf8) + credentialID + Data(repeating: 0x4E, count: 32))
+    }
+
     @Test func createEnrollmentMengirimPerangkatDanGedung() async throws {
         // Endpoint tracer backend R1 (pengganti sementara enrolment kartu fisik).
         let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"6f1c2a9e-0000-4000-8000-000000000001"}"#)

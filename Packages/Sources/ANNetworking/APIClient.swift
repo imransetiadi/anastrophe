@@ -63,6 +63,28 @@ public struct APIClient: Sendable {
         return try ProvisionedCredential.decode(try await perform(request))
     }
 
+    /// `POST /v1/credentials/{cred}:challenge` → nonce perpanjangan (FR-45).
+    public func renewalChallenge(credentialID: Data) async throws -> RenewalChallenge {
+        var request = URLRequest(url: credentialURL(credentialID, action: "challenge"))
+        request.httpMethod = "POST"
+        return try Self.decoder.decode(RenewalChallenge.self, from: try await perform(request))
+    }
+
+    /// `POST /v1/credentials/{cred}:renew`: tanda tangan atas nonce → sertifikat baru (FR-45).
+    public func renewCredential(credentialID: Data, nonce: Data, signature: Data, idempotencyKey: UUID) async throws -> ProvisionedCredential {
+        var request = URLRequest(url: credentialURL(credentialID, action: "renew"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(idempotencyKey.uuidString, forHTTPHeaderField: "Idempotency-Key")
+        request.httpBody = try JSONEncoder().encode(["nonce": nonce.base64EncodedString(), "signature": signature.base64EncodedString()])
+        return try ProvisionedCredential.decode(try await perform(request))
+    }
+
+    /// `cred_id` dalam hex huruf kecil, diikuti `:aksi` (SDD §8.5).
+    private func credentialURL(_ credentialID: Data, action: String) -> URL {
+        baseURL.appending(path: "v1/credentials/\(credentialID.hexString):\(action)")
+    }
+
     /// Respons 2xx → body; RFC 9457 → error domain atau `ProblemDetails`.
     private func perform(_ request: URLRequest) async throws -> Data {
         let (data, response) = try await transport.send(request)

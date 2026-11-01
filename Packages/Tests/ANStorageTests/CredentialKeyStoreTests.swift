@@ -107,6 +107,24 @@ struct CredentialKeyStoreTests {
         #expect(try !keys.hasKey(for: server))
     }
 
+    @Test func recordLamaTetapTerbaca() throws {
+        // Review Focus 4: record Keychain yang ditulis sebelum perpanjangan ada tetap terbaca.
+        struct OldRecord: Codable { let credentialID: Data; let certificate: Data; let notAfter: Date; let groupKeys: [String: [Data]] }
+        let old = OldRecord(credentialID: credentialID, certificate: Data([0xCE]), notAfter: Date(timeIntervalSince1970: 1_794_000_000), groupKeys: ["a1a2a3a4a5a6a7a8": [Data([0x04])]])
+        let record = try JSONDecoder().decode(CredentialRecord.self, from: JSONEncoder().encode(old))
+        #expect(record.notAfter == old.notAfter)
+        #expect(record.notBefore == nil)
+        #expect(record.renewalURL == nil)
+    }
+
+    @Test func recordMenyimpanNotBeforeDanRenewalURL() throws {
+        let records = KeychainCredentialRecordStore(store: InMemorySecretStore())
+        let record = CredentialRecord(credentialID: credentialID, certificate: Data([0xCE]), notAfter: Date(timeIntervalSince1970: 1_794_604_800), groupKeys: [:],
+                                      notBefore: Date(timeIntervalSince1970: 1_794_000_000), renewalURL: URL(string: "http://127.0.0.1:8080"))
+        try records.save(record)
+        #expect(try records.record(for: credentialID) == record)
+    }
+
     @Test func recordMenjadiMaterial() throws {
         let groupID = Data(repeating: 0xA1, count: 8)
         let record = CredentialRecord(
