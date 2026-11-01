@@ -161,7 +161,7 @@ func (t *Tx) EnrollCard(ctx context.Context, deviceID, siteID string, cardHMAC [
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return CardEnrollment{}, err
 	}
-	if _, err := t.abandonStale(ctx, at, device, card); err != nil {
+	if _, err := t.abandonStale(ctx, at, device, card, ""); err != nil {
 		return CardEnrollment{}, err
 	}
 	var active int
@@ -235,33 +235,38 @@ func (s *Store) AbandonStaleEnrollments(ctx context.Context, at time.Time) (int,
 	var n int
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		var err error
-		n, err = (&Tx{tx: tx}).abandonStale(ctx, at, "", "")
+		n, err = (&Tx{tx: tx}).abandonStale(ctx, at, "", "", "")
 		return err
 	})
 	return n, err
 }
 
 // abandonStale menandai PROVISIONING tanpa kredensial yang melewati AbandonedEnrollmentTTL sebagai
-// ABANDONED, untuk perangkat atau kartu tertentu (keduanya kosong = semua), dengan audit per instance.
+// ABANDONED, untuk perangkat, kartu, atau undangan tertentu (semuanya kosong = semua), dengan audit per
+// instance.
 // Baris yang sedang dikunci transaksi lain (mis. penerbitan kredensial) dilewati agar tidak deadlock.
-func (t *Tx) abandonStale(ctx context.Context, at time.Time, device, card string) (int, error) {
-	var deviceParam, cardParam any
+func (t *Tx) abandonStale(ctx context.Context, at time.Time, device, card, invitation string) (int, error) {
+	var deviceParam, cardParam, invitationParam any
 	if device != "" {
 		deviceParam = device
 	}
 	if card != "" {
 		cardParam = card
 	}
+	if invitation != "" {
+		invitationParam = invitation
+	}
 	rows, err := t.tx.Query(ctx, `
 		UPDATE card_instances ci SET status = 'ABANDONED', status_changed_at = $1
 		WHERE ci.id IN (
 			SELECT x.id FROM card_instances x
 			WHERE x.status = 'PROVISIONING' AND x.status_changed_at < $2
-			  AND (($3::uuid IS NULL AND $4::uuid IS NULL) OR x.device_id = $3::uuid OR x.physical_card_id = $4::uuid)
+			  AND (($3::uuid IS NULL AND $4::uuid IS NULL AND $5::uuid IS NULL)
+			       OR x.device_id = $3::uuid OR x.physical_card_id = $4::uuid OR x.invitation_id = $5::uuid)
 			  AND NOT EXISTS (SELECT 1 FROM credentials c WHERE c.card_instance_id = x.id)
 			ORDER BY x.id
 			FOR UPDATE OF x SKIP LOCKED)
-		RETURNING ci.id::text, ci.site_id::text`, at, at.Add(-AbandonedEnrollmentTTL), deviceParam, cardParam)
+		RETURNING ci.id::text, ci.site_id::text`, at, at.Add(-AbandonedEnrollmentTTL), deviceParam, cardParam, invitationParam)
 	if err != nil {
 		return 0, err
 	}

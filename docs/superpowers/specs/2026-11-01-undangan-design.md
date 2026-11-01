@@ -33,7 +33,7 @@ Kartu yang tidak terbaca (mis. 125 kHz) dan gedung tanpa registri kartu belum pu
 - Masa berlaku default 7 hari (SDD §5.6); CLI menerima `--ttl` 1–30 hari.
 - Tautan: `https://<domain>/i/<token>`. Domain belum ditentukan, jadi CLI menerima `--link-base`.
 
-## Model data (migrasi `0008_invitations.sql`)
+## Model data (migrasi `0009_invitations.sql`)
 
 - `invitations(id uuid pk, site_id → sites, physical_card_id → physical_cards null, contact_hmac bytea(32) null, token_hash bytea(32) unique, zones_bitmap bigint default 0, expires_at, used_at null, created_at)`.
 - `card_instances.invitation_id → invitations` (null bila lewat kartu).
@@ -49,6 +49,7 @@ Permintaan: `{device_id, invitation}`. `site_id` tidak diperlukan karena diambil
 3. Batas 8 kartu tetap berlaku. Perangkat ini sudah punya card instance aktif untuk kartu yang sama → 409 `ENR-DUPLICATE`.
 4. Card instance dibuat `PROVISIONING`. Undangan adalah niat eksplisit pengelola, jadi aturan perangkat tambahan ADR-0032 tidak berlaku (SDD §8.2: undangan → PROVISIONING). `invitation_id` diisi, dan `physical_card_id` bila undangan diikat ke kartu.
 5. `used_at` diisi di transaksi yang sama. Audit `enrollment.started` `{status, method: "invitation"}` berisi id internal saja.
+   - *Keputusan builder (selaras ADR-0034):* perangkat yang sama dengan token yang sama melanjutkan instance-nya yang belum selesai (200). Bila instance undangan menjadi `ABANDONED`, `used_at` dikosongkan lagi sehingga undangan bisa dipakai ulang sampai kedaluwarsa. Perangkat lain dengan token terpakai tetap `ENR-INVITATION-INVALID`.
 6. Idempotency: hash memakai hash token, bukan token mentah.
 
 Zona sertifikat: kartu terdaftar bila tertaut, lalu `invitations.zones_bitmap` bila lewat undangan, lalu kebijakan gedung untuk data lama.

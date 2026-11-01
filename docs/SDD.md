@@ -27,6 +27,7 @@
 | 2.11 | 2026-11-01 | Perpanjangan memakai zona kartu terdaftar seperti penerbitan pertama (review registri C1, §8.4.2). |
 | 2.12 | 2026-11-01 | Enrolment yang belum selesai dilanjutkan dan `PROVISIONING` terbengkalai menjadi `ABANDONED` (ADR-0034); batas 8 kartu diperiksa sebelum membedakan kartu terdaftar (§8.1). |
 | 2.13 | 2026-11-01 | Catatan implementasi enrolment sebelum akun (§8.4.1), `ENR-NOT-REGISTERED` di diagram, struktur modul `CardIdentity`. |
+| 2.14 | 2026-11-01 | Undangan sekali pakai (ADR-0033): tabel `invitations`, `card_instances.invitation_id`, aturan terpakai dan zona (§8.1). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -575,6 +576,7 @@ audit_events(id bigserial pk, chain text /* site:<uuid> | platform (ADR-0024) */
 - Satu PRIMARY per kepemilikan.
 - Registri (ADR-0031): `physical_cards` hanya menyimpan HMAC per gedung (`card_id_hmac`, `holder_contact_hmac` opsional), unik per (gedung, HMAC); kartu `REMOVED` dijawab sama dengan kartu tak dikenal. `acs_card_number` belum disimpan sampai integrasi ACS. Zona sertifikat diambil dari `physical_cards.zones_bitmap` bila card instance tertaut.
 - Sebelum ada akun (ADR-0032, provisional): perangkat pertama untuk sebuah kartu mendapat `PROVISIONING`, perangkat lain `PENDING_APPROVAL` yang disetujui (`PROVISIONING`) atau ditolak (`REJECTED`) operator; kunci diambil berurutan (perangkat, lalu baris kartu).
+- Undangan (ADR-0033): `invitations` menyimpan hash SHA-256 token (32 byte acak, base64url), gedung, kartu terdaftar opsional, zona, masa berlaku 1–30 hari, dan waktu dipakai; `card_instances.invitation_id`. Undangan dianggap terpakai selama punya card instance yang tidak `ABANDONED`. Enrolment lewat undangan selalu `PROVISIONING` (niat eksplisit pengelola) dengan zona dari kartu terdaftar bila diikat, selain itu dari undangan (0 bila tidak diisi).
 - Enrolment yang belum selesai (ADR-0034): perangkat yang sama dengan instance `PROVISIONING`/`PENDING_APPROVAL` untuk kartu itu melanjutkan instance tersebut (200, `enrollment_id` sama); `ENR-DUPLICATE` hanya untuk `ACTIVE`/`SUSPENDED`. `PROVISIONING` tanpa kredensial yang melewati 15 menit sejak masuk `PROVISIONING` atau terakhir dilanjutkan menjadi `ABANDONED` (tidak aktif; audit `enrollment.abandoned`), lewat pemeriksaan di transaksi enrolment dan sapuan per jam. Perangkat penuh (8 kartu) mendapat `ENR-LIMIT` untuk kartu terdaftar maupun tidak dikenal.
 - `credentials.not_after ≤ issued_at + policy.cert_validity_days`.
 - `denylist_entries.expires_at = not_after` sertifikat terakhir, sehingga denylist tidak tumbuh tanpa batas.
