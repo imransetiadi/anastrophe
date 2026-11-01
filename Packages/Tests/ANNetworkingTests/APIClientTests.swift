@@ -211,6 +211,30 @@ struct APIClientTests {
         }
     }
 
+    @Test func createEnrollmentMengirimHashRahasia() async throws {
+        // ADR-0040: hanya SHA-256 rahasia enrolment yang dikirim, untuk kartu maupun undangan.
+        let hash = Data(repeating: 0x6A, count: 32)
+        let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"e1","status":"PROVISIONING"}"#)
+        let client = APIClient(baseURL: base, transport: transport)
+        _ = try await client.createEnrollment(deviceID: "dev-1", siteID: "site-1", card: CardIdentity("iso14443a:04a1b2c3d4e5f6")!, provisioningKeyHash: hash, idempotencyKey: UUID())
+        let cardRaw = try #require(transport.lastRequest?.httpBody)
+        let cardBody = try #require(try JSONSerialization.jsonObject(with: cardRaw) as? [String: Any])
+        #expect(cardBody["provisioning_key_hash"] as? String == hash.base64EncodedString())
+        _ = try await client.createEnrollment(deviceID: "dev-1", invitation: String(repeating: "A", count: 42) + "w", provisioningKeyHash: hash, idempotencyKey: UUID())
+        let invitationRaw = try #require(transport.lastRequest?.httpBody)
+        let invitationBody = try #require(try JSONSerialization.jsonObject(with: invitationRaw) as? [String: String])
+        #expect(invitationBody["provisioning_key_hash"] == hash.base64EncodedString())
+    }
+
+    @Test func submitCredentialKeyMengirimRahasiaBearer() async throws {
+        let secret = Data([0xFB, 0xFF, 0xBF] + [UInt8](repeating: 0xFF, count: 29))
+        let transport = FakeTransport(status: 200, body: provisionedJSON)
+        _ = try await APIClient(baseURL: base, transport: transport)
+            .submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04]), provisioningSecret: secret, idempotencyKey: UUID())
+        let header = try #require(transport.lastRequest?.value(forHTTPHeaderField: "Authorization"))
+        #expect(header == "Bearer " + secret.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: ""))
+    }
+
     @Test func createEnrollmentStatusTakDikenalDitolak() async throws {
         let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"e1","status":"MYSTERY"}"#)
         let card = try #require(CardIdentity("iso14443a:04a1b2c3d4e5f6"))

@@ -89,7 +89,8 @@ struct LabBackendLaunchTests {
         #expect(await services.runPendingLabBackendProvisioning(transport: transport) == localized("lab.imported"))
         let enrolment = try #require(transport.bodies[1])
         let body = try #require(try JSONSerialization.jsonObject(with: enrolment) as? [String: String])
-        #expect(body == ["device_id": "d1", "invitation": token])
+        #expect(body["device_id"] == "d1" && body["invitation"] == token)
+        #expect(body.keys.sorted() == ["device_id", "invitation", "provisioning_key_hash"])
     }
 
     @Test func provisioningPeluncuranDilewatiBilaSudahAdaKartu() async throws {

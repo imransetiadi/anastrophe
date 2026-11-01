@@ -35,6 +35,7 @@ final class SequenceTransport: HTTPTransport, @unchecked Sendable {
     private var replies: [(Int, String, String)]
     private(set) var paths: [String] = []
     private(set) var bodies: [Data?] = []
+    private(set) var authorizations: [String?] = []
 
     init(_ replies: [(status: Int, body: String, contentType: String)]) {
         self.replies = replies.map { ($0.status, $0.body, $0.contentType) }
@@ -44,6 +45,7 @@ final class SequenceTransport: HTTPTransport, @unchecked Sendable {
         let reply: (Int, String, String)? = lock.withLock {
             paths.append(request.url?.path(percentEncoded: false) ?? "")
             bodies.append(request.httpBody)
+            authorizations.append(request.value(forHTTPHeaderField: "Authorization"))
             return replies.isEmpty ? nil : replies.removeFirst()
         }
         guard let (status, body, contentType) = reply else { throw URLError(.cannotConnectToHost) }
@@ -111,7 +113,8 @@ struct LabBackendProvisioningTests {
         #expect(card.status == .active)
         let enrolment = try #require(transport.bodies[1])
         let body = try #require(try JSONSerialization.jsonObject(with: enrolment) as? [String: String])
-        #expect(body == ["device_id": "dev", "invitation": token])
+        #expect(body["device_id"] == "dev" && body["invitation"] == token && body["provisioning_key_hash"] != nil)
+        #expect(body.keys.sorted() == ["device_id", "invitation", "provisioning_key_hash"])
     }
 
     @Test func provisionViaBackendMenyimpanTokenStatus() async throws {
@@ -148,6 +151,29 @@ struct LabBackendProvisioningTests {
         let body = try #require(try JSONSerialization.jsonObject(with: raw) as? [String: String])
         #expect(body["status_token_hash"] == StatusToken.hash(existing).base64EncodedString())
         #expect(try tokens.token(forCard: "e1") == existing)
+    }
+
+    @Test func provisionViaBackendMemakaiRahasiaEnrolment() async throws {
+        // ADR-0040: rahasia yang hash-nya dikirim saat enrolment dibawa sebagai bearer saat provisioning.
+        let cards = try SwiftDataCardStore(directory: temporaryDirectory())
+        let transport = SequenceTransport([
+            configBody(),
+            (201, #"{"enrollment_id":"e1","status":"PROVISIONING"}"#, "application/json"),
+            (200, provisionedBody(credentialID: Data(repeating: 0x5D, count: 16)), "application/json"),
+        ])
+        _ = try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", card: labTestCard, channel: .ble,
+                                                          keys: keys, records: records, cards: cards)
+        let raw = try #require(transport.bodies[1])
+        let body = try #require(try JSONSerialization.jsonObject(with: raw) as? [String: Any])
+        let hash = try #require(body["provisioning_key_hash"] as? String)
+        let bearer = try #require(transport.authorizations[2])
+        let encoded = String(try #require(bearer.split(separator: " ").last))
+        var padded = encoded.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        while padded.count % 4 != 0 { padded += "=" }
+        let secret = try #require(Data(base64Encoded: padded))
+        #expect(bearer.hasPrefix("Bearer ") && secret.count == 32)
+        #expect(ProvisioningSecret.hash(secret).base64EncodedString() == hash)
+        #expect(transport.authorizations[1] == nil)  // enrolment tidak membawa rahasia mentah
     }
 
     @Test func provisionViaBackendMenyimpanRenewalURL() async throws {

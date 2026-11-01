@@ -50,11 +50,14 @@ enum LabProvisioning {
         let (localID, publicKey) = try begin(keys: keys)
         var movedTo: Data?
         do {
+            // ADR-0040: rahasia enrolment hanya di memori selama alur ini; server menyimpan hash-nya.
+            let secret = try ProvisioningSecret.generate()
+            let secretHash = ProvisioningSecret.hash(secret)
             let start: EnrollmentStart
             if let invitation {
-                start = try await api.createEnrollment(deviceID: deviceID, invitation: invitation, idempotencyKey: UUID())
+                start = try await api.createEnrollment(deviceID: deviceID, invitation: invitation, provisioningKeyHash: secretHash, idempotencyKey: UUID())
             } else {
-                start = try await api.createEnrollment(deviceID: deviceID, siteID: siteID, card: card, idempotencyKey: UUID())
+                start = try await api.createEnrollment(deviceID: deviceID, siteID: siteID, card: card, provisioningKeyHash: secretHash, idempotencyKey: UUID())
             }
             // ADR-0032: perangkat tambahan menunggu operator; tidak ada provisioning sampai disetujui.
             guard start.status == .provisioning else { throw ANError.enrollmentRejected(.pendingApproval) }
@@ -66,7 +69,7 @@ enum LabProvisioning {
                 statusToken = try (try? statusTokens.token(forCard: enrollmentID)) ?? StatusToken.generate()
             }
             let provisioned = try await api.submitCredentialKey(enrollmentID: enrollmentID, channel: channel, publicKey: publicKey,
-                                                                statusTokenHash: statusToken.map(StatusToken.hash), idempotencyKey: UUID())
+                                                                statusTokenHash: statusToken.map(StatusToken.hash), provisioningSecret: secret, idempotencyKey: UUID())
             guard provisioned.channel == channel else { throw ANError.invalidData }
             try keys.moveKey(from: localID, to: provisioned.credentialID)
             movedTo = provisioned.credentialID
