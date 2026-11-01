@@ -45,7 +45,11 @@ Bahasa domain bersama (*ubiquitous language*) untuk PRD, SDD, QA Suite, kode, da
 | **Revoke (cabut)** | Penonaktifan permanen kredensial; masuk denylist reader. | `revoke()` |
 | **Denylist** | Daftar `cred_id` yang dicabut, disinkronkan ke reader/gateway. | `Denylist` |
 | **Transfer perangkat** | Re-provisioning ke iPhone baru dan pencabutan kredensial lama (ADR-0007). | `DeviceTransfer` |
-| **Perpanjangan** | Penerbitan ulang sertifikat sebelum kedaluwarsa (FR-45). | `CertRenewal` |
+| **Perpanjangan** | Penerbitan ulang sertifikat untuk kunci yang sama (FR-45). Hanya setelah autentikasi tap: sertifikat kedaluwarsa diperpanjang sebelum presentasi, sisa < 50% setelah tap (ADR-0023). | `CredentialRenewer`, `RenewalScheduler`, `RenewalPolicy` |
+| **Nonce perpanjangan** | 32 B acak dari server, berlaku 120 dtk, sekali pakai, terikat ke satu kredensial (SDD §8.4.2). | `RenewalChallenge` |
+| **Bukti kepemilikan** | Tanda tangan kunci kredensial atas `"ANP1-RENEW"` ‖ `cred_id` ‖ nonce; membuktikan perangkat masih memegang kunci. | `RenewalChallenge.message(credentialID:)` |
+| **Backend penerbit** | Base URL backend yang menerbitkan kredensial, disimpan per record untuk perpanjangan. Kartu tanpa backend penerbit (lab `lab_ca.py`) tidak diperpanjang. | `CredentialRecord.renewalURL` |
+| **Perlu diperbarui** | Status tampilan kartu aktif dengan sisa masa berlaku < 24 jam atau yang sudah lewat (FR-38, TC-DEV-10). | `CardStatus.needsRenewal`, `Card.displayStatus` |
 | **UNREACHABLE** | Status server untuk kredensial yang perangkatnya tidak lagi melapor (mis. app dihapus). | `.unreachable` |
 
 ## Protokol & platform
@@ -60,6 +64,14 @@ Bahasa domain bersama (*ubiquitous language*) untuk PRD, SDD, QA Suite, kode, da
 | **Presentment intent assertion** | Klaim eksklusif sementara atas UI kontak agar app default (mis. Apple Pay) tidak muncul (N). |
 | **Secure Enclave / Secure Element (SE)** | Prosesor keamanan untuk kunci & biometrik / chip aman tempat applet kredensial berjalan. |
 | **OSDP Transparent Mode** | Mode OSDP yang meneruskan data aplikasi (APDU) dari reader ke panel/gateway lewat kanal aman. |
+
+## Lab & pengujian
+
+| Istilah | Definisi |
+|---|---|
+| **Reader uji** | Peripheral BLE untuk pengujian lab (rig R7) yang menjalankan sisi reader ANP/1. Bentuknya (Mac atau dev board) menunggu ADR-0022. |
+| **devseed** | Perintah dev `anastrophe-devseed` yang menyiapkan gedung, reader group, dan perangkat lab; hanya untuk database lokal. |
+| **Provisioning lab** | Alur DEBUG yang mengambil kartu langsung dari backend dev (`-ANLabBackend`) atau dari `lab_ca.py`; tidak ada di build Release. |
 
 ## Istilah yang dihindari
 
