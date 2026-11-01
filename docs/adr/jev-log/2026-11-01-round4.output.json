@@ -1,0 +1,27 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "label": "D20-backend-language",
+  "input": {
+    "decision": "Which language/runtime should the Anastrophe R1 backend (REST /v1 API, enrollment, credential issuance, reader sync) be implemented in?",
+    "candidates": ["go", "typescript_node"],
+    "priorities": "Correct, auditable cryptography for certificate issuance and key handling; simple, reliable multi-region deployment (ADR-0014); a small team should be able to maintain it; reuse the shared anp1-v1 test vectors in CI.",
+    "requirements": [
+      "Can sign ES256 COSE_Sign1 certificates with a key held in a cloud KMS/HSM without exporting the private key.",
+      "Can verify the shared anp1-v1 test vector values (P-256, HKDF-SHA256, AES-128-GCM) using maintained libraries.",
+      "Can be deployed identically to a primary and a hot-standby region with automated failover."
+    ],
+    "escalate_on_contradiction": true
+  },
+  "recommendation": {"selected": "go", "escaped": false, "confidence": 0.7, "probabilities": {"go": 0.76, "typescript_node": 0.08, "ask_user": 0.06, "investigate": 0.1, "none": 0}, "contradicted_requirements": []},
+  "checks": [
+    {"candidate": "go", "requirement": 0, "answer": "supported"},
+    {"candidate": "go", "requirement": 1, "answer": "supported"},
+    {"candidate": "go", "requirement": 2, "answer": "unknown"},
+    {"candidate": "typescript_node", "requirement": 0, "answer": "supported"},
+    {"candidate": "typescript_node", "requirement": 1, "answer": "supported"},
+    {"candidate": "typescript_node", "requirement": 2, "answer": "unknown"}
+  ],
+  "usage": {"input_tokens": 2169, "output_tokens": 317},
+  "status": "0,60–0,80 → Provisional (ADR-0018); tinjau ulang di akhir M1."
+}

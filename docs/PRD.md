@@ -378,6 +378,7 @@ Keputusan diambil lewat lapisan keputusan **JEV** (ADR-0018). Status mengikuti c
 | 7 | **Entitas hukum untuk entitlement NFC & SE?** | — (JEV: `investigate`) | **Eskalasi ke manusia** — butuh legal/finance | ADR-0017 |
 | 8 | Topologi backend R1? | Multi-region primary + hot standby (JEV 0,48) | Diterima — keputusan pengguna setelah eskalasi | ADR-0014 |
 | 9 | Strategi pemindaian BLE Tap (NFR-P04)? | Pindai saat lembar dibuka + early exit (JEV 0,51) | Diterima — keputusan pengguna setelah eskalasi | ADR-0019 |
+| 10 | Bahasa backend R1? | Go, satu biner statis per region | Provisional (0,70) | ADR-0020 |
 
 ## 16. Lampiran A — Pemetaan fitur Samsung → Anastrophe
 

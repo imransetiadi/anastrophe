@@ -152,7 +152,7 @@ flowchart TB
 | Reader referensi | NFC (ISO 14443-4 PCD) + BLE peripheral + SE (kunci reader group) + MCU; output OSDP v2.2/Wiegand | ADR-0016 |
 | Edge Gateway | Menjalankan ANP/1 untuk reader OSDP Transparent Mode; cache offline | Linux + TPM; I-12 |
 
-Backend referensi: TypeScript (Node.js 24) atau Go, PostgreSQL 16, Redis (rate-limit), HSM/KMS cloud. Region dan residensi data mengikuti regulasi (UU PDP untuk data WNI); topologi R1 di ADR-0014.
+Backend: Go 1.24+ (ADR-0020, provisional), PostgreSQL 16, Redis (rate-limit), HSM/KMS cloud. Region dan residensi data mengikuti regulasi (UU PDP untuk data WNI); topologi R1 di ADR-0014.
 
 ## 4. Model kanal
 
@@ -744,7 +744,7 @@ Tidak ada GPS, tidak ada tracking lintas app (ATT tidak dipakai). Privacy Manife
 ## 12. Infrastruktur & deployment
 
 - **Lingkungan:** Dev, QA, Load, Staging, Production (O-W13).
-- **Topologi R1:** menunggu ADR-0014. Usulan JEV: region primer + *hot standby* dengan failover otomatis; alternatif: satu region multi-AZ + backup lintas region. Untuk R2 wajib multi-region (O-W14).
+- **Topologi R1 (ADR-0014, diterima):** region primer + region sekunder *hot standby* dengan failover otomatis sejak R1 (RTO ≤ 30 menit), sehingga R2 tidak butuh re-arsitektur (O-W14).
 - **CI/CD:** build & uji otomatis per PR; distribusi TestFlight; infrastruktur sebagai kode; secret di secret manager (tidak di repo).
 - **Konfigurasi & feature flag:** `/config` per wilayah/gedung; kill switch per kanal.
 
