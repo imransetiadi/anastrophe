@@ -288,3 +288,86 @@ func TestImportKutipRusakDibatalkan(t *testing.T) {
 		t.Fatalf("impor seharusnya batal seluruhnya, audit: %d", len(events))
 	}
 }
+
+func inviteToken(t *testing.T, out string) string {
+	t.Helper()
+	for _, line := range strings.Split(out, "\n") {
+		if token, ok := strings.CutPrefix(line, "token: "); ok {
+			return token
+		}
+	}
+	t.Fatalf("token tidak tercetak: %s", out)
+	return ""
+}
+
+func TestInviteMencetakTokenSekali(t *testing.T) {
+	// Review Focus 3: token dicetak sekali; database dan audit hanya menyimpan hash-nya.
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	var out, errOut bytes.Buffer
+	code := run(ctx, []string{"invite", "--site", site, "--zones", "Lobi;Parkir", "--link-base", "https://contoh.test/i/", "--operator", "staf-01"}, &out, &errOut, env(dsn))
+	if code != 0 {
+		t.Fatalf("kode %d: %s %s", code, out.String(), errOut.String())
+	}
+	token := inviteToken(t, out.String())
+	if !strings.Contains(out.String(), "tautan: https://contoh.test/i/"+token) {
+		t.Fatalf("tautan tidak tercetak: %s", out.String())
+	}
+	if strings.Contains(allTablesText(t, dsn), strings.ToLower(token)) {
+		t.Fatal("token mentah tersimpan di database")
+	}
+	hash, err := store.InvitationTokenHash(token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	device, _ := db.CreateDevice(ctx)
+	r, err := db.EnrollInvitation(ctx, device, hash, time.Now())
+	if err != nil || r.Status != "PROVISIONING" {
+		t.Fatalf("undangan hasil CLI tidak bisa dipakai: %+v %v", r, err)
+	}
+	_, _, err = db.Idempotent(ctx, "zona-undangan", []byte("h"), func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
+		e, err := tx.EnrollmentForUpdate(ctx, r.ID)
+		if err == nil && e.ZonesBitmap != 5 {
+			t.Errorf("zona undangan = %d, ingin 5 (Lobi + Parkir)", e.ZonesBitmap)
+		}
+		return 200, []byte("{}"), err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestInviteKartuHarusTerdaftar(t *testing.T) {
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	var out, errOut bytes.Buffer
+	run(ctx, []string{"import", "--site", site, "--file", writeCSV(t, "tech,card_id,holder_contact,zones\niso14443a,04a1b2c3d4e5f6,,Lobi\n"), "--operator", "staf-01"}, &out, &errOut, env(dsn))
+	errOut.Reset()
+	if code := run(ctx, []string{"invite", "--site", site, "--card-tech", "iso14443a", "--card-id", "04ffffffffff01", "--operator", "staf-01"}, &out, &errOut, env(dsn)); code != 2 || !strings.Contains(errOut.String(), "belum terdaftar") {
+		t.Fatalf("kartu tidak terdaftar: %d %s", code, errOut.String())
+	}
+	if code := run(ctx, []string{"invite", "--site", site, "--card-tech", "iso14443a", "--card-id", "04a1b2c3d4e5f6", "--operator", "staf-01"}, &out, &errOut, env(dsn)); code != 0 {
+		t.Fatalf("kartu terdaftar: %d %s", code, errOut.String())
+	}
+}
+
+func TestInviteMenolakIsianSalah(t *testing.T) {
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	for name, args := range map[string][]string{
+		"zona-tak-dikenal": {"--zones", "Gudang"},
+		"ttl-31":           {"--ttl", "31"},
+		"ttl-0":            {"--ttl", "0"},
+		"kontak-rusak":     {"--contact", "bukan-kontak"},
+		"tanpa-operator":   {"--operator", ""},
+	} {
+		var out, errOut bytes.Buffer
+		full := append([]string{"invite", "--site", site, "--operator", "staf-01"}, args...)
+		if code := run(ctx, full, &out, &errOut, env(dsn)); code != 2 {
+			t.Errorf("%s: kode %d %s", name, code, out.String())
+		}
+	}
+}
