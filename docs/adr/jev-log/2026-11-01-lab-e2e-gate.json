@@ -82,7 +82,42 @@
           0.73
         ]
       ]
+    },
+    {
+      "evidence": "post-fix simulator e2e (GET /v1/config against the real Go backend), Release re-check at 00df0d3, current suite 188/187/1/0",
+      "action": "escalate",
+      "review": {
+        "safe_to_apply": 0.53,
+        "composite": 0.701,
+        "limiting": "test_gap"
+      },
+      "claims": [
+        [
+          "verified",
+          0.72
+        ],
+        [
+          "verified",
+          0.91
+        ],
+        [
+          "verified",
+          0.82
+        ],
+        [
+          "verified",
+          0.52
+        ],
+        [
+          "verified",
+          0.8
+        ],
+        [
+          "verified",
+          0.37
+        ]
+      ]
     }
   ],
-  "status": "Eskalasi: semua klaim terverifikasi tanpa contradicted/unsupported pada run 2, tetapi tiga klaim < 0,80 dan rubrik test_gap membatasi review. Tindak lanjut: ulangi e2e simulator setelah perbaikan (dekoding /v1/config dari Go) sebagai bukti baru; laporkan ke pengguna."
+  "status": "Eskalasi ke pengguna setelah 3 run: semua klaim verified (tanpa contradicted/unsupported) pada run 2 dan 3, tetapi confidence berfluktuasi dan rubrik test_gap membatasi review. Tidak diulang lagi tanpa bukti baru (ADR-0018)."
 }
