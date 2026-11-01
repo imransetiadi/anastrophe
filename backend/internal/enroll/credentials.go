@@ -86,9 +86,10 @@ const maxBody = 4 << 10
 
 var supportedChannels = map[string]bool{"ble": true, "nfcHCE": true}
 
-// createEnrollment memulai enrolment untuk kartu fisik yang terdaftar di registri gedung (FR-11,
-// FR-13; ADR-0031). Identitas kartu hanya dipakai untuk menghitung HMAC per gedung, lalu dibuang
-// (CLAUDE.md aturan 6). Security code dan App Attest menyusul bersama akun (ADR-0032).
+// createEnrollment memulai enrolment untuk kartu fisik yang terdaftar di registri gedung (FR-11, FR-13;
+// ADR-0031) atau untuk undangan sekali pakai (FR-12; ADR-0033); tepat satu dari keduanya. Identitas kartu
+// hanya dipakai untuk menghitung HMAC per gedung lalu dibuang, dan token undangan hanya dipakai dalam
+// bentuk hash (CLAUDE.md aturan 6). Security code dan App Attest menyusul bersama akun (ADR-0032).
 func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		DeviceID string `json:"device_id"`
@@ -97,31 +98,58 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 			Tech string `json:"tech"`
 			ID   string `json:"id"`
 		} `json:"card"`
+		Invitation *string `json:"invitation"`
 	}
 	body, ok := readBody(w, r)
 	if !ok {
 		return
 	}
-	if err := json.Unmarshal(body, &req); err != nil || req.Card == nil {
+	if err := json.Unmarshal(body, &req); err != nil || (req.Card == nil) == (req.Invitation == nil) {
 		httpapi.WriteProblem(w, problem("REQ-INVALID", http.StatusBadRequest))
 		return
 	}
-	identity, err := registry.ParseCardIdentity(req.Card.Tech, req.Card.ID)
-	if err != nil {
-		httpapi.WriteProblem(w, problem("REQ-INVALID", http.StatusBadRequest))
-		return
+	// requestKey masuk hash idempotency: HMAC kartu atau hash token, tidak pernah nilai mentah,
+	// karena baris idempotency tersimpan di database (aturan 6).
+	var requestKey string
+	var inTx func(ctx context.Context, tx *store.Tx) (store.CardEnrollment, error)
+	var direct func(ctx context.Context) (store.CardEnrollment, error)
+	if req.Invitation != nil {
+		tokenHash, err := store.InvitationTokenHash(*req.Invitation)
+		if err != nil {
+			httpapi.WriteProblem(w, problem("REQ-INVALID", http.StatusBadRequest))
+			return
+		}
+		requestKey = "invitation:" + hex.EncodeToString(tokenHash)
+		inTx = func(ctx context.Context, tx *store.Tx) (store.CardEnrollment, error) {
+			return tx.EnrollInvitation(ctx, req.DeviceID, tokenHash, h.Now())
+		}
+		direct = func(ctx context.Context) (store.CardEnrollment, error) {
+			return h.Store.EnrollInvitation(ctx, req.DeviceID, tokenHash, h.Now())
+		}
+	} else {
+		identity, err := registry.ParseCardIdentity(req.Card.Tech, req.Card.ID)
+		if err != nil {
+			httpapi.WriteProblem(w, problem("REQ-INVALID", http.StatusBadRequest))
+			return
+		}
+		// ID gedung dinormalisasi sekali sebelum MAC, agar impor dan enrolment selalu cocok apa pun
+		// sumber MAC-nya (review registri minor 9).
+		siteID := strings.ToLower(strings.TrimSpace(req.SiteID))
+		// Dihitung di luar transaksi database: produksi memanggil KMS.
+		cardHMAC, err := h.Registry.MAC(r.Context(), siteID, identity.MACInput())
+		if err != nil {
+			h.writeResult(w, 0, nil, err, "registry mac failed")
+			return
+		}
+		requestKey = siteID + "\n" + hex.EncodeToString(cardHMAC)
+		inTx = func(ctx context.Context, tx *store.Tx) (store.CardEnrollment, error) {
+			return tx.EnrollCard(ctx, req.DeviceID, siteID, cardHMAC, h.Now())
+		}
+		direct = func(ctx context.Context) (store.CardEnrollment, error) {
+			return h.Store.EnrollCard(ctx, req.DeviceID, siteID, cardHMAC, h.Now())
+		}
 	}
-	// ID gedung dinormalisasi sekali sebelum MAC, agar impor dan enrolment selalu cocok apa pun sumber
-	// MAC-nya (review registri minor 9).
-	siteID := strings.ToLower(strings.TrimSpace(req.SiteID))
-	// Dihitung di luar transaksi database: produksi memanggil KMS.
-	cardHMAC, err := h.Registry.MAC(r.Context(), siteID, identity.MACInput())
-	if err != nil {
-		h.writeResult(w, 0, nil, err, "registry mac failed")
-		return
-	}
-	enroll := func(add func() (store.CardEnrollment, error)) (int, []byte, error) {
-		result, err := add()
+	enroll := func(result store.CardEnrollment, err error) (int, []byte, error) {
 		var pgErr *pgconn.PgError
 		switch {
 		case errors.Is(err, store.ErrCardLimit):
@@ -132,6 +160,9 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 			return problemBody("ENR-SITE-UNSUPPORTED", http.StatusNotFound)
 		case errors.Is(err, store.ErrNotRegistered):
 			return problemBody("ENR-NOT-REGISTERED", http.StatusNotFound)
+		case errors.Is(err, store.ErrInvitationInvalid):
+			// Tak dikenal, kedaluwarsa, dan terpakai dijawab identik (TC-ENR-08).
+			return problemBody("ENR-INVITATION-INVALID", http.StatusNotFound)
 		case errors.Is(err, store.ErrNotFound), errors.As(err, &pgErr) && pgErr.Code == "23503":
 			return problemBody("ENR-NOT-FOUND", http.StatusNotFound)
 		case err != nil:
@@ -147,23 +178,18 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 	// dua jatah dari batas 8 kartu.
 	var status int
 	var resp []byte
+	var err error
 	if key := r.Header.Get("Idempotency-Key"); key != "" {
 		if !validIdempotencyKey(key) {
 			httpapi.WriteProblem(w, problem("REQ-IDEMPOTENCY-KEY", http.StatusBadRequest))
 			return
 		}
-		// Hash memakai HMAC kartu per gedung, bukan identitas mentah: SHA-256 dari UID pendek bisa
-		// ditebak, sedangkan baris idempotency tersimpan di database (aturan 6).
-		hash := sha256.Sum256([]byte(r.URL.Path + "\n" + req.DeviceID + "\n" + siteID + "\n" + hex.EncodeToString(cardHMAC)))
+		hash := sha256.Sum256([]byte(r.URL.Path + "\n" + req.DeviceID + "\n" + requestKey))
 		status, resp, err = h.Store.Idempotent(r.Context(), key, hash[:], func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
-			return enroll(func() (store.CardEnrollment, error) {
-				return tx.EnrollCard(ctx, req.DeviceID, siteID, cardHMAC, h.Now())
-			})
+			return enroll(inTx(ctx, tx))
 		})
 	} else {
-		status, resp, err = enroll(func() (store.CardEnrollment, error) {
-			return h.Store.EnrollCard(r.Context(), req.DeviceID, siteID, cardHMAC, h.Now())
-		})
+		status, resp, err = enroll(direct(r.Context()))
 	}
 	h.writeResult(w, status, resp, err, "create enrollment failed")
 }
