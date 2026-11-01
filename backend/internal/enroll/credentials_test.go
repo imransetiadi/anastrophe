@@ -28,11 +28,18 @@ import (
 
 var adminDSN string
 
+// skipReason menjelaskan kenapa test database dilewati (dicetak, tidak diam-diam).
+var skipReason = "PostgreSQL tidak tersedia"
+
 func TestMain(m *testing.M) {
 	dsn, stop, err := testpg.Start()
 	if err != nil && !errors.Is(err, testpg.ErrUnavailable) {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+	if err != nil {
+		fmt.Println("test database dilewati:", err)
+		skipReason = err.Error()
 	}
 	adminDSN = dsn
 	code := m.Run()
@@ -59,7 +66,7 @@ func newFixture(t *testing.T) fixture {
 func newFixtureWithPool(t *testing.T, poolParams string) fixture {
 	t.Helper()
 	if adminDSN == "" {
-		t.Skip("PostgreSQL tidak tersedia")
+		testpg.Skip(t, skipReason)
 	}
 	ctx := context.Background()
 	dsn, err := testpg.NewDatabase(ctx, adminDSN)
@@ -442,6 +449,49 @@ func TestKanalDimatikanDitolak(t *testing.T) {
 	rec := f.do(t, http.MethodPost, "/v1/enrollments/"+id+"/credentials", "hce-mati", map[string]string{"channel": "nfcHCE", "public_key": base64.StdEncoding.EncodeToString(phoneKey(t))})
 	if rec.Code != http.StatusBadRequest || problemType(t, rec) != "ENR-INVALID-CHANNEL" {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+}
+
+func TestEnrolmentIdempotencyKeySama(t *testing.T) {
+	// Minor 5: ketuk ganda "Tambah kartu" tidak boleh memakan dua jatah dari 8 kartu.
+	f := newFixture(t)
+	body := map[string]string{"device_id": f.deviceID, "site_id": f.siteID}
+	first := f.do(t, http.MethodPost, "/v1/enrollments", "enrol-1", body)
+	second := f.do(t, http.MethodPost, "/v1/enrollments", "enrol-1", body)
+	if first.Code != http.StatusCreated || first.Body.String() != second.Body.String() {
+		t.Fatalf("pertama %d %s, kedua %d %s", first.Code, first.Body, second.Code, second.Body)
+	}
+	if n, err := f.store.ActiveCardCount(context.Background(), f.deviceID); err != nil || n != 1 {
+		t.Fatalf("kartu aktif = %d (err %v), ingin 1", n, err)
+	}
+}
+
+func TestErrorSignerTidakMembocorkanDetail(t *testing.T) {
+	// Minor 12: jalur error handler (bukan hanya panik) tidak membocorkan pesan internal.
+	f := newFixture(t)
+	f.h.Signers = func(string) (certs.Signer, error) { return nil, errors.New("kms: key arn:secret-key-123 denied") }
+	id := f.enroll(t)
+	rec := f.do(t, http.MethodPost, "/v1/enrollments/"+id+"/credentials", "kms-gagal", map[string]string{"channel": "ble", "public_key": base64.StdEncoding.EncodeToString(phoneKey(t))})
+	if rec.Code != http.StatusInternalServerError || strings.Contains(rec.Body.String(), "secret-key-123") || problemType(t, rec) != "INTERNAL" {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+	if n, _ := f.store.CredentialCount(context.Background(), id); n != 0 {
+		t.Fatal("kredensial tersimpan walau signer gagal")
+	}
+}
+
+func TestJenisErrorDibedakan(t *testing.T) {
+	// Minor 11: log membedakan pembatalan, deadline, dan error Postgres tanpa isi pesan.
+	cases := map[error]string{
+		context.Canceled:                      "canceled",
+		context.DeadlineExceeded:              "deadline",
+		fmt.Errorf("x: %w", context.Canceled): "canceled",
+		errors.New("lain"):                    "other",
+	}
+	for err, want := range cases {
+		if got := errorType(err); got != want {
+			t.Errorf("errorType(%v) = %q, ingin %q", err, got, want)
+		}
 	}
 }
 

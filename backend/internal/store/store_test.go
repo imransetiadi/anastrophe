@@ -218,7 +218,7 @@ func bytesOf(b byte) []byte {
 func TestMigrateParalelAman(t *testing.T) {
 	// Minor 2: beberapa replika memigrasi database baru bersamaan.
 	if adminDSN == "" {
-		t.Skip("PostgreSQL tidak tersedia")
+		testpg.Skip(t, skipReason)
 	}
 	ctx := context.Background()
 	dsn, err := testpg.NewDatabase(ctx, adminDSN)

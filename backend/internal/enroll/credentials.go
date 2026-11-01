@@ -94,19 +94,58 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteProblem(w, problem("REQ-INVALID", http.StatusBadRequest))
 		return
 	}
-	id, err := h.Store.AddCardInstance(r.Context(), req.DeviceID, req.SiteID)
-	var pgErr *pgconn.PgError
-	switch {
-	case errors.Is(err, store.ErrCardLimit):
-		httpapi.WriteProblem(w, problem("ENR-LIMIT", http.StatusConflict))
-	case errors.Is(err, store.ErrNotFound), errors.As(err, &pgErr) && pgErr.Code == "23503":
-		httpapi.WriteProblem(w, problem("ENR-NOT-FOUND", http.StatusNotFound))
-	case err != nil:
-		slog.Error("create enrollment failed", "err_type", errorType(err))
-		httpapi.WriteProblem(w, problem("INTERNAL", http.StatusInternalServerError))
-	default:
-		httpapi.WriteJSON(w, http.StatusCreated, map[string]string{"enrollment_id": id})
+	enroll := func(add func() (string, error)) (int, []byte, error) {
+		id, err := add()
+		var pgErr *pgconn.PgError
+		switch {
+		case errors.Is(err, store.ErrCardLimit):
+			return problemBody("ENR-LIMIT", http.StatusConflict)
+		case errors.Is(err, store.ErrNotFound), errors.As(err, &pgErr) && pgErr.Code == "23503":
+			return problemBody("ENR-NOT-FOUND", http.StatusNotFound)
+		case err != nil:
+			return 0, nil, err
+		}
+		out, err := json.Marshal(map[string]string{"enrollment_id": id})
+		return http.StatusCreated, out, err
 	}
+	// SDD §8.5: POST mutasi menerima Idempotency-Key; dengan key, ketuk ganda tidak memakan
+	// dua jatah dari batas 8 kartu.
+	var status int
+	var resp []byte
+	var err error
+	if key := r.Header.Get("Idempotency-Key"); key != "" {
+		if !validIdempotencyKey(key) {
+			httpapi.WriteProblem(w, problem("REQ-IDEMPOTENCY-KEY", http.StatusBadRequest))
+			return
+		}
+		hash := sha256.Sum256([]byte(r.URL.Path + "\n" + req.DeviceID + "\n" + req.SiteID))
+		status, resp, err = h.Store.Idempotent(r.Context(), key, hash[:], func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
+			return enroll(func() (string, error) { return tx.AddCardInstance(ctx, req.DeviceID, req.SiteID) })
+		})
+	} else {
+		status, resp, err = enroll(func() (string, error) { return h.Store.AddCardInstance(r.Context(), req.DeviceID, req.SiteID) })
+	}
+	h.writeResult(w, status, resp, err, "create enrollment failed")
+}
+
+// writeResult menulis hasil handler; error infrastruktur menjadi 500 tanpa detail.
+func (h *Handler) writeResult(w http.ResponseWriter, status int, resp []byte, err error, logMessage string) {
+	switch {
+	case errors.Is(err, store.ErrIdempotencyConflict):
+		httpapi.WriteProblem(w, problem("REQ-IDEMPOTENCY-CONFLICT", http.StatusUnprocessableEntity))
+		return
+	case err != nil:
+		slog.Error(logMessage, "err_type", errorType(err))
+		httpapi.WriteProblem(w, problem("INTERNAL", http.StatusInternalServerError))
+		return
+	}
+	contentType := "application/json"
+	if status >= 400 {
+		contentType = "application/problem+json"
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.WriteHeader(status)
+	_, _ = w.Write(resp)
 }
 
 func (h *Handler) issueCredential(w http.ResponseWriter, r *http.Request) {
@@ -135,22 +174,7 @@ func (h *Handler) issueCredential(w http.ResponseWriter, r *http.Request) {
 	status, resp, err := h.Store.Idempotent(r.Context(), key, hash[:], func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
 		return h.issue(ctx, tx, id, req)
 	})
-	switch {
-	case errors.Is(err, store.ErrIdempotencyConflict):
-		httpapi.WriteProblem(w, problem("REQ-IDEMPOTENCY-CONFLICT", http.StatusUnprocessableEntity))
-		return
-	case err != nil:
-		slog.Error("issue credential failed", "err_type", errorType(err))
-		httpapi.WriteProblem(w, problem("INTERNAL", http.StatusInternalServerError))
-		return
-	}
-	contentType := "application/json"
-	if status >= 400 {
-		contentType = "application/problem+json"
-	}
-	w.Header().Set("Content-Type", contentType)
-	w.WriteHeader(status)
-	_, _ = w.Write(resp)
+	h.writeResult(w, status, resp, err, "issue credential failed")
 }
 
 type provisioned struct {
@@ -268,7 +292,12 @@ func problemBody(code string, status int) (int, []byte, error) {
 // errorType mencatat jenis error tanpa isinya (bisa memuat data sensitif).
 func errorType(err error) string {
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "deadline"
+	case errors.As(err, &pgErr):
 		return "pg:" + pgErr.Code
 	}
 	return "other"

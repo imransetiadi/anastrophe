@@ -40,10 +40,11 @@ public struct APIClient: Sendable {
 
     /// `POST /v1/enrollments` versi tracer backend R1: mendaftarkan kartu untuk perangkat di gedung.
     /// Enrolment produksi memakai identitas kartu fisik, security code, dan App Attest (SDD §8.4.1).
-    public func createEnrollment(deviceID: String, siteID: String) async throws -> String {
+    public func createEnrollment(deviceID: String, siteID: String, idempotencyKey: UUID) async throws -> String {
         var request = URLRequest(url: baseURL.appending(path: "v1/enrollments"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(idempotencyKey.uuidString, forHTTPHeaderField: "Idempotency-Key")
         request.httpBody = try JSONEncoder().encode(["device_id": deviceID, "site_id": siteID])
         struct Created: Decodable {
             let enrollmentID: String

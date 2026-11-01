@@ -86,10 +86,12 @@ struct APIClientTests {
     @Test func createEnrollmentMengirimPerangkatDanGedung() async throws {
         // Endpoint tracer backend R1 (pengganti sementara enrolment kartu fisik).
         let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"6f1c2a9e-0000-4000-8000-000000000001"}"#)
-        let id = try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", siteID: "site-1")
+        let key = UUID()
+        let id = try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", siteID: "site-1", idempotencyKey: key)
         #expect(id == "6f1c2a9e-0000-4000-8000-000000000001")
         let request = try #require(transport.lastRequest)
         #expect(request.httpMethod == "POST")
+        #expect(request.value(forHTTPHeaderField: "Idempotency-Key") == key.uuidString)
         #expect(request.url?.path() == "/v1/enrollments")
         let body = try JSONSerialization.jsonObject(with: try #require(request.httpBody)) as? [String: String]
         #expect(body == ["device_id": "dev-1", "site_id": "site-1"])
@@ -98,7 +100,7 @@ struct APIClientTests {
     @Test func createEnrollmentBatasKartu() async {
         let transport = FakeTransport(status: 409, body: #"{"type":"ENR-LIMIT","status":409}"#, contentType: "application/problem+json")
         await #expect(throws: ANError.cardLimitReached) {
-            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", siteID: "site-1")
+            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", siteID: "site-1", idempotencyKey: UUID())
         }
     }
 

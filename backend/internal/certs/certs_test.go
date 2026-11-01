@@ -109,9 +109,16 @@ func TestSertifikatLintasImplementasi(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	der, _ := x509.MarshalPKIXPublicKey(signer.Public())
-	os.WriteFile(filepath.Join(dir, "ca.pem"), pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der}), 0o600)
-	os.WriteFile(filepath.Join(dir, "cert.bin"), cert, 0o600)
+	der, err := x509.MarshalPKIXPublicKey(signer.Public())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "ca.pem"), pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "cert.bin"), cert, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	check := `import json, sys
 sys.path.insert(0, sys.argv[1])
 import lab_ca
@@ -147,14 +154,27 @@ print(json.dumps({"cred_id": payload[1].hex(), "channel": payload[5], "not_after
 	var credential struct {
 		Certificate string `json:"certificate"`
 	}
-	json.Unmarshal(issued, &credential)
-	pythonCert, _ := base64.StdEncoding.DecodeString(credential.Certificate)
+	if err := json.Unmarshal(issued, &credential); err != nil {
+		t.Fatal(err)
+	}
+	pythonCert, err := base64.StdEncoding.DecodeString(credential.Certificate)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var site struct {
 		CAPrivatePEM string `json:"ca_private_pem"`
 	}
-	raw, _ := os.ReadFile(filepath.Join(lab, "site.json"))
-	json.Unmarshal(raw, &site)
+	raw, err := os.ReadFile(filepath.Join(lab, "site.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(raw, &site); err != nil {
+		t.Fatal(err)
+	}
 	block, _ := pem.Decode([]byte(site.CAPrivatePEM))
+	if block == nil {
+		t.Fatal("site.json tidak berisi PEM kunci CA")
+	}
 	caKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
 		t.Fatal(err)

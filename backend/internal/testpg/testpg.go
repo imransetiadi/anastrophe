@@ -12,6 +12,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -24,9 +26,49 @@ var ErrUnavailable = errors.New("testpg: PostgreSQL tidak tersedia")
 func Start() (string, func(), error) {
 	initdb, err1 := exec.LookPath("initdb")
 	pgctl, err2 := exec.LookPath("pg_ctl")
-	if err1 != nil || err2 != nil {
+	if err1 != nil || err2 != nil || os.Geteuid() == 0 { // initdb menolak berjalan sebagai root
 		return "", func() {}, ErrUnavailable
 	}
+	if out, err := exec.Command(pgctl, "--version").Output(); err == nil && !atLeastMajor(string(out), 16) {
+		return "", func() {}, fmt.Errorf("%w: butuh PostgreSQL ≥ 16, ditemukan %q", ErrUnavailable, strings.TrimSpace(string(out)))
+	}
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ { // port bisa direbut proses lain di antara pilih & start
+		dsn, stop, err := start(initdb, pgctl)
+		if err == nil {
+			return dsn, stop, nil
+		}
+		lastErr = err
+	}
+	return "", func() {}, lastErr
+}
+
+// atLeastMajor membaca mis. "pg_ctl (PostgreSQL) 16.14 (Homebrew)". Versi yang tidak bisa
+// dibaca dianggap memenuhi: lebih baik test berjalan daripada dilewati diam-diam.
+func atLeastMajor(version string, major int) bool {
+	m := regexp.MustCompile(`\(PostgreSQL\)\s+(\d+)`).FindStringSubmatch(version)
+	if m == nil {
+		return true
+	}
+	got, err := strconv.Atoi(m[1])
+	return err != nil || got >= major
+}
+
+// Skip melewati test bila PostgreSQL tidak tersedia, atau menggagalkannya bila
+// ANASTROPHE_REQUIRE_PG=1 (CI) agar tidak ada test database yang hilang diam-diam.
+func Skip(t interface {
+	Helper()
+	Skip(...any)
+	Fatal(...any)
+}, reason string) {
+	t.Helper()
+	if os.Getenv("ANASTROPHE_REQUIRE_PG") == "1" {
+		t.Fatal("PostgreSQL wajib (ANASTROPHE_REQUIRE_PG=1): " + reason)
+	}
+	t.Skip(reason)
+}
+
+func start(initdb, pgctl string) (string, func(), error) {
 	dir, err := os.MkdirTemp("", "anastrophe-pg-")
 	if err != nil {
 		return "", func() {}, err

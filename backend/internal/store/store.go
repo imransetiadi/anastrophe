@@ -122,8 +122,26 @@ func (s *Store) CreateDevice(ctx context.Context) (string, error) {
 // AddCardInstance menambah kartu dengan mengunci baris perangkat lebih dulu, sehingga dua
 // permintaan paralel tidak bisa sama-sama melewati batas 8 (TC-ENR-12).
 func (s *Store) AddCardInstance(ctx context.Context, deviceID, siteID string) (string, error) {
-	id := newUUID()
+	var id string
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		var err error
+		id, err = addCardInstance(ctx, tx, deviceID, siteID)
+		return err
+	})
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+// AddCardInstance di dalam transaksi idempotency (satu koneksi per permintaan).
+func (t *Tx) AddCardInstance(ctx context.Context, deviceID, siteID string) (string, error) {
+	return addCardInstance(ctx, t.tx, deviceID, siteID)
+}
+
+func addCardInstance(ctx context.Context, tx pgx.Tx, deviceID, siteID string) (string, error) {
+	id := newUUID()
+	err := func() error {
 		var locked string
 		if !looksLikeUUID(deviceID) || !looksLikeUUID(siteID) {
 			return ErrNotFound
@@ -143,7 +161,7 @@ func (s *Store) AddCardInstance(ctx context.Context, deviceID, siteID string) (s
 		}
 		_, err := tx.Exec(ctx, `INSERT INTO card_instances (id, device_id, site_id, status) VALUES ($1, $2, $3, 'PROVISIONING')`, id, deviceID, siteID)
 		return err
-	})
+	}()
 	if err != nil {
 		return "", err
 	}

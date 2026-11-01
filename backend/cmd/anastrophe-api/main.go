@@ -13,6 +13,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -56,7 +58,12 @@ func run() error {
 		return err
 	}
 	devCA := certs.NewSoftwareSigner(caKey)
-	slog.Warn("memakai Site CA perangkat lunak sementara; sertifikat tidak berlaku setelah restart")
+	der, err := x509.MarshalPKIXPublicKey(devCA.Public())
+	if err != nil {
+		return err
+	}
+	slog.Warn("memakai Site CA perangkat lunak sementara; sertifikat tidak berlaku setelah restart",
+		"site_ca_public_key_pem", string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der})))
 	enabledChannels := []string{"ble"}
 	handlers := &enroll.Handler{
 		Store:           db,
