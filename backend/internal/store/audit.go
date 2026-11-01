@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -87,6 +88,10 @@ func (t *Tx) AppendAudit(ctx context.Context, e AuditEvent) error {
 	if e.At.IsZero() {
 		return errors.New("store: waktu event audit kosong")
 	}
+	if t.deferring {
+		t.pending = append(t.pending, e)
+		return nil
+	}
 	chain := AuditChain(e.SiteID)
 	if _, err := t.tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1, hashtext($2))`, auditLockNamespace, chain); err != nil {
 		return err
@@ -130,6 +135,40 @@ func (t *Tx) AppendAudit(ctx context.Context, e AuditEvent) error {
 		chain, site, seq, at, e.Actor, e.Action, e.Subject, string(data), prev,
 		auditHash(prev, seq, chain, at, e.Actor, e.Action, e.Subject, data))
 	return err
+}
+
+// deferAudits menahan event AppendAudit di memori sampai flushAudits (ADR-0051), sehingga kunci rantai
+// audit baru diambil sesudah semua kunci baris diperoleh.
+func (t *Tx) deferAudits() { t.deferring = true }
+
+// flushAudits menulis event yang ditahan, diurutkan stabil per rantai: kunci rantai diambil dalam urutan
+// global yang sama di semua transaksi, dan urutan di dalam satu rantai tidak berubah.
+func (t *Tx) flushAudits(ctx context.Context) error {
+	events := t.pending
+	t.pending, t.deferring = nil, false
+	sort.SliceStable(events, func(i, j int) bool { return AuditChain(events[i].SiteID) < AuditChain(events[j].SiteID) })
+	for _, e := range events {
+		if err := t.AppendAudit(ctx, e); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// withDeferredAudits menjalankan fn dengan audit ditahan lalu menuliskannya, juga saat fn gagal, agar audit
+// tetap ikut ter-commit bila pemanggil meng-commit perubahan sebelum galat. Galat fn didahulukan. Bila
+// penahanan sudah aktif, pemanggil luar yang menulis.
+func withDeferredAudits[T any](ctx context.Context, t *Tx, fn func() (T, error)) (T, error) {
+	if t.deferring {
+		return fn()
+	}
+	t.deferAudits()
+	r, err := fn()
+	if ferr := t.flushAudits(ctx); err == nil && ferr != nil {
+		var zero T
+		return zero, ferr
+	}
+	return r, err
 }
 
 // AppendAudit menambah event dalam transaksinya sendiri (event tanpa perubahan bisnis).

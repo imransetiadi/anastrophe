@@ -250,7 +250,12 @@ var ErrNotProvisionable = errors.New("store: card instance tidak dapat diprovisi
 // Tx adalah transaksi yang memegang advisory lock idempotency. Semua kerja satu permintaan
 // berjalan di koneksi ini, sehingga permintaan tidak pernah butuh koneksi kedua (review C1)
 // dan hasilnya ter-commit atomik bersama baris idempotency (review I1).
-type Tx struct{ tx pgx.Tx }
+type Tx struct {
+	tx pgx.Tx
+	// deferring dan pending: event audit yang ditahan sampai flushAudits (ADR-0051).
+	deferring bool
+	pending   []AuditEvent
+}
 
 // EnrollmentForUpdate membaca card instance dan mengunci barisnya sampai transaksi selesai.
 func (t *Tx) EnrollmentForUpdate(ctx context.Context, id string) (Enrollment, error) {

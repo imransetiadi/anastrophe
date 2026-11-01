@@ -123,8 +123,12 @@ func (s *Store) EnrollInvitation(ctx context.Context, deviceID string, tokenHash
 // (ADR-0034). Undangan berkartu menyetujui instance perangkat itu yang belum selesai untuk kartu yang
 // sama (ADR-0035). Tak dikenal, kedaluwarsa, terpakai, dan kartu yang keluar dari registri sama-sama
 // ErrInvitationInvalid.
+//
+// Audit ditahan sampai akhir seperti EnrollCard (ADR-0051).
 func (t *Tx) EnrollInvitation(ctx context.Context, deviceID string, tokenHash []byte, at time.Time) (CardEnrollment, error) {
-	return t.enrollInvitation(ctx, deviceID, tokenHash, at, true)
+	return withDeferredAudits(ctx, t, func() (CardEnrollment, error) {
+		return t.enrollInvitation(ctx, deviceID, tokenHash, at, true)
+	})
 }
 
 func (t *Tx) enrollInvitation(ctx context.Context, deviceID string, tokenHash []byte, at time.Time, retry bool) (CardEnrollment, error) {

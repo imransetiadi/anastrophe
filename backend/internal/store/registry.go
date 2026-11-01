@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // PhysicalCard adalah satu baris registri gedung: hanya HMAC per gedung, tidak pernah identitas
@@ -144,8 +145,13 @@ func (t *Tx) StartCardEnrollment(ctx context.Context, deviceID, siteID string, c
 // PENDING_APPROVAL sampai akun dan keanggotaan ada (ADR-0032). Instance PROVISIONING/PENDING_APPROVAL
 // milik perangkat yang sama dilanjutkan, sedangkan ACTIVE/SUSPENDED menjadi duplikat (ADR-0034). Kunci
 // diambil berurutan (perangkat, lalu kartu) sehingga enrolment bersamaan tersusun tanpa deadlock.
+//
+// Audit ditahan sampai akhir (ADR-0051): kunci rantai audit tidak dipegang selama menunggu baris instance,
+// yang bisa dipegang sapuan per jam yang sedang menunggu kunci rantai yang sama.
 func (t *Tx) EnrollCard(ctx context.Context, deviceID, siteID string, cardHMAC []byte, at time.Time) (CardEnrollment, error) {
-	return t.enrollCard(ctx, deviceID, siteID, cardHMAC, at, true)
+	return withDeferredAudits(ctx, t, func() (CardEnrollment, error) {
+		return t.enrollCard(ctx, deviceID, siteID, cardHMAC, at, true)
+	})
 }
 
 // errInstanceChanged: instance yang hendak dilanjutkan berubah status di tengah transaksi (mis. sapuan
@@ -216,20 +222,25 @@ func (t *Tx) enrollCard(ctx context.Context, deviceID, siteID string, cardHMAC [
 			if h.status != "PROVISIONING" && h.status != "PENDING_APPROVAL" {
 				return CardEnrollment{}, ErrDuplicateEnrollment
 			}
+			// Melanjutkan PROVISIONING memperpanjang batas waktu terbengkalai. PENDING_APPROVAL hanya dikunci, agar
+			// langkah sesudah enrolment di transaksi yang sama (rahasia enrolment, ADR-0040) tidak menunggu baris
+			// ini sambil memegang kunci rantai audit (ADR-0051).
+			// Dijaga status (review akhir undangan M4): sapuan atau operator bisa mengubah instance setelah
+			// dibaca; bila begitu, enrolment diulang sekali.
+			var tag pgconn.CommandTag
 			if h.status == "PROVISIONING" {
-				// Melanjutkan memperpanjang batas waktu terbengkalai.
-				// Dijaga status (review akhir undangan M4): sapuan bisa menandai instance ABANDONED setelah
-				// dibaca; bila begitu, enrolment diulang sekali sehingga instance baru dibuat.
-				tag, err := t.tx.Exec(ctx, `UPDATE card_instances SET status_changed_at = $2 WHERE id = $1 AND status = 'PROVISIONING'`, h.id, at)
-				if err != nil {
-					return CardEnrollment{}, err
+				tag, err = t.tx.Exec(ctx, `UPDATE card_instances SET status_changed_at = $2 WHERE id = $1 AND status = 'PROVISIONING'`, h.id, at)
+			} else {
+				tag, err = t.tx.Exec(ctx, `SELECT 1 FROM card_instances WHERE id = $1 AND status = 'PENDING_APPROVAL' FOR UPDATE`, h.id)
+			}
+			if err != nil {
+				return CardEnrollment{}, err
+			}
+			if tag.RowsAffected() != 1 {
+				if retry {
+					return t.enrollCard(ctx, deviceID, siteID, cardHMAC, at, false)
 				}
-				if tag.RowsAffected() != 1 {
-					if retry {
-						return t.enrollCard(ctx, deviceID, siteID, cardHMAC, at, false)
-					}
-					return CardEnrollment{}, errInstanceChanged
-				}
+				return CardEnrollment{}, errInstanceChanged
 			}
 			return CardEnrollment{ID: h.id, Status: h.status, Resumed: true}, nil
 		}
@@ -273,7 +284,9 @@ func (s *Store) AbandonStaleEnrollments(ctx context.Context, at time.Time) (int,
 	var n int
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		var err error
-		n, err = (&Tx{tx: tx}).abandonStale(ctx, at, "", "", "")
+		t := &Tx{tx: tx}
+		// ADR-0051: audit ditulis sesudah semua baris terkunci, berurutan per rantai.
+		n, err = withDeferredAudits(ctx, t, func() (int, error) { return t.abandonStale(ctx, at, "", "", "") })
 		return err
 	})
 	return n, err
