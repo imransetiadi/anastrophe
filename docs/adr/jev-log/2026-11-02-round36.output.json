@@ -1,0 +1,47 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "deadlock_sapuan",
+    "escaped": false,
+    "confidence": 0.96,
+    "probabilities": {
+      "persetujuan_fr07": 0.03,
+      "deadlock_sapuan": 0.97,
+      "pemulihan_fr44": 0,
+      "laporan_fr58": 0,
+      "ask_user": 0,
+      "investigate": 0,
+      "none": 0
+    },
+    "contradicted_requirements": []
+  },
+  "checks": {
+    "persetujuan_fr07": [
+      "supported",
+      "supported",
+      "supported"
+    ],
+    "deadlock_sapuan": [
+      "supported",
+      "supported",
+      "supported"
+    ],
+    "pemulihan_fr44": [
+      "contradicted",
+      "supported",
+      "contradicted"
+    ],
+    "laporan_fr58": [
+      "supported",
+      "contradicted",
+      "supported"
+    ]
+  },
+  "warnings": [],
+  "usage": {
+    "input_tokens": 3306,
+    "output_tokens": 596
+  }
+}

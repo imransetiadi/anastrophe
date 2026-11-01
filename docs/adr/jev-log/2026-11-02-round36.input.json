@@ -1,0 +1,20 @@
+{
+  "tool": "jev_decide",
+  "decision": "Fokus unit kerja berikutnya untuk Anastrophe setelah filter daftar kartu (ADR-0050) selesai di commit 2ebd649.",
+  "candidates": [
+    "persetujuan_fr07",
+    "deadlock_sapuan",
+    "pemulihan_fr44",
+    "laporan_fr58"
+  ],
+  "requirements": [
+    "Dapat diselesaikan dan diverifikasi tanpa input yang belum tersedia: DEVELOPMENT_TEAM, kunci Apple/APNs, iPhone fisik, dokumen legal final, atau keputusan pengguna yang masih menunggu.",
+    "Memajukan requirement atau atribut kualitas P0 R1.",
+    "Tidak menuntut keputusan semantik keamanan baru yang wajib dieskalasi ke pengguna sebelum bisa dibangun."
+  ],
+  "escalate_on_contradiction": true,
+  "evidence_summary": [
+    "Deadlock 40P01 enrolment–sapuan (backlog, pra-ada); usulan perbaikan tercatat; bisa diuji dengan test urutan kunci deterministik.",
+    "FR-07 butuh dokumen legal untuk isi final; FR-44 butuh keputusan semantik (mengganti instance aktif); FR-43 belum ada desain; FR-58 P1."
+  ]
+}
