@@ -15,6 +15,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // newStatusToken membuat token baca status seperti app (ADR-0037): header bearer base64url dan hash
@@ -257,5 +260,49 @@ func TestPerpanjanganTidakMembocorkanPenangguhan(t *testing.T) {
 	}
 	if strings.Join(answers["aktif"], "|") != strings.Join(answers["ditangguhkan"], "|") {
 		t.Fatalf("jawaban berbeda: %v vs %v", answers["aktif"], answers["ditangguhkan"])
+	}
+}
+
+func TestPerpanjanganMengunciInstanceSebelumKredensial(t *testing.T) {
+	// Review akhir siklus hidup M1: perpanjangan yang memasang hash token harus mengunci instance sebelum
+	// kredensial, sama dengan transisi operator dan hapus kartu, agar keduanya tidak saling deadlock.
+	// Transaksi uji memegang kunci instance (seperti transisi operator); bila urutannya benar,
+	// perpanjangan menunggu di instance dan baris kredensial masih bebas dikunci.
+	f := newFixture(t)
+	ctx := context.Background()
+	card := f.provision(t)
+	nonce := card.challenge(t, card.credID)
+	_, _, hashB64 := newStatusToken(t)
+	conn, err := pgx.Connect(ctx, f.dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(ctx)
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `SELECT 1 FROM card_instances WHERE id = $1 FOR UPDATE`, card.enrollmentID); err != nil {
+		t.Fatal(err)
+	}
+	renewed := make(chan int, 1)
+	go func() {
+		rec := f.do(t, http.MethodPost, "/v1/credentials/"+hex.EncodeToString(card.credID)+":renew", "renew-urutan", map[string]string{
+			"nonce":             base64.StdEncoding.EncodeToString(nonce),
+			"signature":         base64.StdEncoding.EncodeToString(renewalSignature(t, card.key, card.credID, nonce)),
+			"status_token_hash": hashB64,
+		})
+		renewed <- rec.Code
+	}()
+	time.Sleep(300 * time.Millisecond)
+	_, lockErr := tx.Exec(ctx, `SELECT 1 FROM credentials WHERE cred_id = $1 FOR UPDATE NOWAIT`, card.credID)
+	if err := tx.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if code := <-renewed; code != http.StatusOK {
+		t.Fatalf("perpanjangan: %d", code)
+	}
+	if lockErr != nil {
+		t.Fatalf("perpanjangan mengunci kredensial sebelum instance: %v", lockErr)
 	}
 }

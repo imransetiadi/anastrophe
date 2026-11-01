@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"crypto/subtle"
+	"encoding/hex"
 	"errors"
 	"regexp"
 	"slices"
@@ -20,6 +21,8 @@ var (
 	ErrInvalidStatus = errors.New("store: status tidak dikenal")
 	// ErrInvalidTokenHash: hash token baca status harus SHA-256 (32 byte).
 	ErrInvalidTokenHash = errors.New("store: hash token status harus 32 byte")
+	// ErrInvalidProvisioningHash: hash rahasia enrolment harus SHA-256 (32 byte).
+	ErrInvalidProvisioningHash = errors.New("store: hash rahasia enrolment harus 32 byte")
 )
 
 // reasonCode: kode pendek, bukan teks bebas, karena audit append-only tidak boleh memuat data pribadi.
@@ -38,7 +41,7 @@ type CardInstanceSummary struct {
 
 // SuspendCard menangguhkan card instance ACTIVE beserta kredensial ACTIVE-nya (FR-51).
 func (s *Store) SuspendCard(ctx context.Context, cardInstanceID, operator string, at time.Time) error {
-	return s.transition(ctx, cardInstanceID, operator, at, []string{"ACTIVE"}, func(t *Tx, id string) (string, map[string]any, error) {
+	return s.transition(ctx, cardInstanceID, operator, at, []string{"ACTIVE"}, func(t *Tx, id, _ string) (string, map[string]any, error) {
 		if _, err := t.tx.Exec(ctx, `UPDATE credentials SET status = 'SUSPENDED' WHERE card_instance_id = $1 AND status = 'ACTIVE'`, id); err != nil {
 			return "", nil, err
 		}
@@ -49,7 +52,7 @@ func (s *Store) SuspendCard(ctx context.Context, cardInstanceID, operator string
 
 // ResumeCard memulihkan card instance SUSPENDED beserta kredensial SUSPENDED-nya (FR-51).
 func (s *Store) ResumeCard(ctx context.Context, cardInstanceID, operator string, at time.Time) error {
-	return s.transition(ctx, cardInstanceID, operator, at, []string{"SUSPENDED"}, func(t *Tx, id string) (string, map[string]any, error) {
+	return s.transition(ctx, cardInstanceID, operator, at, []string{"SUSPENDED"}, func(t *Tx, id, _ string) (string, map[string]any, error) {
 		if _, err := t.tx.Exec(ctx, `UPDATE credentials SET status = 'ACTIVE' WHERE card_instance_id = $1 AND status = 'SUSPENDED'`, id); err != nil {
 			return "", nil, err
 		}
@@ -65,17 +68,31 @@ func (s *Store) RevokeCardInstance(ctx context.Context, cardInstanceID, reason, 
 		return 0, ErrInvalidReason
 	}
 	var n int
-	err := s.transition(ctx, cardInstanceID, operator, at, []string{"ACTIVE", "SUSPENDED", "PROVISIONING"}, func(t *Tx, id string) (string, map[string]any, error) {
+	err := s.transition(ctx, cardInstanceID, operator, at, []string{"ACTIVE", "SUSPENDED", "PROVISIONING"}, func(t *Tx, id, site string) (string, map[string]any, error) {
 		revoked, err := t.revokeInstance(ctx, id, reason, at)
+		if err != nil {
+			return "", nil, err
+		}
 		n = len(revoked)
-		return "card.revoked", map[string]any{"reason": reason, "credentials": n}, err
+		// Review akhir siklus hidup M8: event per kredensial, pemicu Site Sync yang sama dengan hapus kartu.
+		for _, c := range revoked {
+			err := t.AppendAudit(ctx, AuditEvent{
+				SiteID: site, Actor: "operator:" + operator, Action: "credential.revoked",
+				Subject: "credential:" + hex.EncodeToString(c.CredID),
+				Data:    map[string]any{"channel": c.Channel, "reason": reason}, At: at,
+			})
+			if err != nil {
+				return "", nil, err
+			}
+		}
+		return "card.revoked", map[string]any{"reason": reason, "credentials": n}, nil
 	})
 	return n, err
 }
 
 // transition mengunci baris instance, memeriksa status asal, menjalankan apply, lalu mencatat audit
 // dalam satu transaksi. Urutan kunci: instance, lalu kredensial (sama dengan hapus kartu).
-func (s *Store) transition(ctx context.Context, cardInstanceID, operator string, at time.Time, from []string, apply func(t *Tx, id string) (string, map[string]any, error)) error {
+func (s *Store) transition(ctx context.Context, cardInstanceID, operator string, at time.Time, from []string, apply func(t *Tx, id, site string) (string, map[string]any, error)) error {
 	if !operatorName.MatchString(operator) {
 		return ErrInvalidOperator
 	}
@@ -95,7 +112,7 @@ func (s *Store) transition(ctx context.Context, cardInstanceID, operator string,
 			return ErrInvalidTransition
 		}
 		t := &Tx{tx: tx}
-		action, data, err := apply(t, id)
+		action, data, err := apply(t, id, site)
 		if err != nil {
 			return err
 		}
@@ -204,16 +221,34 @@ func (t *Tx) InitStatusTokenHash(ctx context.Context, cardInstanceID string, has
 // yang dikembalikan kepada perangkat itu (baru, dilanjutkan, atau dipromosikan).
 func (t *Tx) SetProvisioningKeyHash(ctx context.Context, cardInstanceID string, hash []byte) error {
 	if len(hash) != 32 {
-		return ErrInvalidTokenHash
+		return ErrInvalidProvisioningHash
 	}
-	tag, err := t.tx.Exec(ctx, `UPDATE card_instances SET provisioning_key_hash = $2 WHERE id = $1`, cardInstanceID, hash)
+	// Dijaga status (review akhir provisioning M1): enrolment ulang yang menunggu kunci tidak boleh
+	// memasang hash pada instance yang sudah aktif selama menunggu.
+	tag, err := t.tx.Exec(ctx, `UPDATE card_instances SET provisioning_key_hash = $2 WHERE id = $1 AND status IN ('PROVISIONING', 'PENDING_APPROVAL')`, cardInstanceID, hash)
 	if err != nil {
 		return err
 	}
-	if tag.RowsAffected() != 1 {
-		return ErrNotFound
+	if tag.RowsAffected() == 1 {
+		return nil
 	}
-	return nil
+	var status string
+	if err := t.tx.QueryRow(ctx, `SELECT status FROM card_instances WHERE id = $1`, cardInstanceID).Scan(&status); errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	} else if err != nil {
+		return err
+	}
+	return ErrDuplicateEnrollment
+}
+
+// LockInstanceOfCredential mengunci card instance milik kredensial sebelum baris kredensial dikunci,
+// agar perpanjangan memakai urutan kunci yang sama dengan transisi operator dan hapus kartu (instance,
+// lalu kredensial; review akhir siklus hidup M1). Kredensial tak dikenal tidak dianggap galat di sini.
+func (t *Tx) LockInstanceOfCredential(ctx context.Context, credID []byte) error {
+	_, err := t.tx.Exec(ctx, `
+		SELECT ci.id FROM card_instances ci JOIN credentials c ON c.card_instance_id = ci.id
+		WHERE c.cred_id = $1 FOR UPDATE OF ci`, credID)
+	return err
 }
 
 // InTx menjalankan fn dalam satu transaksi; galat dari fn membatalkan semuanya.

@@ -117,6 +117,10 @@ func (s *Store) EnrollInvitation(ctx context.Context, deviceID string, tokenHash
 // sama (ADR-0035). Tak dikenal, kedaluwarsa, terpakai, dan kartu yang keluar dari registri sama-sama
 // ErrInvitationInvalid.
 func (t *Tx) EnrollInvitation(ctx context.Context, deviceID string, tokenHash []byte, at time.Time) (CardEnrollment, error) {
+	return t.enrollInvitation(ctx, deviceID, tokenHash, at, true)
+}
+
+func (t *Tx) enrollInvitation(ctx context.Context, deviceID string, tokenHash []byte, at time.Time, retry bool) (CardEnrollment, error) {
 	if !looksLikeUUID(deviceID) {
 		return CardEnrollment{}, ErrNotFound
 	}
@@ -167,8 +171,16 @@ func (t *Tx) EnrollInvitation(ctx context.Context, deviceID string, tokenHash []
 			return CardEnrollment{}, ErrInvitationInvalid
 		}
 		if status == "PROVISIONING" {
-			if _, err := t.tx.Exec(ctx, `UPDATE card_instances SET status_changed_at = $2 WHERE id = $1`, existing, at); err != nil {
+			// Dijaga status (review akhir undangan M4), seperti jalur kartu.
+			tag, err := t.tx.Exec(ctx, `UPDATE card_instances SET status_changed_at = $2 WHERE id = $1 AND status = 'PROVISIONING'`, existing, at)
+			if err != nil {
 				return CardEnrollment{}, err
+			}
+			if tag.RowsAffected() != 1 {
+				if retry {
+					return t.enrollInvitation(ctx, deviceID, tokenHash, at, false)
+				}
+				return CardEnrollment{}, errInstanceChanged
 			}
 		}
 		return CardEnrollment{ID: existing, Status: status, Resumed: true}, nil

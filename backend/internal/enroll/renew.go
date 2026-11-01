@@ -127,6 +127,10 @@ func (h *Handler) renewCredential(w http.ResponseWriter, r *http.Request, credID
 // renew: urutan cek SDD §8.4.2 dalam satu transaksi. Jalur gagal tidak menulis apa pun,
 // karena Idempotent meng-commit respons < 500.
 func (h *Handler) renew(ctx context.Context, tx *store.Tx, credID, nonce, sig, statusTokenHash []byte) (int, []byte, error) {
+	// Urutan kunci instance → kredensial, sama dengan transisi operator dan hapus kartu (review M1).
+	if err := tx.LockInstanceOfCredential(ctx, credID); err != nil {
+		return 0, nil, err
+	}
 	cred, err := tx.CredentialForRenewal(ctx, credID)
 	if errors.Is(err, store.ErrNotFound) {
 		return problemBody("CRED-NOT-FOUND", http.StatusNotFound)

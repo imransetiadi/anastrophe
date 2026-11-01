@@ -125,12 +125,16 @@ func TestTambahKanalKartuAktifDitolak(t *testing.T) {
 	if r := f.provisionWith(t, id, bearer, "nfcHCE"); r.code != http.StatusNotFound || r.typ != "ENR-NOT-FOUND" {
 		t.Fatalf("kanal kedua setelah hash terhapus: %d %s", r.code, r.body)
 	}
+	// Simulasikan hash yang tertinggal pada instance ACTIVE (SetProvisioningKeyHash sendiri kini
+	// menolaknya, review akhir M1) untuk menguji pertahanan berlapis 409.
 	secret, again, _ := newProvisioningSecret(t)
 	sum := sha256.Sum256(secret)
-	_, _, err := f.store.Idempotent(context.Background(), "pasang-hash", []byte("h"), func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
-		return 200, []byte("{}"), tx.SetProvisioningKeyHash(ctx, id, sum[:])
-	})
+	conn, err := pgx.Connect(context.Background(), f.dsn)
 	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(context.Background())
+	if _, err := conn.Exec(context.Background(), `UPDATE card_instances SET provisioning_key_hash = $2 WHERE id = $1`, id, sum[:]); err != nil {
 		t.Fatal(err)
 	}
 	if r := f.provisionWith(t, id, again, "nfcHCE"); r.code != http.StatusConflict || r.typ != "ENR-NOT-PROVISIONABLE" {

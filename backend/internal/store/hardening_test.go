@@ -1,0 +1,122 @@
+package store
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"testing"
+	"time"
+)
+
+func TestHashRahasiaTidakDipasangPadaInstanceAktif(t *testing.T) {
+	// Review akhir provisioning M1: enrolment ulang yang menunggu kunci tidak boleh memasang hash pada
+	// instance yang sudah ACTIVE.
+	s := freshStore(t)
+	ctx := context.Background()
+	_, _, id, _ := activeCard(t, s, "ble")
+	sum := sha256.Sum256([]byte("rahasia"))
+	err := s.InTx(ctx, func(tx *Tx) error { return tx.SetProvisioningKeyHash(ctx, id, sum[:]) })
+	if !errors.Is(err, ErrDuplicateEnrollment) {
+		t.Fatalf("hash pada instance ACTIVE: %v", err)
+	}
+	var stored []byte
+	if err := s.pool.QueryRow(ctx, `SELECT provisioning_key_hash FROM card_instances WHERE id = $1`, id).Scan(&stored); err != nil || stored != nil {
+		t.Fatalf("hash tersimpan %x (%v)", stored, err)
+	}
+}
+
+func TestHashRahasiaBukan32ByteGalatSendiri(t *testing.T) {
+	// Review akhir provisioning M5: galat hash provisioning tidak menyebut token status.
+	s := freshStore(t)
+	ctx := context.Background()
+	_, _, id, _ := activeCard(t, s)
+	err := s.InTx(ctx, func(tx *Tx) error { return tx.SetProvisioningKeyHash(ctx, id, make([]byte, 31)) })
+	if !errors.Is(err, ErrInvalidProvisioningHash) || errors.Is(err, ErrInvalidTokenHash) {
+		t.Fatalf("galat = %v", err)
+	}
+}
+
+// abandonConcurrently mengunci instance dan menandainya ABANDONED dalam transaksi yang belum di-commit,
+// seperti sapuan per jam yang sedang berjalan; commit() menyelesaikannya.
+func abandonConcurrently(t *testing.T, s *Store, id string) (commit func()) {
+	t.Helper()
+	ctx := context.Background()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `UPDATE card_instances SET status = 'ABANDONED' WHERE id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	return func() {
+		if err := tx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestResumeKartuTidakMenghidupkanInstanceTerbengkalai(t *testing.T) {
+	// Review akhir undangan M4 (jalur kartu): bila sapuan menandai instance ABANDONED saat enrolment
+	// melanjutkannya, enrolment tidak boleh mengembalikan instance itu sebagai PROVISIONING.
+	s := freshStore(t)
+	ctx := context.Background()
+	siteID, _ := registrySite(t, s)
+	device, old, _ := activeCardOn(t, s, siteID, "A")
+	commit := abandonConcurrently(t, s, old)
+	done := make(chan CardEnrollment, 1)
+	errs := make(chan error, 1)
+	go func() {
+		r, err := s.EnrollCard(ctx, device, siteID, cardHMAC("A"), time.Now())
+		done <- r
+		errs <- err
+	}()
+	time.Sleep(300 * time.Millisecond)
+	commit()
+	r, err := <-done, <-errs
+	if err != nil || r.ID == old || r.Status != "PROVISIONING" {
+		t.Fatalf("enrolment setelah instance terbengkalai: %+v %v (lama %s)", r, err, old)
+	}
+}
+
+func TestResumeUndanganTidakMenghidupkanInstanceTerbengkalai(t *testing.T) {
+	// Review akhir undangan M4 (jalur undangan): sama, untuk perangkat yang melanjutkan undangannya.
+	s := freshStore(t)
+	now := time.Now()
+	siteID, device := registrySite(t, s)
+	token := invite(t, s, Invitation{SiteID: siteID, ZonesBitmap: 1}, now)
+	first, err := redeem(t, s, device, token, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit := abandonConcurrently(t, s, first.ID)
+	done := make(chan CardEnrollment, 1)
+	errs := make(chan error, 1)
+	go func() {
+		r, err := redeem(t, s, device, token, now)
+		done <- r
+		errs <- err
+	}()
+	time.Sleep(300 * time.Millisecond)
+	commit()
+	r, err := <-done, <-errs
+	if err != nil || r.ID == first.ID || r.Status != "PROVISIONING" {
+		t.Fatalf("undangan setelah instance terbengkalai: %+v %v (lama %s)", r, err, first.ID)
+	}
+}
+
+func TestRevokeOperatorMenulisAuditKredensial(t *testing.T) {
+	// Review akhir siklus hidup M8: pencabutan operator juga menulis credential.revoked per kredensial,
+	// pemicu Site Sync yang sama dengan hapus kartu (SDD §8.4.3).
+	s := freshStore(t)
+	ctx := context.Background()
+	_, _, id, creds := activeCard(t, s, "ble")
+	if _, err := s.RevokeCardInstance(ctx, id, "hilang", "staf-01", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	events := auditOf(t, s, "credential:"+hex.EncodeToString(creds[0]))
+	if len(events) != 1 || events[0].Action != "credential.revoked" || events[0].Actor != "operator:staf-01" ||
+		events[0].Data["channel"] != "ble" || events[0].Data["reason"] != "hilang" {
+		t.Fatalf("audit kredensial = %+v", events)
+	}
+}

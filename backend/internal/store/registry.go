@@ -135,6 +135,14 @@ func (t *Tx) StartCardEnrollment(ctx context.Context, deviceID, siteID string, c
 // milik perangkat yang sama dilanjutkan, sedangkan ACTIVE/SUSPENDED menjadi duplikat (ADR-0034). Kunci
 // diambil berurutan (perangkat, lalu kartu) sehingga enrolment bersamaan tersusun tanpa deadlock.
 func (t *Tx) EnrollCard(ctx context.Context, deviceID, siteID string, cardHMAC []byte, at time.Time) (CardEnrollment, error) {
+	return t.enrollCard(ctx, deviceID, siteID, cardHMAC, at, true)
+}
+
+// errInstanceChanged: instance yang hendak dilanjutkan berubah status di tengah transaksi (mis. sapuan
+// menandainya ABANDONED) dua kali berturut-turut.
+var errInstanceChanged = errors.New("store: instance berubah saat dilanjutkan")
+
+func (t *Tx) enrollCard(ctx context.Context, deviceID, siteID string, cardHMAC []byte, at time.Time, retry bool) (CardEnrollment, error) {
 	if !looksLikeUUID(deviceID) || !looksLikeUUID(siteID) {
 		return CardEnrollment{}, ErrNotFound
 	}
@@ -193,8 +201,17 @@ func (t *Tx) EnrollCard(ctx context.Context, deviceID, siteID string, cardHMAC [
 			}
 			if h.status == "PROVISIONING" {
 				// Melanjutkan memperpanjang batas waktu terbengkalai.
-				if _, err := t.tx.Exec(ctx, `UPDATE card_instances SET status_changed_at = $2 WHERE id = $1`, h.id, at); err != nil {
+				// Dijaga status (review akhir undangan M4): sapuan bisa menandai instance ABANDONED setelah
+				// dibaca; bila begitu, enrolment diulang sekali sehingga instance baru dibuat.
+				tag, err := t.tx.Exec(ctx, `UPDATE card_instances SET status_changed_at = $2 WHERE id = $1 AND status = 'PROVISIONING'`, h.id, at)
+				if err != nil {
 					return CardEnrollment{}, err
+				}
+				if tag.RowsAffected() != 1 {
+					if retry {
+						return t.enrollCard(ctx, deviceID, siteID, cardHMAC, at, false)
+					}
+					return CardEnrollment{}, errInstanceChanged
 				}
 			}
 			return CardEnrollment{ID: h.id, Status: h.status, Resumed: true}, nil
