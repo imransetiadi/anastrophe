@@ -298,8 +298,9 @@ func TestKanalDimatikanTidakDiperpanjang(t *testing.T) {
 	if rec.Code != http.StatusConflict || problemType(t, rec) != "CRED-NOT-RENEWABLE" {
 		t.Fatalf("renew kanal mati: %d %s", rec.Code, rec.Body)
 	}
-	rec = f.do(t, http.MethodPost, "/v1/credentials/"+hex.EncodeToString(f.credID)+":challenge", "", map[string]string{})
-	if rec.Code != http.StatusConflict || problemType(t, rec) != "CRED-NOT-RENEWABLE" {
+	// Challenge tetap boleh: nonce juga dipakai untuk hapus kartu (ADR-0026), dan pengguna harus
+	// tetap bisa menghapus kartu di kanal yang dimatikan.
+	if rec := f.do(t, http.MethodPost, "/v1/credentials/"+hex.EncodeToString(f.credID)+":challenge", "", map[string]string{}); rec.Code != http.StatusCreated {
 		t.Fatalf("challenge kanal mati: %d %s", rec.Code, rec.Body)
 	}
 }
@@ -318,3 +319,5 @@ func TestKredensialDicabutTidakDiperpanjang(t *testing.T) {
 		t.Fatalf("challenge dicabut: %d %s", rec.Code, rec.Body)
 	}
 }
+
+func hexString(b []byte) string { return hex.EncodeToString(b) }

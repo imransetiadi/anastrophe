@@ -60,7 +60,7 @@ func (h *Handler) renewalChallenge(w http.ResponseWriter, r *http.Request, credI
 		return
 	}
 	expiresAt := h.Now().UTC().Add(RenewalChallengeTTL).Truncate(time.Second)
-	switch err := h.Store.CreateRenewalChallenge(r.Context(), credID, nonce, expiresAt, h.channelEnabled); {
+	switch err := h.Store.CreateRenewalChallenge(r.Context(), credID, nonce, expiresAt); {
 	case errors.Is(err, store.ErrNotFound):
 		httpapi.WriteProblem(w, problem("CRED-NOT-FOUND", http.StatusNotFound))
 	case errors.Is(err, store.ErrNotRenewable):

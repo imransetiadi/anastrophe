@@ -317,21 +317,22 @@ func (c RenewableCredential) Renewable() bool {
 	return c.Status == "ACTIVE" && c.CardStatus == "ACTIVE"
 }
 
-// CreateRenewalChallenge menyimpan nonce untuk kredensial yang masih bisa diperpanjang dan
-// kanalnya masih diizinkan kill switch (FR-04).
-func (s *Store) CreateRenewalChallenge(ctx context.Context, credID, nonce []byte, expiresAt time.Time, channelAllowed func(string) bool) error {
-	var id, channel, status, cardStatus string
+// CreateRenewalChallenge menyimpan nonce untuk kredensial ACTIVE. Nonce dipakai untuk
+// perpanjangan dan hapus kartu (ADR-0026); kill switch kanal hanya ditegakkan saat perpanjangan,
+// agar kartu di kanal yang dimatikan tetap bisa dihapus.
+func (s *Store) CreateRenewalChallenge(ctx context.Context, credID, nonce []byte, expiresAt time.Time) error {
+	var id, status, cardStatus string
 	err := s.pool.QueryRow(ctx, `
-		SELECT c.id, c.channel, c.status, ci.status
+		SELECT c.id, c.status, ci.status
 		FROM credentials c JOIN card_instances ci ON ci.id = c.card_instance_id
-		WHERE c.cred_id = $1`, credID).Scan(&id, &channel, &status, &cardStatus)
+		WHERE c.cred_id = $1`, credID).Scan(&id, &status, &cardStatus)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNotFound
 	}
 	if err != nil {
 		return err
 	}
-	if !(RenewableCredential{Status: status, CardStatus: cardStatus}).Renewable() || !channelAllowed(channel) {
+	if !(RenewableCredential{Status: status, CardStatus: cardStatus}).Renewable() {
 		return ErrNotRenewable
 	}
 	_, err = s.pool.Exec(ctx, `INSERT INTO renewal_challenges (nonce, credential_id, expires_at) VALUES ($1, $2, $3)`, nonce, id, expiresAt)
@@ -342,6 +343,48 @@ func (s *Store) CreateRenewalChallenge(ctx context.Context, credID, nonce []byte
 func (s *Store) PurgeRenewalChallenges(ctx context.Context, before time.Time) (int64, error) {
 	tag, err := s.pool.Exec(ctx, `DELETE FROM renewal_challenges WHERE expires_at < $1`, before)
 	return tag.RowsAffected(), err
+}
+
+// RevokedCredential adalah kredensial yang baru dicabut bersama kartunya.
+type RevokedCredential struct {
+	CredID  []byte
+	Channel string
+}
+
+// RevokeCard menandai nonce terpakai, lalu mencabut semua kredensial ACTIVE kartu dan card
+// instance-nya dalam transaksi pemanggil (hapus kartu, ADR-0026). Slot batas 8 kartu terbebas.
+func (t *Tx) RevokeCard(ctx context.Context, cardID string, nonce []byte, reason string, now time.Time) ([]RevokedCredential, error) {
+	tag, err := t.tx.Exec(ctx, `UPDATE renewal_challenges SET used_at = $2 WHERE nonce = $1 AND used_at IS NULL`, nonce, now)
+	if err != nil {
+		return nil, err
+	}
+	if tag.RowsAffected() != 1 {
+		return nil, ErrNotRenewable
+	}
+	rows, err := t.tx.Query(ctx, `
+		UPDATE credentials SET status = 'REVOKED', revoked_at = $2, revoke_reason = $3
+		WHERE card_instance_id = $1 AND status = 'ACTIVE'
+		RETURNING cred_id, channel`, cardID, now, reason)
+	if err != nil {
+		return nil, err
+	}
+	var revoked []RevokedCredential
+	for rows.Next() {
+		var r RevokedCredential
+		if err := rows.Scan(&r.CredID, &r.Channel); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		revoked = append(revoked, r)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if _, err := t.tx.Exec(ctx, `UPDATE card_instances SET status = 'REVOKED' WHERE id = $1`, cardID); err != nil {
+		return nil, err
+	}
+	return revoked, nil
 }
 
 // CredentialCert membaca sertifikat dan masa berlaku yang tersimpan (diagnostik dan test).
