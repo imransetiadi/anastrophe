@@ -9,6 +9,7 @@ enum EnrollmentMessages {
         case .enrollmentRejected(.siteUnsupported): return localized("enroll.error.site_unsupported")
         case .enrollmentRejected(.duplicate): return localized("enroll.error.duplicate")
         case .enrollmentRejected(.pendingApproval): return localized("enroll.error.pending_approval")
+        case .enrollmentRejected(.invitationInvalid): return localized("enroll.error.invitation_invalid")
         case .cardLimitReached: return localized("enroll.error.limit")
         default: return nil
         }

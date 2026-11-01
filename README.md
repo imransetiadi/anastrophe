@@ -92,7 +92,7 @@ go -C backend run ./cmd/anastrophe-devseed -lab-dir ../scripts/anp1/.lab   # men
 # devseed juga mendaftarkan kartu lab ke registri (-lab-card, default iso14443a:04a1b2c3d4e5f6)
 ANASTROPHE_DEV_SOFTWARE_CA=1 go -C backend run ./cmd/anastrophe-api
 xcrun simctl launch booted app.anastrophe -ANLabBackend http://127.0.0.1:8080 \
-  -ANLabDevice <device_id> -ANLabSite <site_id>   # opsional: -ANLabCard <tech>:<hex>, default sama dengan devseed
+  -ANLabDevice <device_id> -ANLabSite <site_id>   # opsional: -ANLabCard <tech>:<hex> (default sama dengan devseed) atau -ANLabInvite <token>
 ```
 
 Catatan alur lab:
@@ -100,6 +100,7 @@ Catatan alur lab:
 - **Reader uji.** `-lab-dir` memakai kunci reader group dari `lab_ca.py init`, sehingga ponsel menerima tanda tangan reader uji. Reader juga memverifikasi sertifikat terhadap Site CA (SDD §7.5). CA dev `anastrophe-api` dibuat ulang setiap start (kunci publiknya dicetak di log), dan `site_id` di sertifikat = `-site-code` devseed, jadi reader uji harus memakai keduanya. Tanpa `-lab-dir`, devseed membuat group baru yang kunci privatnya dibuang.
 - **Batas 8 kartu.** Setiap enrolment memakai satu dari 8 slot kartu perangkat di server. Enrolment yang gagal sebelum kredensial dilanjutkan bila dicoba lagi, dan slotnya bebas otomatis setelah 15 menit (ADR-0034). Perangkat baru untuk gedung yang sama: `go -C backend run ./cmd/anastrophe-devseed -site-code <hex> -new-device` (tidak butuh kunci registri).
 - **Perangkat tambahan.** Perangkat kedua untuk kartu lab yang sama mendapat `PENDING_APPROVAL` dan app menampilkan "Menunggu persetujuan". Setujui dengan `anastrophe-registry approve --card-instance <id> --operator <pegangan>`, lalu jalankan app lagi: enrolment dilanjutkan dan kredensial diterbitkan (ADR-0032/0034).
+- **Undangan.** `anastrophe-registry invite --site <site_id> --operator <pegangan>` mencetak token sekali. Jalankan app dengan `-ANLabInvite <token>` sebagai pengganti kartu lab: enrolment tanpa kartu fisik, selalu langsung `PROVISIONING` (ADR-0033). Token yang terpakai, kedaluwarsa, atau tak dikenal ditolak dengan "Undangan tidak berlaku atau sudah dipakai."
 - **Provisioning otomatis.** Argumen `-ANLab*` hanya memprovisikan bila perangkat belum punya kartu dan penyimpanan berfungsi. Layar Lab → "Backend dev" memakai kartu lab bawaan; untuk kartu lain, daftarkan dulu lewat `anastrophe-registry import` lalu jalankan app dengan `-ANLabCard <tech>:<hex>`. Kode lab tidak ikut build Release.
 - **Perpanjangan.** `-ANLabRenew` (atau tombol "Perpanjang (lab)" di detail kartu) memperpanjang sertifikat kartu dari backend tanpa tap. Di luar lab, perpanjangan hanya terjadi setelah tap (ADR-0023).
 - **Hapus kartu.** `-ANLabDelete` menghapus kartu pertama tanpa ketukan (verifikasi simulator). Di app biasa: Detail → Pengaturan → Hapus kartu, dengan konfirmasi dan autentikasi (FR-31, ADR-0026).

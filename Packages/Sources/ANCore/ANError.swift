@@ -11,5 +11,5 @@ public enum ANError: Error, Equatable, Sendable {
 
 /// Alasan enrolment kartu ditolak server (SDD §15).
 public enum EnrollmentRejection: String, Equatable, Sendable {
-    case notRegistered, siteUnsupported, duplicate, pendingApproval
+    case notRegistered, siteUnsupported, duplicate, pendingApproval, invitationInvalid
 }

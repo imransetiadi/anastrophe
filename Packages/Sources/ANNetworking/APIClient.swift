@@ -41,10 +41,6 @@ public struct APIClient: Sendable {
     /// `POST /v1/enrollments`: enrolment untuk kartu fisik terdaftar (ADR-0031). Identitas kartu hanya
     /// lewat TLS; server menghitung HMAC per gedung. Security code dan App Attest menyusul (SDD §8.4.1).
     public func createEnrollment(deviceID: String, siteID: String, card: CardIdentity, idempotencyKey: UUID) async throws -> EnrollmentStart {
-        var request = URLRequest(url: baseURL.appending(path: "v1/enrollments"))
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(idempotencyKey.uuidString, forHTTPHeaderField: "Idempotency-Key")
         struct Body: Encodable {
             struct Card: Encodable {
                 let tech: String
@@ -55,7 +51,21 @@ public struct APIClient: Sendable {
             let card: Card
             enum CodingKeys: String, CodingKey { case deviceID = "device_id", siteID = "site_id", card }
         }
-        request.httpBody = try JSONEncoder().encode(Body(deviceID: deviceID, siteID: siteID, card: .init(tech: card.technology.rawValue, id: card.hex)))
+        return try await postEnrollment(Body(deviceID: deviceID, siteID: siteID, card: .init(tech: card.technology.rawValue, id: card.hex)), idempotencyKey: idempotencyKey)
+    }
+
+    /// `POST /v1/enrollments` dengan undangan (FR-12, ADR-0033): token menggantikan kartu fisik. Gedung
+    /// dan zona berasal dari undangan, jadi body hanya perangkat dan token.
+    public func createEnrollment(deviceID: String, invitation: String, idempotencyKey: UUID) async throws -> EnrollmentStart {
+        try await postEnrollment(["device_id": deviceID, "invitation": invitation], idempotencyKey: idempotencyKey)
+    }
+
+    private func postEnrollment(_ body: some Encodable, idempotencyKey: UUID) async throws -> EnrollmentStart {
+        var request = URLRequest(url: baseURL.appending(path: "v1/enrollments"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(idempotencyKey.uuidString, forHTTPHeaderField: "Idempotency-Key")
+        request.httpBody = try JSONEncoder().encode(body)
         return try Self.decoder.decode(EnrollmentStart.self, from: try await perform(request))
     }
 

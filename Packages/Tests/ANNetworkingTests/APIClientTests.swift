@@ -158,6 +158,17 @@ struct APIClientTests {
         #expect(body["card"] as? [String: String] == ["tech": "iso14443a", "id": "04a1b2c3d4e5f6"])
     }
 
+    @Test func createEnrollmentMengirimUndangan() async throws {
+        // ADR-0033: undangan menggantikan kartu fisik; body hanya perangkat dan token.
+        let token = String(repeating: "A", count: 42) + "w"
+        let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"e1","status":"PROVISIONING"}"#)
+        let start = try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", invitation: token, idempotencyKey: UUID())
+        #expect(start == EnrollmentStart(enrollmentID: "e1", status: .provisioning))
+        let raw = try #require(transport.lastRequest?.httpBody)
+        let body = try #require(try JSONSerialization.jsonObject(with: raw) as? [String: String])
+        #expect(body == ["device_id": "dev-1", "invitation": token])
+    }
+
     @Test func createEnrollmentStatusTakDikenalDitolak() async throws {
         let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"e1","status":"MYSTERY"}"#)
         let card = try #require(CardIdentity("iso14443a:04a1b2c3d4e5f6"))
@@ -171,6 +182,7 @@ struct APIClientTests {
         ("ENR-SITE-UNSUPPORTED", 404, ANError.enrollmentRejected(.siteUnsupported)),
         ("ENR-DUPLICATE", 409, ANError.enrollmentRejected(.duplicate)),
         ("ENR-PENDING-APPROVAL", 409, ANError.enrollmentRejected(.pendingApproval)),
+        ("ENR-INVITATION-INVALID", 404, ANError.enrollmentRejected(.invitationInvalid)),
     ])
     func galatRegistriMenjadiErrorDomain(code: String, status: Int, expected: ANError) async throws {
         let transport = FakeTransport(status: status, body: #"{"type":"\#(code)","status":\#(status)}"#, contentType: "application/problem+json")

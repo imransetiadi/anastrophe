@@ -33,6 +33,15 @@ struct LabBackendTargetTests {
         #expect(LabBackendTarget(arguments: base + ["-ANLabCard", "iso14443a:zz"]) == nil)
     }
 
+    @Test func undanganLabDariArgumen() {
+        // ADR-0033: lab bisa mendaftar dengan undangan sebagai pengganti kartu lab.
+        let token = String(repeating: "A", count: 42) + "w"
+        let base = ["Anastrophe", "-ANLabBackend", "http://127.0.0.1:8080", "-ANLabDevice", "d1", "-ANLabSite", "s1"]
+        #expect(LabBackendTarget(arguments: base + ["-ANLabInvite", token])?.invitation == token)
+        #expect(LabBackendTarget(arguments: base)?.invitation == nil)
+        #expect(LabBackendTarget(arguments: base + ["-ANLabInvite", "pendek"]) == nil)
+    }
+
     @Test func isianFormDirapikan() {
         // ID biasanya ditempel dari terminal, sering dengan spasi atau baris baru di ujung.
         let target = LabBackendTarget(url: " http://127.0.0.1:8080\n", deviceID: " d1\n", siteID: "s1 ")
@@ -61,6 +70,22 @@ struct LabBackendLaunchTests {
         #expect(try await services.cards.all().map(\.siteName) == ["Gedung Lab"])
         #expect(await services.runPendingLabBackendProvisioning(transport: transport) == nil)
         #expect(transport.paths.count == 3)  // tidak ada enrolment kedua
+    }
+
+    @Test func provisioningPeluncuranDenganUndangan() async throws {
+        // ADR-0033: -ANLabInvite menggantikan kartu lab di body enrolment.
+        let token = String(repeating: "A", count: 42) + "w"
+        let services = AppServices.inMemory()
+        services.configureLabBackend(arguments: arguments + ["-ANLabInvite", token])
+        let transport = SequenceTransport([
+            configBody(),
+            (201, #"{"enrollment_id":"e1","status":"PROVISIONING"}"#, "application/json"),
+            (200, provisionedBody(credentialID: Data(repeating: 0x5E, count: 16)), "application/json"),
+        ])
+        #expect(await services.runPendingLabBackendProvisioning(transport: transport) == localized("lab.imported"))
+        let enrolment = try #require(transport.bodies[1])
+        let body = try #require(try JSONSerialization.jsonObject(with: enrolment) as? [String: String])
+        #expect(body == ["device_id": "d1", "invitation": token])
     }
 
     @Test func provisioningPeluncuranDilewatiBilaSudahAdaKartu() async throws {

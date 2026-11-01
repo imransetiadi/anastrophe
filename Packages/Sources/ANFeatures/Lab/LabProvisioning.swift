@@ -24,14 +24,15 @@ enum LabProvisioning {
         return try await store(provisioned, keys: keys, records: records, cards: cards)
     }
 
-    /// Alur lab lewat backend dev (cmd/anastrophe-devseed + anastrophe-api): enrolment kartu terdaftar,
-    /// provisioning kredensial, lalu kunci dipindah ke `cred_id` dari server. Gagal di mana pun
-    /// tidak menyisakan kunci, record, atau kartu (FR-19).
+    /// Alur lab lewat backend dev (cmd/anastrophe-devseed + anastrophe-api): enrolment kartu terdaftar
+    /// atau undangan (ADR-0033), provisioning kredensial, lalu kunci dipindah ke `cred_id` dari server.
+    /// Gagal di mana pun tidak menyisakan kunci, record, atau kartu (FR-19).
     static func provisionViaBackend(
         api: APIClient,
         deviceID: String,
         siteID: String,
         card: CardIdentity,
+        invitation: String? = nil,
         channel: ChannelKind,
         keys: any CredentialKeyStore,
         records: any CredentialRecordStore,
@@ -48,7 +49,12 @@ enum LabProvisioning {
         let (localID, publicKey) = try begin(keys: keys)
         var movedTo: Data?
         do {
-            let start = try await api.createEnrollment(deviceID: deviceID, siteID: siteID, card: card, idempotencyKey: UUID())
+            let start: EnrollmentStart
+            if let invitation {
+                start = try await api.createEnrollment(deviceID: deviceID, invitation: invitation, idempotencyKey: UUID())
+            } else {
+                start = try await api.createEnrollment(deviceID: deviceID, siteID: siteID, card: card, idempotencyKey: UUID())
+            }
             // ADR-0032: perangkat tambahan menunggu operator; tidak ada provisioning sampai disetujui.
             guard start.status == .provisioning else { throw ANError.enrollmentRejected(.pendingApproval) }
             let enrollmentID = start.enrollmentID

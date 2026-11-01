@@ -609,6 +609,22 @@
         }
       }
     },
+    "enroll.error.invitation_invalid": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This invitation is invalid or has already been used."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undangan tidak berlaku atau sudah dipakai."
+          }
+        }
+      }
+    },
     "enroll.error.limit": {
       "localizations": {
         "en": {

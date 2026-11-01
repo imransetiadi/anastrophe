@@ -21,6 +21,7 @@ public struct ProblemDetails: Decodable, Error, Equatable, Sendable {
         case "ENR-SITE-UNSUPPORTED": ANError.enrollmentRejected(.siteUnsupported)
         case "ENR-DUPLICATE": ANError.enrollmentRejected(.duplicate)
         case "ENR-PENDING-APPROVAL": ANError.enrollmentRejected(.pendingApproval)
+        case "ENR-INVITATION-INVALID": ANError.enrollmentRejected(.invitationInvalid)
         default: nil
         }
     }

@@ -98,6 +98,22 @@ struct LabBackendProvisioningTests {
         #expect(try await cards.all().isEmpty)
     }
 
+    @Test func provisionViaBackendDenganUndangan() async throws {
+        // ADR-0033: body enrolment membawa token undangan, bukan identitas kartu.
+        let cards = try SwiftDataCardStore(directory: temporaryDirectory())
+        let token = String(repeating: "A", count: 42) + "w"
+        let transport = SequenceTransport([
+            configBody(),
+            (201, #"{"enrollment_id":"e1","status":"PROVISIONING"}"#, "application/json"),
+            (200, provisionedBody(credentialID: Data(repeating: 0x5D, count: 16)), "application/json"),
+        ])
+        let card = try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", card: labTestCard, invitation: token, channel: .ble, keys: keys, records: records, cards: cards)
+        #expect(card.status == .active)
+        let enrolment = try #require(transport.bodies[1])
+        let body = try #require(try JSONSerialization.jsonObject(with: enrolment) as? [String: String])
+        #expect(body == ["device_id": "dev", "invitation": token])
+    }
+
     @Test func provisionViaBackendMenyimpanRenewalURL() async throws {
         // ADR-0023: record mengingat backend penerbit dan awal masa berlaku untuk perpanjangan.
         let cards = try SwiftDataCardStore(directory: temporaryDirectory())

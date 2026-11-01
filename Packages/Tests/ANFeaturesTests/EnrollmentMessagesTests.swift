@@ -7,7 +7,7 @@ import Testing
 struct EnrollmentMessagesTests {
     @Test func setiapAlasanPunyaTeksSendiri() {
         let errors: [ANError] = [.enrollmentRejected(.notRegistered), .enrollmentRejected(.siteUnsupported),
-                                 .enrollmentRejected(.duplicate), .enrollmentRejected(.pendingApproval), .cardLimitReached]
+                                 .enrollmentRejected(.duplicate), .enrollmentRejected(.pendingApproval), .enrollmentRejected(.invitationInvalid), .cardLimitReached]
         let texts = errors.compactMap { EnrollmentMessages.text(for: $0) }
         #expect(texts.count == errors.count)
         #expect(Set(texts).count == errors.count)
