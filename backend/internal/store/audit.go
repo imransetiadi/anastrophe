@@ -79,8 +79,9 @@ func auditHash(prev []byte, seq int64, chain string, at time.Time, actor, action
 //
 // Kontrak: transaksi READ COMMITTED (di REPEATABLE READ penambahan paralel gagal 23505); kunci
 // audit diambil terakhir, setelah kunci idempotency dan kunci baris; satu rantai per transaksi
-// (atau kunci rantai berurutan); jangan memegang FOR UPDATE pada baris sites sebelum memanggil,
-// karena insert mengambil KEY SHARE pada sites lewat foreign key.
+// (atau kunci rantai berurutan, lihat flushAudits). Baris gedung dikunci KEY SHARE tepat sebelum
+// kunci rantai (insert membutuhkannya lewat foreign key), jadi pemanggil yang memegang FOR UPDATE
+// pada baris sites (policy, site-code) tidak membentuk siklus dengan pemegang kunci rantai (ADR-0051).
 //
 // Data yang di-hash adalah teks jsonb PostgreSQL (`jsonb::text`), sama persis dengan yang dibaca
 // kembali saat verifikasi; pemeriksa eksternal memakai teks itu apa adanya.
@@ -93,6 +94,11 @@ func (t *Tx) AppendAudit(ctx context.Context, e AuditEvent) error {
 		return nil
 	}
 	chain := AuditChain(e.SiteID)
+	if e.SiteID != "" {
+		if _, err := t.tx.Exec(ctx, `SELECT 1 FROM sites WHERE id = $1 FOR KEY SHARE`, e.SiteID); err != nil {
+			return err
+		}
+	}
 	if _, err := t.tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1, hashtext($2))`, auditLockNamespace, chain); err != nil {
 		return err
 	}

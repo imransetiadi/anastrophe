@@ -48,4 +48,6 @@ Desain dan rencananya ada di `docs/superpowers/specs/2026-11-02-deadlock-enrolme
 
 - **Jalur galat:** event yang ditahan tetap ditulis walau enrolment gagal, lalu ikut di-rollback oleh pemanggil saat ini. Pemanggil yang meng-commit perubahan sebelum galat (mis. instance basi sudah `ABANDONED`) tetap mendapat auditnya.
 - **Lanjutan `PENDING_APPROVAL`:** jalur kartu mengunci baris instance yang dilanjutkan di dalam enrolment (dijaga status, diulang sekali bila berubah). Tanpa itu, pemasangan rahasia enrolment sesudah audit ditulis (ADR-0040) bisa menunggu baris yang dipegang `DecideEnrollment` sambil memegang kunci rantai.
+- **Baris gedung (review akhir):** `AppendAudit` mengunci baris gedung `FOR KEY SHARE` sebelum kunci rantai. Tanpa itu, insert audit (foreign key ke `sites`) bisa menunggu perintah operator `policy`/`site-code` yang memegang `sites FOR UPDATE` dan menunggu kunci rantai yang sama (40P01, sudah ada sebelumnya).
+- **Sisa:** kunci rantai memakai `hashtext(chain)`; tabrakan hash antar-rantai sangat jarang dan dideteksi PostgreSQL sebagai 40P01.
 - **Bukti:** TC-DR-05 (QA §11.1).

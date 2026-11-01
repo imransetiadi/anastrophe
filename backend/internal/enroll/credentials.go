@@ -186,6 +186,8 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 	}
 	// ADR-0040: instance yang dikembalikan kepada perangkat ini dan masih menunggu kredensial pertama
 	// (baru, dilanjutkan, atau dipromosikan) memakai rahasia enrolment terbaru, dalam transaksi yang sama.
+	// ADR-0051: audit enrolment sudah ditulis saat inTx kembali, dan baris instance yang dikembalikan sudah
+	// dikunci enrolment, jadi langkah di bawah tidak menunggu baris sambil memegang kunci rantai audit.
 	armed := func(ctx context.Context, tx *store.Tx) (store.CardEnrollment, error) {
 		result, err := inTx(ctx, tx)
 		if err == nil && provisioningHash != nil && (result.Status == "PROVISIONING" || result.Status == "PENDING_APPROVAL") {

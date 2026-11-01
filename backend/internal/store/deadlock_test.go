@@ -9,15 +9,15 @@ import (
 	"time"
 )
 
-// waitForLockWait menunggu sampai ada backend lain yang menunggu kunci baris dengan query yang memuat
-// fragmen tertentu (pola deterministik, tanpa jeda tetap; ADR-0051).
+// waitForLockWait menunggu sampai ada backend lain di database test ini yang menunggu kunci dengan query yang
+// memuat fragmen tertentu (fragmen kosong = query apa pun; pola deterministik, tanpa jeda tetap; ADR-0051).
 func waitForLockWait(t *testing.T, s *Store, fragment string) {
 	t.Helper()
 	ctx := context.Background()
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		var n int
-		err := s.pool.QueryRow(ctx, `SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE '%' || $1 || '%' AND pid <> pg_backend_pid()`, fragment).Scan(&n)
+		err := s.pool.QueryRow(ctx, `SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%' || $1 || '%' AND pid <> pg_backend_pid()`, fragment).Scan(&n)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -490,5 +490,51 @@ func TestPenahananAuditBersarang(t *testing.T) {
 	var n int
 	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE action = 'enrollment.started'`).Scan(&n); err != nil || n != 1 {
 		t.Fatalf("audit enrollment.started = %d %v, ingin 1", n, err)
+	}
+}
+
+func TestEnrolmentTidakMemegangKunciRantaiSaatMenungguBarisGedung(t *testing.T) {
+	// Review akhir ADR-0051 (Important 1): insert audit mengambil KEY SHARE pada baris gedung lewat foreign key.
+	// Operator yang memegang sites FOR UPDATE (policy, site-code) lalu meminta kunci rantai tidak boleh bertemu
+	// enrolment yang memegang kunci rantai sambil menunggu baris gedung itu (siklus 40P01).
+	s := freshStore(t)
+	site, _ := registrySite(t, s, PhysicalCard{CardHMAC: cardHMAC("A"), ZonesBitmap: 1}, PhysicalCard{CardHMAC: cardHMAC("B"), ZonesBitmap: 1})
+	device := newDevice(t, s)
+	ctx := context.Background()
+	t0 := time.Now().Add(-time.Hour)
+	stale, err := s.EnrollCard(ctx, device, site, cardHMAC("A"), t0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.EnrollCard(ctx, device, site, cardHMAC("B"), t0.Add(10*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	holder, err := s.pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer holder.Rollback(ctx)
+	if _, err := holder.Exec(ctx, `SELECT id FROM sites WHERE id = $1 FOR UPDATE`, site); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		// Jalur lanjutan: enrolment tidak mengunci baris gedung sebelum audit instance basi ditulis.
+		_, err := s.EnrollCard(ctx, device, site, cardHMAC("B"), t0.Add(20*time.Minute))
+		done <- err
+	}()
+	waitForLockWait(t, s, "")
+	free := auditChainLockFree(t, s, site)
+	if err := holder.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("enrolment sesudah kunci gedung dilepas: %v", err)
+	}
+	if !free {
+		t.Fatal("enrolment memegang kunci rantai audit sambil menunggu baris gedung")
+	}
+	if n := abandonedAudits(t, s, stale.ID); n != 1 {
+		t.Fatalf("audit enrollment.abandoned untuk instance basi = %d, ingin 1", n)
 	}
 }
