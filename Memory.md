@@ -12,7 +12,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 ## Status terkini
 
 - Branch kerja: `feat/r1-scaffold`, di-push ke GitHub private `imransetiadi/anastrophe` (origin) atas permintaan pengguna; belum di-merge.
-- Suite terakhir: Swift host 334 test (1 dilewati, tanpa gagal), simulator 332 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 10 paket lulus dengan PostgreSQL.
+- Suite terakhir: Swift host 345 test (1 dilewati, tanpa gagal), simulator 343 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 10 paket lulus dengan PostgreSQL.
 - Menunggu keputusan pengguna:
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
   - ADR-0038: cara mencegah pemegang kartu membatalkan suspend/revoke operator; rekomendasi `hold_pending_approval`, JEV 0,45.
@@ -20,7 +20,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
   - ADR-0046: kontrol enumerasi identitas kartu lewat enrolment, yang menjadi **gerbang pra-pilot** bersama App Attest; rekomendasi deteksi per gedung + pembatas per perangkat yang di-attest, JEV 0,49.
   - ADR-0047: kedaluwarsa permintaan `PENDING_APPROVAL` (batas 4 per kartu sudah diterapkan), JEV 0,51.
 
-  - Tinjauan 12 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu (`docs/adr/jev-log/*-gate.json`).
+  - Tinjauan 13 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan (`docs/adr/jev-log/*-gate.json`).
   - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
 
@@ -41,6 +41,43 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Provisioning aman | Rahasia enrolment dari app (hanya hash di server) wajib untuk kredensial pertama; tambah kanal ke kartu aktif ditolak. Risiko sisa: id perangkat + identitas kartu bisa mengambil alih enrolment yang belum selesai (ADR-0041) | FR-16, ADR-0039, ADR-0040, ADR-0041 |
 | Ketahanan | Update dijaga status, urutan kunci instance → kredensial, denylist dari sertifikat terpanjang + purge, pembaruan kartu atomik, jam monotonik yang ikut berjalan saat tidur | ADR-0042 |
 | Tambah Kartu | Alur produksi di semua build: kode gedung + tempel kartu (pembaca identifier saja) atau tautan undangan, kanal otomatis, perangkat dibuat saat enrolment, batas 4 permintaan menunggu per kartu. Gerbang pra-pilot terbuka: App Attest + kontrol enumerasi kartu (ADR-0046) | FR-05, FR-10–FR-13, ADR-0043–ADR-0047 |
+| Bantuan | Tombol Bantuan di tab Kunci: FAQ sepuluh topik (ID/EN), status cara akses di iPhone ini, iPhone yang didukung, laporan diagnostik tanpa rahasia | FR-60, FR-02, FR-27, FR-63, ADR-0048 |
+
+## APP-2026-11-02-0518 - Layar Bantuan dan FAQ in-app (Selesai, commit lokal; gate tereskalasi)
+
+Fokus dari ADR-0048 (JEV 0,99). Setelah alur Tambah Kartu ada, FAQ menjadi P0 murni app berikutnya yang tidak terblokir: FR-60, FR-02, FR-27, ditambah FR-63 (P1).
+
+Isi pekerjaan:
+- **Pintu masuk:** tombol "Bantuan" di tab Kunci untuk semua build.
+- **`HelpTopic`:** sepuluh topik FAQ ID/EN sesuai perilaku R1:
+  - perpanjangan saat kartu dipakai dengan internet;
+  - hapus kartu di iPhone lama sebelum menambah di iPhone baru;
+  - perangkat tambahan perlu persetujuan;
+  - layar terkunci butuh buka app + Face ID;
+  - tanpa menjanjikan fitur yang belum ada.
+- **Status cara akses** di iPhone ini; build tanpa emulasi tidak menyalahkan iPhone atau wilayah.
+- **iPhone yang didukung.**
+- **`DiagnosticsReport`** lewat `ShareLink`:
+  - tanpa id, token, nama kartu, zona, atau host layanan;
+  - penyimpanan gagal → "kartu: tidak terbaca".
+
+Review akhir (opus) memberi verdict "With fixes"; 3 Important diperbaiki:
+- jawaban offline;
+- laporan saat penyimpanan gagal;
+- panduan ganti iPhone.
+
+Minor 6 dinaikkan dan diperbaiki. Sisa minor di [backlog](docs/agentmemory/backlog.md).
+
+Bukti:
+- Swift host 345 test, simulator 343 test; build Debug dan Release sukses.
+- Screenshot ID/EN/AX5.
+- Mutasi tertangkap.
+- `jev_verify` 5/5 klaim platform FAQ.
+- `check_docs` 0 masalah.
+
+`jev_gate` tereskalasi (composite 0,83, `safe_to_apply` 0,73).
+
+Commit unit ini: `84ebff0`, `d1a15e6`, `6915b5b`, `aa5af43`, `dd94518`, `d479f9d`, dan commit ini. Obsidian: `sessions/2026-11-02-bantuan-faq.md`, `decisions/ADR-0048…`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
 
 ## APP-2026-11-02-0445 - Alur Tambah Kartu produksi (Selesai, commit lokal; gate tereskalasi; gerbang pra-pilot terbuka)
 

@@ -1,0 +1,76 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "action": "escalate",
+  "label": "bantuan-faq-plan-close-gate",
+  "request": "Close plan 2026-11-02-bantuan-faq (ADR-0048) including the final-review fix pass.",
+  "reason_codes": [
+    "confidence_below_review",
+    "review_escalated",
+    "claim_confidence_below_auto_accept"
+  ],
+  "review": {
+    "safe_to_apply": 0.73,
+    "composite": 0.826,
+    "limiting_rubrics": [
+      "blast_radius"
+    ],
+    "scores": {
+      "correctness": 1.87,
+      "spec_match": 1.92,
+      "test_gap": 0.3,
+      "blast_radius": 1.52
+    }
+  },
+  "verification": {
+    "action": "review",
+    "verified": 7,
+    "contradicted": 0,
+    "unsupported": 0,
+    "needs_review": 1,
+    "results": [
+      {
+        "claim": "Host 345, simulator 343, Debug/Release builds",
+        "verdict": "verified",
+        "confidence": 0.96
+      },
+      {
+        "claim": "Ten FR-60 topics ID/EN; help.* jargon-free",
+        "verdict": "verified",
+        "confidence": 0.88
+      },
+      {
+        "claim": "Report never contains ids/tokens/names/zones/host even when stores contain them",
+        "verdict": "verified",
+        "confidence": 0.67,
+        "action": "review"
+      },
+      {
+        "claim": "Storage failure → 'penyimpanan: gagal' / 'kartu: tidak terbaca'",
+        "verdict": "verified",
+        "confidence": 0.86
+      },
+      {
+        "claim": "Offline and new-iPhone answers corrected in both languages",
+        "verdict": "verified",
+        "confidence": 0.92
+      },
+      {
+        "claim": "FAQ platform claims supported by evidence",
+        "verdict": "verified",
+        "confidence": 0.92
+      },
+      {
+        "claim": "check_docs 0",
+        "verdict": "verified",
+        "confidence": 0.97
+      }
+    ]
+  },
+  "note": "Klaim universal 'never contains' hanya dibuktikan oleh kasus yang diuji (0,67). Tidak diajukan ulang (ADR-0018).",
+  "usage": {
+    "input_tokens": 4153,
+    "output_tokens": 358
+  }
+}

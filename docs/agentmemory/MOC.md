@@ -11,6 +11,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Sesi
 
+- [2026-11-02 — Layar Bantuan dan FAQ](sessions/2026-11-02-bantuan-faq.md)
 - [2026-11-02 — Alur Tambah Kartu produksi](sessions/2026-11-02-alur-tambah-kartu.md)
 - [2026-11-02 — Perbaikan minor tertunda](sessions/2026-11-02-perbaikan-minor.md)
 - [2026-11-02 — Provisioning kredensial yang aman](sessions/2026-11-02-provisioning-aman.md)
@@ -24,6 +25,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Keputusan
 
+- [ADR-0048 — Fokus berikutnya: layar Bantuan dan FAQ in-app](decisions/ADR-0048-fokus-bantuan-faq.md) · JEV 0,99
 - [ADR-0045 — Perangkat dibuat di dalam transaksi enrolment](decisions/ADR-0045-perangkat-dibuat-saat-enrolment.md) · JEV 0,77 (provisional)
 - [ADR-0044 — Kode gedung untuk enrolment kartu fisik](decisions/ADR-0044-kode-gedung-untuk-enrolment-kartu.md) · JEV 0,96
 - [ADR-0043 — Fokus berikutnya: alur Tambah Kartu produksi](decisions/ADR-0043-fokus-alur-tambah-kartu.md) · JEV 0,98
@@ -55,6 +57,6 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 ## Menunggu pengguna
 
 - ADR-0017 (entitas hukum untuk entitlement), ADR-0022 (bentuk reader uji BLE), ADR-0038 (cegah pembatalan suspend/revoke; rekomendasi `hold_pending_approval`), ADR-0041 (pengambilalihan enrolment yang belum selesai; rekomendasi `first_writer_wins`), ADR-0046 (kontrol enumerasi kartu sebagai gerbang pra-pilot; rekomendasi deteksi per gedung + App Attest), ADR-0047 (kedaluwarsa permintaan menunggu).
-- Tinjauan gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu.
+- Tinjauan gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan.
 - Integrasi branch `feat/r1-scaffold`: merge ke `main` atau PR (sudah di-push ke GitHub private).
 - `DEVELOPMENT_TEAM` serta iPhone dan reader untuk uji bertipe H.
