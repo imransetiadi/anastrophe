@@ -92,15 +92,18 @@ struct CardDetailView: View {
     var history: [TapEntry] = []
     let onUse: () -> Void
     @State private var confirmsDelete = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         List {
             Section {
                 LabeledContent(localized("detail.site"), value: card.siteName)
                 LabeledContent(localized("detail.zones"), value: card.zones.joined(separator: ", "))
-                HStack {
+                // Di ukuran aksesibilitas label dan badge ditumpuk, seperti baris lain, agar teks badge tidak terpotong.
+                let statusLayout = dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout())
+                statusLayout {
                     Text(localized("detail.status"))
-                    Spacer(minLength: 8)
+                    if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
                     StatusBadge(status: card.displayStatus())
                 }
                 // Tanpa ini separator mengikuti teks badge, bukan tepi baris seperti baris lain.
