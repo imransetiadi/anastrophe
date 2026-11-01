@@ -352,6 +352,7 @@ Format ID: `TC-<AREA>-<NN>`. **Prio:** P0/P1/P2. **Tipe:** U unit · I integrasi
 | TC-UX-06 | Bahasa ID & EN | Semua string diterjemahkan; format tanggal lokal | FR-61 | P0 | E |
 | TC-UX-07 | zh-Hant & ms | Wajib bila pilot di HK/MY | FR-61 | P1 | E |
 | TC-UX-08 | FAQ in-app | Mencakup semua topik FR-60, per kanal | FR-60 | P0 | E |
+| TC-UX-11 | Bantuan: perangkat didukung dan layar terkunci | Dari tab Kunci: daftar iPhone yang didukung (iPhone 11 ke atas, SE gen 2/3, iOS 26+), penjelasan bahwa kartu di app tidak bisa dipakai saat terkunci/layar mati/baterai habis tanpa membuka app dan autentikasi, dan status kanal di iPhone ini sesuai kelayakan | FR-02, FR-27 | P0 | E |
 | TC-UX-09 | Checklist design system | Checklist `pages/ios-app.md` §9 terpenuhi | NFR-A01, NFR-C01 | P0 | M |
 | TC-UX-10 | Pesan error | Setiap kode katalog SDD §15 menampilkan pesan + langkah lanjut | FR-26 | P1 | E |
 
@@ -616,7 +617,7 @@ Jadwal mengikuti milestone PRD §13; uji pilot mencakup 2 lokasi (ADR-0011).
 | Req | Kasus uji |
 |---|---|
 | FR-01 | TC-ELG-01, TC-ELG-02, TC-ELG-03 |
-| FR-02 | TC-ELG-05 |
+| FR-02 | TC-ELG-05, TC-UX-11 |
 | FR-03 | TC-ACC-01, TC-ACC-02, TC-ACC-03 |
 | FR-04 | TC-ELG-01, TC-ELG-04, TC-ELG-08 |
 | FR-05 | TC-ELG-06, TC-ELG-07, TC-ENR-22 |
@@ -639,7 +640,7 @@ Jadwal mengikuti milestone PRD §13; uji pilot mencakup 2 lokasi (ADR-0011).
 | FR-24 | TC-MGT-12 |
 | FR-25 | TC-PRSN-10, TC-PROTO-08, TC-RDR-01, TC-RDR-06 |
 | FR-26 | TC-PRSN-01, TC-PRSN-14, TC-PRSN-15, TC-PRSN-17, TC-UX-10 |
-| FR-27 | TC-PRSN-11, TC-PRSW-03 |
+| FR-27 | TC-PRSN-11, TC-PRSW-03, TC-UX-11 |
 | FR-28 | TC-PRSN-08, TC-PRSN-09 |
 | FR-29 | TC-PRSN-12 |
 | FR-30 | TC-MGT-01, TC-UPG-02 |

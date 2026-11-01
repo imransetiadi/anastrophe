@@ -1,0 +1,47 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "bantuan_faq",
+    "escaped": false,
+    "confidence": 0.99,
+    "probabilities": {
+      "bantuan_faq": 0.99,
+      "minor_tambah_kartu": 0,
+      "kebijakan_gedung": 0.01,
+      "akses_cepat": 0,
+      "ask_user": 0,
+      "investigate": 0,
+      "none": 0
+    },
+    "contradicted_requirements": []
+  },
+  "checks": {
+    "bantuan_faq": [
+      "supported",
+      "supported",
+      "supported"
+    ],
+    "minor_tambah_kartu": [
+      "supported",
+      "contradicted",
+      "supported"
+    ],
+    "kebijakan_gedung": [
+      "supported",
+      "unknown",
+      "supported"
+    ],
+    "akses_cepat": [
+      "unknown",
+      "contradicted",
+      "unknown"
+    ]
+  },
+  "warnings": [],
+  "usage": {
+    "input_tokens": 3398,
+    "output_tokens": 593
+  }
+}
