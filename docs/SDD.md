@@ -15,6 +15,7 @@
 | 1.0 | 2026-11-01 | Draft awal: satu jalur NFC in-app, protokol challenge–response sederhana. |
 | 2.0 | 2026-11-01 | Abstraksi tiga kanal (W/N/B); desain `CredentialSession` (personalisasi wired) dan BLE; **ANP/1 didesain ulang** (ECDH ephemeral, reader group diautentikasi lebih dulu, identitas terenkripsi, semua APDU < 255 B). Backend: kartu ↔ kredensial per kanal, perpanjangan sertifikat 7 hari, sengketa klaim, hapus akun. Reader referensi + gateway OSDP Transparent Mode. Keamanan, privasi, infrastruktur, observabilitas, katalog error. ADR dipindah ke `docs/adr/` dan diputuskan lewat JEV. |
 | 2.1 | 2026-11-01 | ANP/1: format plaintext AUTH1/GET_CERT/RESULT, `cert_hash`, AAD respons, dan seq per pesan dipatok (§7.4, §7.6); penyamaan kerja verifikasi pada jalur `6982`; test vector v1 (§7.11). |
+| 2.2 | 2026-11-01 | Perpanjangan sertifikat (ADR-0023): pemicu hanya setelah autentikasi tap (§5.5), challenge + format bukti kepemilikan (§8.4.2), endpoint (§8.5), kode `CRED-*` (§15). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -269,7 +270,10 @@ func resolveAvailability(_ kind: ChannelKind, config: RemoteConfig) async -> Cha
 
 ### 5.5 Tugas background & push
 
-- **Perpanjangan sertifikat** (FR-45): `BGAppRefreshTask` (best-effort) + saat app dibuka + saat menerima silent push `cert_renewal_due`. Perpanjang bila sisa < 50%.
+- **Perpanjangan sertifikat** (FR-45, ADR-0023): hanya setelah pengguna mengautentikasi untuk tap. App memakai ulang `LAContext` yang sama untuk tanda tangan bukti kepemilikan, jadi tidak ada prompt kedua (O-A25).
+  - Sisa masa berlaku < 50%: diperpanjang setelah aliran tap selesai, tanpa menahan tap.
+  - Sudah kedaluwarsa: diperpanjang lebih dulu (paling lama 5 dtk), lalu tap dilanjutkan; bila gagal, tap gagal tertutup.
+  - `BGAppRefreshTask`, pembukaan app, dan silent push `cert_renewal_due` hanya memeriksa masa berlaku dan memperbarui status; ketiganya tidak pernah menandatangani, karena kunci `.userPresence` butuh UI autentikasi (I-15).
 - **Status kartu**: silent push (`content-available`) untuk suspend/revoke/approve. App memperbarui status lokal; penegakan tetap di reader.
 
 ### 5.6 Deep link & undangan
@@ -623,7 +627,14 @@ sequenceDiagram
 
 #### 8.4.2 Perpanjangan sertifikat (FR-45)
 
-App mengirim `POST /v1/credentials/{id}:renew`, berisi tanda tangan kunci kredensial atas nonce server (bukti kepemilikan) + App Attest assertion. Server menerbitkan sertifikat baru untuk kunci yang sama, kecuali kredensial berstatus SUSPENDED/REVOKED.
+`{cred}` = `cred_id` dalam hex huruf kecil.
+
+1. App meminta nonce lewat `POST /v1/credentials/{cred}:challenge`. Nonce 32 B, berlaku 120 dtk, sekali pakai, dan terikat ke satu kredensial.
+2. App mengirim `POST /v1/credentials/{cred}:renew` (`Idempotency-Key` wajib) berisi nonce, tanda tangan kunci kredensial (ECDSA P-256, raw r‖s) atas `"ANP1-RENEW"` ‖ `cred_id` ‖ `nonce` sebagai bukti kepemilikan, dan App Attest assertion. Prefix memisahkan domain pesan dari transcript ANP/1.
+3. Dalam satu transaksi, server memeriksa berurutan: kredensial ada (404 `CRED-NOT-FOUND`); kredensial dan card instance ACTIVE (409 `CRED-NOT-RENEWABLE`, termasuk SUSPENDED/REVOKED); nonce valid (400 `CRED-CHALLENGE-INVALID`); tanda tangan valid (400 `CRED-PROOF-INVALID`).
+4. Server menerbitkan sertifikat baru untuk kunci, `cred_id`, dan kanal yang sama, dengan zona dan masa berlaku dari kebijakan gedung saat ini. Nonce ditandai terpakai hanya bila perpanjangan sukses. Respons memakai kontrak provisioning (termasuk `not_before`).
+
+Kapan app memicu alur ini diatur ADR-0023 (§5.5). App Attest belum diimplementasikan karena butuh tim pengembang Apple dan perangkat fisik.
 
 #### 8.4.3 Propagasi pencabutan (G4, NFR-R04)
 
@@ -655,7 +666,7 @@ Semua POST mutasi menerima header `Idempotency-Key`. Error memakai RFC 9457 (`ty
 | `POST /enrollments/{id}/se-personalization` | Sesi personalisasi applet (N-SE) | FR-16 |
 | `GET /cards` · `GET /cards/{id}` | Daftar & detail kartu | FR-30, FR-38 |
 | `DELETE /cards/{id}` | Hapus kartu | FR-31 |
-| `POST /credentials/{id}:renew` | Perpanjang sertifikat | FR-45 |
+| `POST /credentials/{cred}:challenge` · `POST /credentials/{cred}:renew` | Nonce perpanjangan; perpanjang sertifikat (§8.4.2) | FR-45 |
 | `GET /ownerships/{id}/members` · `DELETE /ownerships/{id}/members/{uid}` | Kelola anggota | FR-33 |
 | `PUT /ownerships/{id}/security-code` | Ganti code | FR-34 |
 | `POST /claims` | Laporkan sengketa | FR-18 |
@@ -788,6 +799,10 @@ Tidak ada GPS, tidak ada tracking lintas app (ATT tidak dipakai). Privacy Manife
 | `PRS-DENIED-ZONE` | Zona tidak diizinkan | "Kartu ini tidak berlaku di pintu ini." | — |
 | `PRS-SUSPENDED` | Kredensial ditangguhkan | "Kartu sedang ditangguhkan." | Hubungi pengelola |
 | `CRED-EXPIRED` | Sertifikat kedaluwarsa | "Sambungkan ke internet untuk memperbarui kartu." | Perpanjang otomatis saat online |
+| `CRED-NOT-FOUND` | `cred_id` tidak dikenal saat perpanjangan | "Kartu tidak ditemukan. Tambahkan ulang kartu." | Enrolment ulang |
+| `CRED-NOT-RENEWABLE` | Kredensial atau kartu ditangguhkan/dicabut | "Kartu sedang ditangguhkan. Hubungi pengelola gedung." | Hubungi admin |
+| `CRED-CHALLENGE-INVALID` | Nonce tidak dikenal, terpakai, kedaluwarsa, atau milik kredensial lain | — (diulang otomatis pada tap berikutnya) | Minta nonce baru |
+| `CRED-PROOF-INVALID` | Tanda tangan bukti kepemilikan tidak valid | "Kartu perlu didaftarkan ulang." | Enrolment ulang |
 | `DEV-KEY-MISSING` | Restore/passcode dimatikan | "Kartu perlu dipindahkan ke iPhone ini." | Alur transfer |
 | `NET-OFFLINE` | Aksi butuh online | "Butuh koneksi internet untuk langkah ini." | Retry otomatis |
 

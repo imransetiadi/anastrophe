@@ -1,5 +1,7 @@
 import ANCore
 import ANNetworking
+import ANStorage
+import CryptoKit
 import Foundation
 import Testing
 @testable import ANFeatures
@@ -62,6 +64,41 @@ struct LabBackendLaunchTests {
         #expect(await services.runPendingLabBackendProvisioning(transport: transport) == localized("lab.backend.skipped"))
         #expect(transport.paths.isEmpty)
         #expect(try await services.cards.all().count == 1)
+    }
+
+    /// Kartu lab dengan record yang bisa diperpanjang (renewalURL terisi).
+    func renewableCard(in services: AppServices) async throws -> Card {
+        let credentialID = Data(repeating: 0x5E, count: 16)
+        _ = try services.keys.createKey(for: credentialID)
+        try services.records.save(CredentialRecord(credentialID: credentialID, certificate: Data(repeating: 0xAA, count: 188), notAfter: Date(timeIntervalSince1970: 1_794_096_000),
+                                                   groupKeys: ["a1a2a3a4a5a6a7a8": [P256.Signing.PrivateKey().publicKey.x963Representation]], renewalURL: URL(string: "http://127.0.0.1:8080")))
+        let card = Card(id: UUID(), name: "Gedung Lab", siteName: "Gedung Lab", zones: ["Pintu Lab"], status: .active, credentials: [.ble: credentialID], notAfter: Date(timeIntervalSince1970: 1_794_096_000))
+        try await services.cards.add(card)
+        return card
+    }
+
+    var renewalChallengeReply: (status: Int, body: String, contentType: String) {
+        (201, #"{"nonce":"\#(Data(repeating: 0x4E, count: 32).base64EncodedString())","expires_at":"2026-11-09T00:02:00Z"}"#, "application/json")
+    }
+
+    @Test func perpanjanganLabSaatPeluncuran() async throws {
+        let services = AppServices.inMemory()
+        _ = try await renewableCard(in: services)
+        services.configureLabBackend(arguments: ["Anastrophe", "-ANLabRenew"])
+        let transport = SequenceTransport([
+            renewalChallengeReply,
+            (200, provisionedBody(credentialID: Data(repeating: 0x5E, count: 16), notAfter: "2026-11-16T00:00:00Z", notBefore: "2026-11-09T00:00:00Z"), "application/json"),
+        ])
+        #expect(await services.runPendingLabRenewal(transport: transport) == localized("lab.renewed"))
+        #expect(try await services.cards.all().first?.notAfter == Date(timeIntervalSince1970: 1_794_787_200))
+        #expect(await services.runPendingLabRenewal(transport: transport) == nil)  // sekali per peluncuran
+    }
+
+    @Test func perpanjanganLabGagalMenampilkanKode() async throws {
+        let services = AppServices.inMemory()
+        let card = try await renewableCard(in: services)
+        let transport = SequenceTransport([(409, #"{"type":"CRED-NOT-RENEWABLE","status":409}"#, "application/problem+json")])
+        #expect(await services.labRenew(card: card, transport: transport) == "\(localized("lab.renew_failed")) (CRED-NOT-RENEWABLE)")
     }
 
     @Test func tanpaArgumenTidakAdaProvisioning() async {

@@ -1,7 +1,9 @@
 #if DEBUG
 import ANCore
+import ANCrypto
 import ANNetworking
 import Foundation
+import LocalAuthentication
 
 /// Backend dev untuk provisioning lab (`cmd/anastrophe-devseed` + `anastrophe-api`). DEBUG saja.
 struct LabBackendTarget: Equatable, Sendable {
@@ -39,6 +41,32 @@ extension AppServices {
     /// Membaca argumen peluncuran lab; provisioning berjalan saat layar Kunci pertama tampil.
     public func configureLabBackend(arguments: [String]) {
         pendingLabBackend = LabBackendTarget(arguments: arguments)
+        pendingLabRenewal = arguments.contains("-ANLabRenew")
+    }
+
+    /// Perpanjangan dari `-ANLabRenew`, sekali per peluncuran; nil bila tidak diminta.
+    func runPendingLabRenewal(transport: any HTTPTransport = URLSession.shared) async -> String? {
+        guard pendingLabRenewal else { return nil }
+        pendingLabRenewal = false
+        guard let card = try? await cards.all().first(where: { $0.credentials[.ble] != nil || $0.credentials[.nfcHCE] != nil }) else { return nil }
+        return await labRenew(card: card, transport: transport)
+    }
+
+    /// Memperpanjang sertifikat kartu tanpa menunggu tap (lab). Di simulator kunci perangkat
+    /// lunak tidak memakai konteks; di iPhone konteks baru memunculkan Face ID/passcode.
+    func labRenew(card: Card, transport: any HTTPTransport = URLSession.shared) async -> String {
+        guard let channel = [ChannelKind.ble, .nfcHCE].first(where: { card.credentials[$0] != nil }) else {
+            return localized("lab.renew_failed")
+        }
+        do {
+            _ = try await CredentialRenewer(keys: keys, records: records, cards: cards, transport: transport)
+                .renew(card: card, channel: channel, context: AuthorizedContext(laContext: LAContext()))
+            return localized("lab.renewed")
+        } catch let problem as ProblemDetails {
+            return "\(localized("lab.renew_failed")) (\(problem.type))"
+        } catch {
+            return localized("lab.renew_failed")
+        }
     }
 
     /// Provisioning lab dari argumen peluncuran, sekali per peluncuran; nil bila tidak ada.

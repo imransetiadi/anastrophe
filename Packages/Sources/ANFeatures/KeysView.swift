@@ -33,6 +33,18 @@ public struct KeysView: View {
                 .navigationDestination(for: Card.ID.self) { id in
                     if let card = model.cards.first(where: { $0.id == id }) {
                         CardDetailView(card: card, presentability: model.presentability(of: card)) { use(card) }
+                            #if DEBUG
+                            .toolbar {
+                                ToolbarItem(placement: .primaryAction) {
+                                    Button(localized("lab.renew")) {
+                                        Task {
+                                            labMessage = await services.labRenew(card: card)
+                                            await model.load()
+                                        }
+                                    }
+                                }
+                            }
+                            #endif
                     }
                 }
                 .toolbar {
@@ -46,6 +58,7 @@ public struct KeysView: View {
         .task {
             #if DEBUG
             if let message = await services.runPendingLabBackendProvisioning() { labMessage = message }
+            if let message = await services.runPendingLabRenewal() { labMessage = message }
             #endif
             await model.load()
             openDemoScreen()

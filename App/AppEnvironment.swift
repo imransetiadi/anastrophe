@@ -7,8 +7,8 @@ enum AppEnvironment {
     static func makeServices() async -> AppServices {
         #if DEBUG
         let arguments = ProcessInfo.processInfo.arguments
+        let screen = arguments.firstIndex(of: "-ANDemoScreen").flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
         if arguments.contains("-ANDemo") {
-            let screen = arguments.firstIndex(of: "-ANDemoScreen").flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
             return await AppServices.demo(screen: screen)
         }
         #endif
@@ -19,7 +19,8 @@ enum AppEnvironment {
         #endif
         let services = (try? AppServices.live(nfcEmulationEntitled: nfcEmulationEntitled)) ?? AppServices.storageUnavailable()
         #if DEBUG
-        services.configureLabBackend(arguments: arguments)  // -ANLabBackend <url> -ANLabDevice <id> -ANLabSite <id>
+        services.configureLabBackend(arguments: arguments)  // -ANLabBackend <url> -ANLabDevice <id> -ANLabSite <id>, -ANLabRenew
+        services.demoScreen = screen  // verifikasi visual alur lab dengan layanan live
         #endif
         return services
     }

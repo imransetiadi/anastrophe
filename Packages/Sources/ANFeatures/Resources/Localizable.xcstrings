@@ -705,6 +705,54 @@
         }
       }
     },
+    "lab.renew": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Renew (lab)"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perpanjang (lab)"
+          }
+        }
+      }
+    },
+    "lab.renew_failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Renewal failed."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perpanjangan gagal."
+          }
+        }
+      }
+    },
+    "lab.renewed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Certificate renewed."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sertifikat diperpanjang."
+          }
+        }
+      }
+    },
     "lab.step1": {
       "localizations": {
         "en": {

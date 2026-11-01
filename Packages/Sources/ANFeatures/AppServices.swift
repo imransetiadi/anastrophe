@@ -45,6 +45,8 @@ public final class AppServices {
     public var demoScreen: String?
     /// Provisioning lab yang menunggu layar Kunci (`-ANLabBackend`), lihat `LabBackendTarget`.
     var pendingLabBackend: LabBackendTarget?
+    /// Perpanjangan lab saat peluncuran (`-ANLabRenew`) untuk verifikasi di simulator.
+    var pendingLabRenewal = false
     #endif
 
     init(

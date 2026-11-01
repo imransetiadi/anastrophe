@@ -229,7 +229,7 @@ Format ID: `TC-<AREA>-<NN>`. **Prio:** P0/P1/P2. **Tipe:** U unit · I integrasi
 | TC-DEV-06 | Reinstall app | Hapus & pasang ulang app | Kartu lama tidak dapat dipakai; tawarkan transfer | FR-43 | P0 | E | N, B |
 | TC-DEV-07 | Passcode dimatikan | Matikan passcode perangkat | Kunci in-app terhapus; app mendeteksi & menawarkan pemulihan | FR-44 | P0 | E | N, B |
 | TC-DEV-08 | Face ID didaftarkan ulang | Reset & daftar ulang Face ID | Kredensial **tetap** berfungsi (ADR-0009) | FR-44 | P0 | E | N, B |
-| TC-DEV-09 | Perpanjangan otomatis | Majukan jam server hingga sisa < 50%; app online | Sertifikat diperpanjang tanpa interaksi | FR-45 | P0 | I | N, B |
+| TC-DEV-09 | Perpanjangan otomatis | Majukan jam hingga sisa < 50%; app online; lakukan tap | Sertifikat diperpanjang setelah tap tanpa prompt tambahan (ADR-0023) | FR-45 | P0 | I | N, B |
 | TC-DEV-10 | Peringatan perlu online | Sisa < 24 jam, perangkat offline | Peringatan "Perlu terhubung ke internet"; status "Perlu diperbarui" | FR-45, FR-38 | P0 | E | N, B |
 | TC-DEV-11 | Sertifikat kedaluwarsa | Offline > 7 hari, tap | Ditolak `CRED-EXPIRED`; setelah online → diperpanjang → grant | FR-45, NFR-R04 | P0 | H | N, B |
 | TC-DEV-12 | Satu kredensial per kartu per iPhone | Coba enrolment ganda kartu sama di iPhone sama | Ditolak/idempoten | FR-46 | P1 | I | Semua |
@@ -518,7 +518,7 @@ Laporan per milestone memuat: pass rate per area & kanal, cakupan traceability (
 
 ### 11.1 Hasil verifikasi — M1 tracer bullet sisi app (2026-11-01)
 
-Lingkungan: branch `feat/r1-scaffold`, Xcode 27.2 (27B52), host macOS dan iOS Simulator 27.2 (iPhone 17 Pro); backend Go 1.27 + PostgreSQL 16 sementara (`go test ./...` di `backend/`). Hasil (setelah putaran perbaikan review akhir, iterasi 2 dan 3, dan lab end-to-end): 158 unit test lulus dan 1 dilewati (khusus perangkat) di host maupun simulator; `python3 -I -m unittest discover -s scripts/anp1` 7 OK. "Logika lulus" berarti alur diuji terhadap reader ANP/1 perangkat lunak dan sesi/link palsu, **bukan** perangkat keras. Kasus bertipe H tetap tertunda sampai diuji di iPhone fisik dan reader.
+Lingkungan: branch `feat/r1-scaffold`, Xcode 27.2 (27B52), host macOS dan iOS Simulator 27.2 (iPhone 17 Pro); backend Go 1.27 + PostgreSQL 16 sementara (`go test ./...` di `backend/`). Hasil (setelah putaran perbaikan review akhir, iterasi 2 dan 3, lab end-to-end, dan perpanjangan sertifikat): 187 unit test lulus dan 1 dilewati (khusus perangkat) di host maupun simulator; `python3 -I -m unittest discover -s scripts/anp1` 7 OK. "Logika lulus" berarti alur diuji terhadap reader ANP/1 perangkat lunak dan sesi/link palsu, **bukan** perangkat keras. Kasus bertipe H tetap tertunda sampai diuji di iPhone fisik dan reader.
 
 | Kasus | Hasil | Bukti |
 |---|---|---|
@@ -539,6 +539,7 @@ Lingkungan: branch `feat/r1-scaffold`, Xcode 27.2 (27B52), host macOS dan iOS Si
 | TC-ENR-12 | Lulus di backend: race dua permintaan saat 7 kartu → tepat satu sukses (`SELECT … FOR UPDATE`, PostgreSQL 16) | `TestRaceBatasDelapan` (10× ulang tanpa gagal) |
 | TC-ENR-13 | **Tertunda** (iPhone fisik, `AN_DEVICE_TESTS=1`) | test tersedia, dilewati di simulator |
 | Lab end-to-end app ↔ backend (bukan TC formal: langkah provisioning FR-16 dari TC-ENR-01, tanpa kartu fisik, OTP, dan App Attest) | Lulus di simulator: kartu dari backend dev tampil Aktif; DB berisi tepat 1 credential BLE `ACTIVE` untuk perangkat seed (sertifikat 188 B, berlaku 7 hari); peluncuran ulang tidak menambah kartu; build Release tanpa simbol/string lab | `provisionViaBackendMembuatKartuAktif`, `provisionViaBackendGagalTidakMenyisakanKunci`, `provisionViaBackendDitolakLokalSaatDelapanKartu`, `LabBackendLaunchTests`; `nm -a`/`strings -a` Debug vs Release |
+| TC-DEV-09 | Logika lulus (ADR-0023): kedaluwarsa diperpanjang sebelum presentasi dengan batas 5 dtk lalu gagal tertutup; sisa < 50% diperpanjang setelah tap; backend menolak nonce terpakai, kedaluwarsa, atau lintas kredensial dan kredensial ditangguhkan. Lab simulator: sertifikat 1 hari diperpanjang menjadi 7 hari pada baris kredensial yang sama (jumlah kredensial tetap 1, sertifikat berganti), 1 nonce terpakai. Uji dengan Face ID nyata di perangkat tertunda | `RenewalSchedulerTests`, `CredentialRenewerTests`, `TestPerpanjanganMenerbitkanSertifikatBaru`, `TestNonceKredensialLainDitolak`, `TestKredensialDitangguhkanTidakDiperpanjang` |
 | TC-PRSN-17 | Lulus | `teksPresentasiTanpaJargon` |
 | Temuan review C1/I1 (Face ID membuat scene `.inactive`; "Coba lagi") | Lulus: presentasi hanya dibatalkan saat `.background`; ganti item lembar tidak membatalkan presentasi baru | `inactiveTidakMembatalkanPresentasi`, `cobaLagiTidakMembatalkanPresentasiBaru`, `ketukGandaHanyaMemulaiSatuPresentasi` |
 
