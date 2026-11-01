@@ -1,0 +1,38 @@
+{
+  "tool": "jev_decide",
+  "label": "D30-tampilan-riwayat-tap",
+  "decision": "How should the card detail screen present the local 30-day tap history (FR-30), given that it currently shows only the 20 newest rows under a '30 hari' heading with no way to reach older entries?",
+  "candidates": [
+    {
+      "id": "show_all_inline",
+      "description": "Render every entry from the last 30 days inline in the detail history section; the Settings -> Delete section sits below all entries."
+    },
+    {
+      "id": "inline_recent_plus_all",
+      "description": "Show the 5 most recent entries inline, then a 'Lihat semua (n)' navigation row (only when more exist) that opens a full screen listing all 30-day entries, newest first."
+    },
+    {
+      "id": "history_screen_only",
+      "description": "Replace the inline section with one 'Riwayat tap (n)' navigation row that opens the full 30-day list; no entries inline."
+    },
+    {
+      "id": "cap_20_relabel",
+      "description": "Keep 20 rows inline, rename the heading to '20 tap terakhir', and store only the 20 most recent entries per card."
+    }
+  ],
+  "evidence_refs": [
+    "FR-30",
+    "FR-31",
+    "O-S11",
+    "NFR-A01",
+    "TC-MGT-01",
+    "review akhir riwayat tap I2"
+  ],
+  "priorities": "1) FR-30: every tap from the last 30 days must be viewable. 2) The detail stays scannable: one primary action, and FR-31's Settings -> Delete reachable without long scrolling (O-S11). 3) Usable at AX5 text size (NFR-A01). 4) Minimal new UI and strings (ID+EN).",
+  "requirements": [
+    "Every tap entry from the last 30 days can be viewed in the app.",
+    "The Settings -> Delete section stays reachable without scrolling past a long list of history rows.",
+    "The most recent taps are visible on the detail screen without extra navigation."
+  ],
+  "escalate_on_contradiction": true
+}

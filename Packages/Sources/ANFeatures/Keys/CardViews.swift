@@ -133,15 +133,23 @@ struct CardDetailView: View {
                         .listRowSeparator(.hidden)
                 }
             }
-            // FR-30: riwayat tap lokal 30 hari, hanya di perangkat.
+            // FR-30: riwayat tap lokal 30 hari, hanya di perangkat; lima terbaru di sini (ADR-0030).
             Section(localized("detail.history")) {
-                if history.isEmpty {
+                let preview = TapHistoryPreview(history)
+                if preview.inline.isEmpty {
                     Text(localized("detail.history.empty"))
                         .font(.footnote)
                         .foregroundStyle(ANColor.mutedForeground)
                 } else {
-                    ForEach(history.prefix(20)) { entry in
+                    ForEach(preview.inline) { entry in
                         TapHistoryRow(entry: entry)
+                    }
+                    if preview.showsAll {
+                        NavigationLink {
+                            TapHistoryList(entries: history)
+                        } label: {
+                            LabeledContent(localized("detail.history.see_all"), value: preview.total.formatted())
+                        }
                     }
                 }
             }
@@ -192,6 +200,33 @@ struct CardDetailView: View {
         case .bluetoothUnauthorized: localized("card.reason.bluetooth_denied")
         case .noChannel: localized("card.reason.no_channel")
         }
+    }
+}
+
+/// Ringkasan riwayat di detail (ADR-0030): lima tap terbaru; sisanya lewat "Lihat semua".
+struct TapHistoryPreview: Equatable {
+    static let inlineLimit = 5
+    let inline: [TapEntry]
+    let total: Int
+    var showsAll: Bool { total > inline.count }
+
+    init(_ entries: [TapEntry]) {
+        inline = Array(entries.prefix(Self.inlineLimit))
+        total = entries.count
+    }
+}
+
+/// Riwayat tap 30 hari lengkap (FR-30, ADR-0030), terbaru di atas.
+struct TapHistoryList: View {
+    let entries: [TapEntry]
+
+    var body: some View {
+        List(entries) { entry in
+            TapHistoryRow(entry: entry)
+        }
+        .scrollContentBackground(.hidden)
+        .background(ANColor.background)
+        .navigationTitle(localized("detail.history"))
     }
 }
 

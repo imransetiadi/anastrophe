@@ -32,3 +32,5 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0026](0026-hapus-kartu-bukti-kepemilikan.md) | Hapus kartu dengan bukti kepemilikan kunci | Diterima | `pop_revoke` | 0.98 |
 | [ADR-0027](0027-hapus-kartu-ditangguhkan.md) | Kartu yang ditangguhkan bisa dihapus pemiliknya | Diterima | `revoke_suspended` | 0.94 |
 | [ADR-0028](0028-hapus-kartu-tanpa-kunci.md) | Kartu tanpa kunci dihapus lokal tanpa bukti | Diterima | `local_delete_no_proof` | 1.0 |
+| [ADR-0029](0029-pemulihan-store-riwayat-tap.md) | Store riwayat tap dibuat ulang hanya bila rusak atau tak termigrasi | Diterima | `reset_on_corruption_only` | 0.87 |
+| [ADR-0030](0030-tampilan-riwayat-tap.md) | Detail kartu: lima tap terbaru + riwayat 30 hari | Diterima | `inline_recent_plus_all` | 0.95 |

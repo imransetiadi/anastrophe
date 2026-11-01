@@ -1,0 +1,32 @@
+{
+  "tool": "jev_decide",
+  "label": "D29-pemulihan-store-riwayat",
+  "decision": "How should the iOS app recover when the local tap-history store (SwiftData, 30-day log) cannot be opened at launch, given that today this failure makes the whole app fall back to the 'storage unavailable' mode with no cards?",
+  "candidates": [
+    {
+      "id": "fallback_in_memory",
+      "description": "On open failure use InMemoryTapHistoryStore for this session and leave the file untouched; the next launch tries again. Persistent history stays unavailable for as long as the file remains unreadable (possibly until reinstall)."
+    },
+    {
+      "id": "reset_then_fallback",
+      "description": "On open failure delete the TapHistory directory and retry once; if the retry also fails use InMemoryTapHistoryStore. Old unreadable history is lost; persistence is restored."
+    },
+    {
+      "id": "reset_on_corruption_only",
+      "description": "Inspect the thrown error; delete and recreate only for corruption or migration errors (SQLite 26/11, model incompatibility); for any other error use InMemoryTapHistoryStore without deleting."
+    }
+  ],
+  "evidence_refs": [
+    "FR-30",
+    "TC-UPG-02",
+    "SDD §5.3",
+    "review akhir riwayat tap I1"
+  ],
+  "priorities": "1) Opening doors must never depend on the tap-history log: cards and presentation stay available when it fails. 2) FR-30 history should work persistently again after a failure, without reinstalling. 3) Do not destroy history that is still readable. 4) Keep the code small and testable on the host (Swift Testing, temporary directory).",
+  "requirements": [
+    "A tap-history store that cannot be opened never makes cards or presentation unavailable.",
+    "After the history file becomes corrupt or unmigratable, history is persisted across launches again without reinstalling the app.",
+    "History that can still be read is never deleted."
+  ],
+  "escalate_on_contradiction": true
+}

@@ -29,3 +29,11 @@ scripts/anp1/.lab/
 
 # Python
 __pycache__/
+
+# Obsidian: state per perangkat untuk vault docs/agentmemory (konfigurasi bersama tetap di-commit)
+docs/agentmemory/.obsidian/workspace*.json
+docs/agentmemory/.obsidian/cache
+docs/agentmemory/.trash/
+# Bila root repo dibuka sebagai vault
+/.obsidian/
+/.trash/

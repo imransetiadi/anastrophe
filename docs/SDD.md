@@ -4,7 +4,7 @@
 |---|---|
 | Versi dokumen | 2.0 (Draft untuk review) |
 | Tanggal | 2026-11-01 |
-| Status | Draft — 2 keputusan menunggu manusia: ADR-0014 (topologi backend), ADR-0017 (entitas hukum) |
+| Status | Draft — 2 keputusan menunggu manusia: ADR-0017 (entitas hukum), ADR-0022 (reader uji BLE) |
 | Dokumen terkait | [PRD](PRD.md) · [QA Suite](QA_SUITE.md) · [Research Evidence](research/RESEARCH_EVIDENCE.md) · [ADR](adr/README.md) · [Glosarium](../GLOSSARY.md) · [Design system iOS](design-system/anastrophe/pages/ios-app.md) |
 | Lapisan keputusan | JEV (`jev_decide`) — ADR-0018 |
 
@@ -20,6 +20,7 @@
 | 2.4 | 2026-11-01 | Audit: tag hash `ANP1-AUDIT-v1`, data = teks `jsonb`, CHECK chain kanonik, batas deteksi dan head per jam (§8.1, §11), pseudonim sejak ditulis (§8.4.6, ADR-0025). |
 | 2.5 | 2026-11-01 | Hapus kartu (ADR-0026): `DELETE /cards/{id}` dengan bukti kepemilikan kunci (§8.5), kode `CARD-*` (§15). |
 | 2.6 | 2026-11-01 | Hapus kartu: kartu SUSPENDED bisa dihapus dan 410 `CARD-GONE` (ADR-0027), kartu tanpa kunci dihapus lokal (ADR-0028), `:challenge` memuat `card_instance_id` dan tidak lagi menegakkan kill switch (§8.4.2, §8.5, §15). |
+| 2.7 | 2026-11-01 | Riwayat tap: store yang rusak atau tak termigrasi dibuat ulang, galat lain memakai riwayat sementara di memori tanpa menghapus berkas (ADR-0029, §5.3); detail kartu menampilkan lima tap terbaru dan "Lihat semua" ke riwayat 30 hari (ADR-0030). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -244,6 +245,8 @@ Target minimum: **iOS 26.0** (ADR-0006). Tidak meminta *default contactless app*
 | Token sesi & refresh | Keychain | `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` |
 | Metadata kartu (nama, gedung, zona, status, kanal) | SwiftData | File protection `.complete`; `isExcludedFromBackup = true` |
 | Riwayat tap lokal (30 hari) | SwiftData | Sama |
+
+**Pemulihan riwayat (ADR-0029):** riwayat tap tidak pernah membuat kartu tak tersedia. Bila store tidak bisa dibuka, metadata dibaca lewat Core Data. Store dibuat ulang sekali hanya bila berkasnya rusak (galat 259) atau skemanya tidak cocok dengan model saat ini. Galat lain, misalnya berkas terkunci proteksi data atau tanpa izin, memakai riwayat sementara di memori untuk sesi itu tanpa menghapus berkas. Perubahan skema `TapEntity` tetap wajib diuji migrasinya (TC-UPG-02).
 
 **Deteksi restore:** saat launch, app memastikan setiap kredensial lokal punya kunci yang dapat dimuat. Bila metadata ada tetapi kunci tidak ada (restore ke perangkat lain atau passcode dimatikan), kartu ditandai "Perlu dipindahkan" (FR-40, FR-44). Hanya kartu berstatus Aktif atau Perlu diperbarui yang ditandai; status pemblokir dari server (Ditangguhkan, Menunggu persetujuan, Dicabut) tetap tampil karena memindahkan kartu tidak menyelesaikannya. Kanal yang diperiksa hanya N-HCE dan B (kunci N-SE ada di applet, W di Wallet).
 

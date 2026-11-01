@@ -1,0 +1,112 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "label": "riwayat-tap-completion",
+  "date": "2026-11-01",
+  "request": "Plan 2026-11-01-riwayat-tap (Task 1, 284762c) + final-review fixes I1/I2 (ADR-0029/0030)",
+  "runs": [
+    {
+      "note": "run 1: log uji hanya di kolom tests; klaim jumlah test memakai angka turunan (234 lulus)",
+      "action": "escalate",
+      "review": {
+        "safe_to_apply": 0.32,
+        "composite": 0.662,
+        "limiting": "correctness"
+      },
+      "claims": [
+        [
+          "live() tidak gagal karena riwayat",
+          "verified",
+          0.67
+        ],
+        [
+          "store rusak/tak termigrasi dibuat ulang dan persisten",
+          "verified",
+          0.7
+        ],
+        [
+          "store tak terbaca tidak dihapus",
+          "verified",
+          0.77
+        ],
+        [
+          "detail lima terbaru + Lihat semua",
+          "verified",
+          0.86
+        ],
+        [
+          "view model memuat semua entri 30 hari",
+          "verified",
+          0.53
+        ],
+        [
+          "jumlah suite host 235 (234/1), simulator 233 (232/1)",
+          "contradicted",
+          0.44
+        ],
+        [
+          "uji mutasi",
+          "verified",
+          0.44
+        ],
+        [
+          "string see_all ID/EN + lint",
+          "verified",
+          0.46
+        ]
+      ]
+    },
+    {
+      "note": "run 2 (terakhir): klaim jumlah test ditulis persis seperti log; log verbatim tetap di kolom tests, bukan evidence",
+      "action": "escalate",
+      "review": {
+        "safe_to_apply": 0.27,
+        "composite": 0.6885,
+        "limiting": "test_gap"
+      },
+      "claims": [
+        [
+          "live() tidak gagal karena riwayat",
+          "unsupported",
+          0.3
+        ],
+        [
+          "store rusak/tak termigrasi dibuat ulang dan persisten",
+          "verified",
+          0.64
+        ],
+        [
+          "store tak terbaca tidak dihapus",
+          "verified",
+          0.74
+        ],
+        [
+          "detail lima terbaru + Lihat semua",
+          "verified",
+          0.64
+        ],
+        [
+          "view model memuat semua entri 30 hari",
+          "verified",
+          0.85
+        ],
+        [
+          "baris Test run host 235 / simulator 233",
+          "unsupported",
+          0.28
+        ],
+        [
+          "uji mutasi",
+          "unsupported",
+          0.48
+        ],
+        [
+          "string see_all ID/EN + lint",
+          "unsupported",
+          0.8
+        ]
+      ]
+    }
+  ],
+  "status": "Eskalasi ke pengguna; tidak diulang lagi (ADR-0018). Pelajaran: verifikasi klaim jev_gate hanya membaca butir evidence, jadi log uji yang hanya ada di kolom tests membuat klaim unsupported. Bukti uji lengkap ada di ledger rencana dan docs/agentmemory/sessions/2026-11-01-perbaikan-riwayat-tap.md."
+}

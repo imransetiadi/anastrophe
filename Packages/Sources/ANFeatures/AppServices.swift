@@ -136,7 +136,8 @@ public final class AppServices {
         let config = localConfig(nfcEmulationEntitled: nfcEmulationEntitled)
         let cards = try SwiftDataCardStore(directory: URL.applicationSupportDirectory.appending(path: "Anastrophe/Cards"))
         let revision = CardsRevision()
-        let tapHistory = try SwiftDataTapHistoryStore(directory: URL.applicationSupportDirectory.appending(path: "Anastrophe/TapHistory"))
+        // ADR-0029: riwayat tidak pernah membuat kartu tak tersedia.
+        let tapHistory = SwiftDataTapHistoryStore.openRecovering(directory: URL.applicationSupportDirectory.appending(path: "Anastrophe/TapHistory"))
         let launcher = LivePresentationLauncher(keys: keys, records: records, cards: cards, counters: KeychainCounterStore(store: secrets), foreground: foreground, config: config, nfcEmulationEntitled: nfcEmulationEntitled, onCardsChanged: { revision.bump() })
         return AppServices(
             cards: cards,
@@ -446,9 +447,11 @@ extension AppServices {
             Card(id: UUID(), name: "Kantor Lt. 12", siteName: "Graha Mitra", zones: ["Lantai 12"], status: .suspended, credentials: [.ble: Data(repeating: 0x03, count: 16)], notAfter: nil),
         ]
         for card in samples { try? await services.cards.add(card) }
-        // Riwayat contoh untuk kartu pertama (FR-30).
-        try? await services.tapHistory.append(TapEntry(cardID: samples[0].id, date: .now.addingTimeInterval(-3_600), channel: .ble, granted: true, denyReason: nil))
-        try? await services.tapHistory.append(TapEntry(cardID: samples[0].id, date: .now.addingTimeInterval(-2 * 86_400), channel: .ble, granted: false, denyReason: .zoneNotAllowed))
+        // Riwayat contoh untuk kartu pertama (FR-30); lebih dari lima agar "Lihat semua" tampil (ADR-0030).
+        for (index, hours) in [1, 9, 26, 50, 73, 97, 122, 170].enumerated() {
+            let denied = index == 3
+            try? await services.tapHistory.append(TapEntry(cardID: samples[0].id, date: .now.addingTimeInterval(Double(-hours * 3_600)), channel: .ble, granted: !denied, denyReason: denied ? .zoneNotAllowed : nil))
+        }
         return services
     }
 }

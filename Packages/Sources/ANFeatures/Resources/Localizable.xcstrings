@@ -497,6 +497,22 @@
         }
       }
     },
+    "detail.history.see_all": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See all"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lihat semua"
+          }
+        }
+      }
+    },
     "detail.settings": {
       "localizations": {
         "en": {

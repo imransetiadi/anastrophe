@@ -23,5 +23,5 @@
 
 ### Task 1: Store, dekorator, model, UI
 
-- [ ] Test gagal: `SwiftDataTapHistoryStoreTests` (tambah/urut terbaru dulu, pangkas, hapus per kartu), `RecordingLauncherTests` (granted, denied dengan alasan, `batalTidakDicatat`), `KeysViewModel` (`riwayatLebihDariTigaPuluhHariDipangkas`), `hapusKartuMenghapusRiwayat`.
-- [ ] Implementasikan; bagian Riwayat di `CardDetailView`; QA TC-MGT-01; `swift test` + simulator → LULUS; screenshot demo.
+- [x] Test gagal: `SwiftDataTapHistoryStoreTests` (tambah/urut terbaru dulu, pangkas, hapus per kartu), `RecordingLauncherTests` (granted, denied dengan alasan, `batalTidakDicatat`), `KeysViewModel` (`riwayatLebihDariTigaPuluhHariDipangkas`), `hapusKartuMenghapusRiwayat`.
+- [x] Implementasikan; bagian Riwayat di `CardDetailView`; QA TC-MGT-01; `swift test` + simulator → LULUS; screenshot demo.

@@ -1,0 +1,72 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "reset_on_corruption_only",
+    "escaped": false,
+    "confidence": 0.87,
+    "probabilities": {
+      "fallback_in_memory": 0.01,
+      "reset_then_fallback": 0.1,
+      "reset_on_corruption_only": 0.89,
+      "ask_user": 0,
+      "investigate": 0,
+      "none": 0
+    },
+    "contradicted_requirements": []
+  },
+  "requirements_checked": 3,
+  "checks": [
+    {
+      "candidate": "fallback_in_memory",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "fallback_in_memory",
+      "requirement": 1,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "fallback_in_memory",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "reset_then_fallback",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "reset_then_fallback",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "reset_then_fallback",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "reset_on_corruption_only",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "reset_on_corruption_only",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "reset_on_corruption_only",
+      "requirement": 2,
+      "answer": "supported"
+    }
+  ],
+  "warnings": [],
+  "usage": {
+    "input_tokens": 2557,
+    "output_tokens": 455
+  }
+}

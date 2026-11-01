@@ -87,5 +87,18 @@ struct KeysViewModelTests {
         #expect(model.history(for: card).count == 1)
         #expect(try await services.tapHistory.entries(for: card.id, since: .distantPast).count == 1)
     }
+
+    @Test func riwayatLebihDariDuaPuluhTetapDimuatSemua() async throws {
+        // ADR-0030: semua tap 30 hari bisa dibuka lewat "Lihat semua", jadi view model tidak memotong.
+        let services = AppServices.inMemory()
+        let card = Card(id: UUID(), name: "Lobi", siteName: "Menara A", zones: [], status: .active, credentials: [:], notAfter: nil)
+        try await services.cards.add(card)
+        for hour in 1...25 {
+            try await services.tapHistory.append(TapEntry(cardID: card.id, date: .now.addingTimeInterval(Double(-hour * 3_600)), channel: .ble, granted: true, denyReason: nil))
+        }
+        let model = KeysViewModel(services: services)
+        await model.load()
+        #expect(model.history(for: card).count == 25)
+    }
 }
 

@@ -1,4 +1,5 @@
 import ANCore
+import CoreData
 import Foundation
 import SwiftData
 
@@ -38,6 +39,7 @@ final class TapEntity {
 /// Riwayat di SwiftData terpisah; direktori memakai file protection `.complete` dan dikecualikan
 /// dari backup, sama seperti metadata kartu (SDD §5.3).
 public actor SwiftDataTapHistoryStore: TapHistoryStore {
+    static let storeFileName = "taps.store"
     private let context: ModelContext
 
     public init(directory: URL) throws {
@@ -50,7 +52,7 @@ public actor SwiftDataTapHistoryStore: TapHistoryStore {
         excluded.isExcludedFromBackup = true
         var directory = directory
         try directory.setResourceValues(excluded)
-        let configuration = ModelConfiguration(schema: Schema([TapEntity.self]), url: directory.appending(path: "taps.store"), cloudKitDatabase: .none)
+        let configuration = ModelConfiguration(schema: Schema([TapEntity.self]), url: directory.appending(path: Self.storeFileName), cloudKitDatabase: .none)
         context = ModelContext(try ModelContainer(for: TapEntity.self, configurations: configuration))
     }
 
@@ -72,6 +74,35 @@ public actor SwiftDataTapHistoryStore: TapHistoryStore {
     public func removeAll(for cardID: UUID) async throws {
         try context.delete(model: TapEntity.self, where: #Predicate { $0.cardID == cardID })
         try context.save()
+    }
+}
+
+extension SwiftDataTapHistoryStore {
+    /// Membuka riwayat tanpa pernah gagal (ADR-0029), agar kartu tidak ikut tak tersedia. `directory`
+    /// khusus riwayat: store yang rusak atau skemanya tak termigrasi dihapus lalu dibuat ulang sekali;
+    /// galat lain memakai riwayat sementara di memori tanpa menghapus apa pun.
+    public static func openRecovering(directory: URL) -> any TapHistoryStore {
+        if let store = try? SwiftDataTapHistoryStore(directory: directory) { return store }
+        if isUnusable(store: directory.appending(path: storeFileName)) {
+            try? FileManager.default.removeItem(at: directory)
+            if let store = try? SwiftDataTapHistoryStore(directory: directory) { return store }
+        }
+        return InMemoryTapHistoryStore()
+    }
+
+    /// Berkas bukan database, atau skemanya tidak cocok dengan model saat ini. `SwiftDataError` tidak
+    /// mengungkap galat di dalamnya, jadi metadata store dibaca lewat Core Data. Berkas yang tidak bisa
+    /// dibaca (proteksi data, izin) atau tidak ada tidak dihitung rusak.
+    static func isUnusable(store url: URL) -> Bool {
+        guard let model = NSManagedObjectModel.makeManagedObjectModel(for: [TapEntity.self]) else { return false }
+        do {
+            let metadata = try NSPersistentStoreCoordinator.metadataForPersistentStore(type: .sqlite, at: url)
+            return !model.isConfiguration(withName: nil, compatibleWithStoreMetadata: metadata)
+        } catch let error as CocoaError where error.code == .fileReadCorruptFile {
+            return true
+        } catch {
+            return false
+        }
     }
 }
 
