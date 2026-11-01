@@ -22,6 +22,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Keputusan
 
+- [ADR-0042 — Fokus berikutnya setelah provisioning aman](decisions/ADR-0042-fokus-setelah-provisioning-aman.md) · JEV 0,41 (eskalasi)
 - [ADR-0041 — Pengambilalihan enrolment yang belum selesai lewat id perangkat](decisions/ADR-0041-pengambilalihan-enrolment-belum-selesai.md) · JEV 0,44 (eskalasi)
 - [ADR-0040 — Rahasia enrolment untuk kredensial pertama](decisions/ADR-0040-rahasia-enrolment-kredensial-pertama.md) · JEV 0,83
 - [ADR-0039 — Fokus berikutnya: provisioning kredensial yang aman](decisions/ADR-0039-fokus-provisioning-aman.md) · JEV 0,92
@@ -48,7 +49,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Menunggu pengguna
 
-- ADR-0017 (entitas hukum untuk entitlement), ADR-0022 (bentuk reader uji BLE), ADR-0038 (cegah pembatalan suspend/revoke; rekomendasi `hold_pending_approval`), dan ADR-0041 (pengambilalihan enrolment yang belum selesai; rekomendasi `first_writer_wins`).
+- ADR-0017 (entitas hukum untuk entitlement), ADR-0022 (bentuk reader uji BLE), ADR-0038 (cegah pembatalan suspend/revoke; rekomendasi `hold_pending_approval`), ADR-0041 (pengambilalihan enrolment yang belum selesai; rekomendasi `first_writer_wins`), dan ADR-0042 (fokus berikutnya: perbaikan minor atau FAQ).
 - Tinjauan gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman.
 - Integrasi branch `feat/r1-scaffold`: merge ke `main` atau PR (sudah di-push ke GitHub private).
 - `DEVELOPMENT_TEAM` serta iPhone dan reader untuk uji bertipe H.

@@ -17,6 +17,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
   - ADR-0038: cara mencegah pemegang kartu membatalkan suspend/revoke operator; rekomendasi `hold_pending_approval`, JEV 0,45.
   - ADR-0041: pengambilalihan enrolment yang belum selesai lewat id perangkat + identitas kartu; rekomendasi `first_writer_wins`, JEV 0,44.
+  - ADR-0042: fokus iterasi berikutnya, perbaikan minor tertunda atau FAQ in-app (FR-60); JEV 0,41; rekomendasi perbaikan minor lebih dulu.
   - Tinjauan 10 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman (`docs/adr/jev-log/*-gate.json`).
   - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
