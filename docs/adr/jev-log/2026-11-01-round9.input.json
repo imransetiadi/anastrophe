@@ -1,0 +1,34 @@
+{
+  "tool": "jev_decide",
+  "label": "D25-pseudonim-audit",
+  "decision": "How should Anastrophe's append-only, per-site hash-chained audit log (ADR-0024) satisfy the SDD rules that audit rows are pseudonymized on account deletion (HMAC user id, NFR-PR03) and retained 1 year (≤ 5 years), given that rows cannot be updated and verification currently starts at seq 1?",
+  "candidates": [
+    {
+      "id": "pseudonymous_at_write",
+      "description": "Write only pseudonymous actor/subject ids from the start: device/credential UUIDs today, and for future user/admin identities a per-site HMAC pseudonym computed at write time with a key held outside the audit table. Account deletion destroys the user-to-pseudonym mapping instead of rewriting rows, so rows stay immutable and hashes stay valid. Retention purges whole leading segments and verification resumes from a stored checkpoint (seq, hash) recorded before the purge."
+    },
+    {
+      "id": "hash_identity_digests",
+      "description": "Change the hash input to cover a digest of each identity field instead of the field itself, so a privileged job can later replace the identity value with a pseudonym (with the trigger temporarily disabled) without breaking verification. Requires a controlled UPDATE path on an otherwise append-only table."
+    },
+    {
+      "id": "crypto_shredding",
+      "description": "Encrypt identity fields per user with a per-user key stored elsewhere; account deletion destroys the key (crypto-shredding). Rows and hashes stay unchanged because the ciphertext is hashed."
+    }
+  ],
+  "evidence_refs": [
+    "SDD §8.4.6",
+    "SDD inventaris data (Audit)",
+    "NFR-PR03",
+    "ADR-0024",
+    "CLAUDE.md aturan 6",
+    "review akhir audit I3"
+  ],
+  "priorities": "1) Satisfy the SDD/NFR-PR03 privacy rules (pseudonymization on deletion, bounded retention). 2) Keep audit rows immutable and tamper-evident (FR-54, ADR-0024). 3) Keep the design simple and consistent with the existing per-site HMAC practice (CLAUDE.md rule 6). 4) Decide before any production row exists. The user approved autonomous iteration; decisions under 0.60 go back to the user.",
+  "requirements": [
+    "Account deletion leaves no directly identifying user value in any audit row, without updating or deleting audit rows.",
+    "Every remaining audit row stays verifiable after account deletion and after retention purges.",
+    "No UPDATE path on audit_events is needed in normal operation."
+  ],
+  "escalate_on_contradiction": true
+}

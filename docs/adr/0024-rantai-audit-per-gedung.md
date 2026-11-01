@@ -23,7 +23,8 @@ Audit dibaca dan diekspor per gedung (`GET /admin/sites/{id}/audit`), dan peran 
 
 - Ekspor audit sebuah gedung dapat diverifikasi utuh tanpa melihat baris tenant lain.
 - Tidak ada kunci tulis yang dipakai bersama oleh semua gedung.
-- Menghapus atau mengubah baris mana pun tetap terdeteksi di rantainya.
+- Baris yang diubah, disisipkan, atau dihapus di tengah rantai terdeteksi. **Tidak terdeteksi** tanpa anchoring eksternal: pemotongan ekor (baris terakhir atau seluruh rantai) dan penghitungan ulang hash oleh pemegang akses tulis. Mitigasi parsial: head tiap rantai dicatat per jam ke log terpusat, sehingga head yang mundur terlihat (temuan review audit I2).
+- Pseudonimisasi dan retensi mengikuti ADR-0025.
 - Verifikasi lintas gedung memerlukan pemeriksaan tiap rantai.
 
 ## Catatan keputusan JEV

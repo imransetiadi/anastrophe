@@ -14,6 +14,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/pem"
 	"errors"
 	"log/slog"
@@ -84,6 +85,7 @@ func run() error {
 			} else if n > 0 {
 				slog.Info("purged renewal challenges", "count", n)
 			}
+			logAuditHeads(ctx, db)
 		}
 	}()
 	addr := os.Getenv("ANASTROPHE_ADDR")
@@ -112,5 +114,22 @@ func run() error {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), httpapi.RequestTimeout+5*time.Second)
 		defer cancel()
 		return server.Shutdown(shutdownCtx)
+	}
+}
+
+// logAuditHeads memverifikasi setiap rantai audit dan mencatat head-nya ke log terpusat sebagai
+// anchor parsial (review audit I2): pemotongan ekor terlihat dari head yang mundur di log.
+func logAuditHeads(ctx context.Context, db *store.Store) {
+	heads, err := db.AuditHeads(ctx)
+	if err != nil {
+		slog.Error("audit heads failed")
+		return
+	}
+	for _, h := range heads {
+		if _, err := db.VerifyAuditChain(ctx, h.Chain); err != nil {
+			slog.Error("audit chain tampered", "chain", h.Chain)
+			continue
+		}
+		slog.Info("audit chain head", "chain", h.Chain, "seq", h.Seq, "hash", hex.EncodeToString(h.Hash))
 	}
 }

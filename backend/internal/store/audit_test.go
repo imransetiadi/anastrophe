@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -59,8 +61,9 @@ func TestHashAuditVektor(t *testing.T) {
 	// Nilai dihitung implementasi Python independen (hashlib + json sort_keys).
 	got := auditHash(make([]byte, 32), 1, "site:00000000-0000-0000-0000-000000000001",
 		time.Unix(1_794_000_000, 123_456_000), "device:d1", "credential.provisioned", "credential:aa",
-		[]byte(`{"channel":"ble","not_after":"2026-11-08T00:00:00Z"}`))
-	if want := "a06df7fd4165fd6a06a1c9e7dd29f798d812290220b4b522efb272f9e25fae0f"; hex.EncodeToString(got) != want {
+		[]byte(`{"channel": "ble", "not_after": "2026-11-08T00:00:00Z"}`))
+	// Tag berversi dan data = teks jsonb PostgreSQL (review audit I1).
+	if want := "072a636f63d58bfdd43ab773c7566e63aad17fbe828ef27c58c65b1c9482a26e"; hex.EncodeToString(got) != want {
 		t.Fatalf("hash = %x, ingin %s", got, want)
 	}
 }
@@ -173,5 +176,80 @@ func TestAuditBersamaanTetapBerantai(t *testing.T) {
 	}
 	if n, err := s.VerifyAuditChain(ctx, AuditChain(site)); err != nil || n != 10 {
 		t.Fatalf("verify = %d, %v", n, err)
+	}
+}
+
+func TestAuditDataNumerikTetapTerverifikasi(t *testing.T) {
+	// Review audit I1: data valid tidak boleh memicu alarm manipulasi setelah lewat jsonb.
+	s := freshStore(t)
+	ctx := context.Background()
+	site := newAuditSite(t, s, 1)
+	e := auditEvent(site, 0)
+	e.Data = map[string]any{"v": 1e-7, "w": 1e21, "z": math.Copysign(0, -1), "s": "<&>é"}
+	if err := s.AppendAudit(ctx, e); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := s.VerifyAuditChain(ctx, AuditChain(site)); err != nil || n != 1 {
+		t.Fatalf("verify = %d, %v", n, err)
+	}
+}
+
+func TestAuditTolakNULDanWaktuKosong(t *testing.T) {
+	s := freshStore(t)
+	ctx := context.Background()
+	site := newAuditSite(t, s, 1)
+	withNUL := auditEvent(site, 0)
+	withNUL.Data = map[string]any{"s": "a\x00b"}
+	noTime := auditEvent(site, 1)
+	noTime.At = time.Time{}
+	for _, e := range []AuditEvent{withNUL, noTime} {
+		if err := s.AppendAudit(ctx, e); err == nil {
+			t.Fatalf("event diterima: %+v", e)
+		}
+	}
+}
+
+func TestAuditChainKanonik(t *testing.T) {
+	// Review audit C1: huruf besar dari klien tidak boleh membuat rantai kedua.
+	id := "0F41AB12-0000-4000-8000-00000000ABCD"
+	if got := AuditChain(id); got != "site:"+strings.ToLower(id) {
+		t.Fatalf("chain = %s", got)
+	}
+}
+
+func TestAuditChainHarusCocokDenganSite(t *testing.T) {
+	s := freshStore(t)
+	ctx := context.Background()
+	site := newAuditSite(t, s, 1)
+	_, err := s.pool.Exec(ctx, `INSERT INTO audit_events (chain, site_id, seq, at, actor, action, subject, prev_hash, hash)
+		VALUES ('site:lain', $1, 1, now(), 'a', 'b', 'c', $2, $2)`, site, make([]byte, 32))
+	if err == nil {
+		t.Fatal("baris dengan chain tak cocok site_id diterima")
+	}
+}
+
+func TestAuditHeads(t *testing.T) {
+	// Review audit I2: head per rantai untuk dicatat ke log terpusat (anchor parsial).
+	s := freshStore(t)
+	ctx := context.Background()
+	a, b := newAuditSite(t, s, 1), newAuditSite(t, s, 2)
+	for i := 0; i < 3; i++ {
+		if err := s.AppendAudit(ctx, auditEvent(a, i)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.AppendAudit(ctx, auditEvent(b, 0)); err != nil {
+		t.Fatal(err)
+	}
+	heads, err := s.AuditHeads(ctx)
+	if err != nil || len(heads) != 2 {
+		t.Fatalf("heads = %+v, %v", heads, err)
+	}
+	for _, h := range heads {
+		rows := auditRows(t, s, h.Chain)
+		last := rows[len(rows)-1]
+		if h.Seq != last.seq || string(h.Hash) != string(last.hash) {
+			t.Fatalf("head %s tidak cocok", h.Chain)
+		}
 	}
 }

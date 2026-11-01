@@ -17,6 +17,7 @@
 | 2.1 | 2026-11-01 | ANP/1: format plaintext AUTH1/GET_CERT/RESULT, `cert_hash`, AAD respons, dan seq per pesan dipatok (§7.4, §7.6); penyamaan kerja verifikasi pada jalur `6982`; test vector v1 (§7.11). |
 | 2.2 | 2026-11-01 | Perpanjangan sertifikat (ADR-0023): pemicu hanya setelah autentikasi tap (§5.5), challenge + format bukti kepemilikan (§8.4.2), endpoint (§8.5), kode `CRED-*` (§15). |
 | 2.3 | 2026-11-01 | Audit log berantai hash per gedung (ADR-0024): kolom `chain`/`site_id`/`seq`, append-only, rumus hash (§8.1). |
+| 2.4 | 2026-11-01 | Audit: tag hash `ANP1-AUDIT-v1`, data = teks `jsonb`, CHECK chain kanonik, batas deteksi dan head per jam (§8.1, §11), pseudonim sejak ditulis (§8.4.6, ADR-0025). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -553,7 +554,7 @@ invitations(id uuid pk, site_id fk, physical_card_id fk null, contact_hmac bytea
 claim_disputes(id uuid pk, physical_card_id fk, reporter_user_id fk, status text, decision text, decided_by fk, decided_at timestamptz)
 denylist_entries(site_id fk, cred_id bytea, revoked_at timestamptz, expires_at timestamptz, primary key(site_id, cred_id))
 admin_users(id uuid pk, org_id fk, idp_subject text, role text, mfa_enrolled bool)
-audit_events(id bigserial pk, chain text /* site:<uuid> | platform (ADR-0024) */, site_id fk null, seq bigint, at timestamptz, actor text, action text, subject text, data jsonb, prev_hash bytea, hash bytea, unique(chain, seq)) /* append-only via trigger; hash = SHA-256("ANP1-AUDIT" ‖ prev_hash ‖ seq ‖ field berawalan panjang) */
+audit_events(id bigserial pk, chain text /* site:<uuid> | platform (ADR-0024) */, site_id fk null, seq bigint, at timestamptz, actor text, action text, subject text, data jsonb, prev_hash bytea, hash bytea, unique(chain, seq)) /* append-only via trigger; CHECK chain kanonik = site_id; hash = SHA-256("ANP1-AUDIT-v1" ‖ prev_hash ‖ seq ‖ field berawalan panjang, data = teks jsonb::text); aktor/subjek hanya pseudonim (ADR-0025) */
 ```
 
 **Invarian:**
@@ -653,7 +654,7 @@ Pemegang sah melapor → `claim_disputes` (OPEN) → admin memverifikasi identit
 
 #### 8.4.6 Hapus akun (FR-06)
 
-`DELETE /v1/me` (autentikasi baru + konfirmasi) → cabut semua kredensial dan pass W → jika pengguna PRIMARY dengan anggota aktif, kepemilikan dialihkan ke status "menunggu pemilik" dan admin dinotifikasi → data pribadi dihapus ≤ 30 hari → `audit_events` dipseudonimkan (HMAC user id) sesuai NFR-PR03.
+`DELETE /v1/me` (autentikasi baru + konfirmasi) → cabut semua kredensial dan pass W → jika pengguna PRIMARY dengan anggota aktif, kepemilikan dialihkan ke status "menunggu pemilik" dan admin dinotifikasi → data pribadi dihapus ≤ 30 hari → audit memenuhi NFR-PR03 tanpa menulis ulang baris: `audit_events` hanya memuat pseudonim sejak ditulis (HMAC per gedung untuk identitas pengguna), dan hapus akun memusnahkan pemetaannya (ADR-0025).
 
 ### 8.5 API (REST JSON `/v1`)
 
@@ -724,7 +725,7 @@ Update firmware bertanda tangan (A/B partition), alarm tamper, heartbeat 60 dtk,
 | Enrolment hijack | Meminjam kartu fisik korban | Kecocokan pemegang + sengketa (ADR-0004) |
 | App termodifikasi/jailbreak | Bypass UI | App Attest; deteksi jailbreak → provisioning ditolak |
 | Pengambilalihan akun | Pencurian sesi | SIWA + OTP, refresh token terikat perangkat, re-auth untuk aksi sensitif |
-| Penyalahgunaan admin | Admin mencabut/menyetujui sembarangan | RBAC, MFA, audit hash-chained, alert aksi massal |
+| Penyalahgunaan admin | Admin mencabut/menyetujui sembarangan | RBAC, MFA, audit hash-chained (head per rantai dicatat per jam ke log terpusat; pemotongan ekor tidak terdeteksi tanpa anchoring), peran DB runtime dipisah dari pemilik tabel (rencana), alert aksi massal |
 | Kebocoran server | Dump DB | HMAC identitas kartu & kontak, Argon2id, Site CA di HSM |
 | Penyalahgunaan intent assertion | Kebijakan Apple | Hanya saat intent aktif (C4, C5) |
 

@@ -49,6 +49,9 @@ Bahasa domain bersama (*ubiquitous language*) untuk PRD, SDD, QA Suite, kode, da
 | **Nonce perpanjangan** | 32 B acak dari server, berlaku 120 dtk, sekali pakai, terikat ke satu kredensial (SDD §8.4.2). | `RenewalChallenge` |
 | **Bukti kepemilikan** | Tanda tangan kunci kredensial atas `"ANP1-RENEW"` ‖ `cred_id` ‖ nonce; membuktikan perangkat masih memegang kunci. | `RenewalChallenge.message(credentialID:)` |
 | **Backend penerbit** | Base URL backend yang menerbitkan kredensial, disimpan per record untuk perpanjangan. Kartu tanpa backend penerbit (lab `lab_ca.py`) tidak diperpanjang. | `CredentialRecord.renewalURL` |
+| **Rantai audit** | Urutan baris `audit_events` per gedung (`site:<uuid>`) yang saling terhubung lewat hash; satu rantai per gedung (ADR-0024). | `AuditChain(siteID)` |
+| **Rantai platform** | Rantai audit untuk event tanpa gedung (mis. `account.deleted`). | `AuditChain("")` |
+| **Head rantai** | Baris terakhir sebuah rantai `(chain, seq, hash)`, dicatat per jam ke log terpusat sebagai anchor parsial. | `AuditHeads` |
 | **Perlu diperbarui** | Status tampilan kartu aktif dengan sisa masa berlaku < 24 jam atau yang sudah lewat (FR-38, TC-DEV-10). | `CardStatus.needsRenewal`, `Card.displayStatus` |
 | **UNREACHABLE** | Status server untuk kredensial yang perangkatnya tidak lagi melapor (mis. app dihapus). | `.unreachable` |
 

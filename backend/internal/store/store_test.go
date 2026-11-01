@@ -35,11 +35,11 @@ func TestBatasDelapanKartu(t *testing.T) {
 	siteID, deviceID := seed(t, s)
 	ctx := context.Background()
 	for i := 0; i < 8; i++ {
-		if _, err := s.AddCardInstance(ctx, deviceID, siteID); err != nil {
+		if _, err := s.StartEnrollment(ctx, deviceID, siteID, time.Now()); err != nil {
 			t.Fatalf("kartu ke-%d: %v", i+1, err)
 		}
 	}
-	if _, err := s.AddCardInstance(ctx, deviceID, siteID); !errors.Is(err, ErrCardLimit) {
+	if _, err := s.StartEnrollment(ctx, deviceID, siteID, time.Now()); !errors.Is(err, ErrCardLimit) {
 		t.Fatalf("kartu ke-9: err = %v, ingin ErrCardLimit", err)
 	}
 }
@@ -52,7 +52,7 @@ func TestRaceBatasDelapan(t *testing.T) {
 	siteID, deviceID := seed(t, s)
 	ctx := context.Background()
 	for i := 0; i < 7; i++ {
-		if _, err := s.AddCardInstance(ctx, deviceID, siteID); err != nil {
+		if _, err := s.StartEnrollment(ctx, deviceID, siteID, time.Now()); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -75,7 +75,7 @@ func TestRaceBatasDelapan(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			<-start
-			_, results[i] = s.AddCardInstance(ctx, deviceID, siteID)
+			_, results[i] = s.StartEnrollment(ctx, deviceID, siteID, time.Now())
 		}(i)
 	}
 	close(start)
@@ -103,7 +103,7 @@ func TestKunciPerangkatMenyerialkanPenambahan(t *testing.T) {
 	siteID, deviceID := seed(t, s)
 	ctx := context.Background()
 	for i := 0; i < 7; i++ {
-		if _, err := s.AddCardInstance(ctx, deviceID, siteID); err != nil {
+		if _, err := s.StartEnrollment(ctx, deviceID, siteID, time.Now()); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -118,7 +118,7 @@ func TestKunciPerangkatMenyerialkanPenambahan(t *testing.T) {
 	}
 	done := make(chan error, 1)
 	go func() {
-		_, err := s.AddCardInstance(ctx, deviceID, siteID)
+		_, err := s.StartEnrollment(ctx, deviceID, siteID, time.Now())
 		done <- err
 	}()
 	select {
@@ -145,7 +145,7 @@ func TestIdempotentGagalTidakMenyimpanApaPun(t *testing.T) {
 	s := freshStore(t)
 	siteID, deviceID := seed(t, s)
 	ctx := context.Background()
-	cardID, err := s.AddCardInstance(ctx, deviceID, siteID)
+	cardID, err := s.StartEnrollment(ctx, deviceID, siteID, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +175,7 @@ func TestSatuKredensialAktifPerKanal(t *testing.T) {
 	s := freshStore(t)
 	siteID, deviceID := seed(t, s)
 	ctx := context.Background()
-	cardID, _ := s.AddCardInstance(ctx, deviceID, siteID)
+	cardID, _ := s.StartEnrollment(ctx, deviceID, siteID, time.Now())
 	pub := append([]byte{0x04}, make([]byte, 64)...)
 	save := func(credByte byte) error {
 		_, _, err := s.Idempotent(ctx, "k-"+string(rune('a'+credByte)), []byte{credByte}, func(ctx context.Context, tx *Tx) (int, []byte, error) {

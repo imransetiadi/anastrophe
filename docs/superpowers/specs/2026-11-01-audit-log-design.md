@@ -60,7 +60,9 @@ Dua transaksi pada gedung yang sama berjalan berurutan; gedung berbeda berjalan 
 
 ## Verifikasi
 
-`(*Store).VerifyAuditChain(ctx, chain) (rows int, err error)` menghitung ulang semua hash. Hasilnya `ErrAuditTampered`, berisi `seq` pertama yang tidak cocok, bila ada baris yang diubah, dihapus (lompatan `seq`), atau disisipkan.
+`(*Store).VerifyAuditChain(ctx, chain) (rows int, err error)` menghitung ulang semua hash. Hasilnya `ErrAuditTampered`, berisi `seq` pertama yang tidak cocok, bila ada baris yang diubah, disisipkan, atau dihapus di tengah (lompatan `seq`).
+
+Pemotongan ekor dan penghitungan ulang hash oleh pemegang akses tulis tidak terdeteksi tanpa anchoring eksternal. Sebagai anchor parsial, API mencatat head setiap rantai per jam ke log terpusat. Setelah review: tag hash berversi `ANP1-AUDIT-v1`, data yang di-hash adalah teks `jsonb::text` PostgreSQL, dan `chain` kanonik dijaga constraint (migrasi `0006`).
 
 ## Diserahkan ke builder
 

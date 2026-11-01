@@ -1,0 +1,71 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "label": "D25-pseudonim-audit",
+  "recommendation": {
+    "selected": "pseudonymous_at_write",
+    "escaped": false,
+    "confidence": 0.96,
+    "probabilities": {
+      "pseudonymous_at_write": 0.97,
+      "hash_identity_digests": 0,
+      "crypto_shredding": 0.01,
+      "ask_user": 0.01,
+      "investigate": 0,
+      "none": 0.01
+    },
+    "contradicted_requirements": []
+  },
+  "checks": [
+    {
+      "candidate": "pseudonymous_at_write",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "pseudonymous_at_write",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "pseudonymous_at_write",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "hash_identity_digests",
+      "requirement": 0,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "hash_identity_digests",
+      "requirement": 1,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "hash_identity_digests",
+      "requirement": 2,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "crypto_shredding",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "crypto_shredding",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "crypto_shredding",
+      "requirement": 2,
+      "answer": "supported"
+    }
+  ],
+  "usage": {
+    "input_tokens": 2635,
+    "output_tokens": 461
+  },
+  "status": "≥ 0,80 → Diterima (ADR-0018)."
+}

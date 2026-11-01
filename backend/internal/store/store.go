@@ -121,19 +121,6 @@ func (s *Store) CreateDevice(ctx context.Context) (string, error) {
 
 // AddCardInstance menambah kartu dengan mengunci baris perangkat lebih dulu, sehingga dua
 // permintaan paralel tidak bisa sama-sama melewati batas 8 (TC-ENR-12).
-func (s *Store) AddCardInstance(ctx context.Context, deviceID, siteID string) (string, error) {
-	var id string
-	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		var err error
-		id, err = addCardInstance(ctx, tx, deviceID, siteID)
-		return err
-	})
-	if err != nil {
-		return "", err
-	}
-	return id, nil
-}
-
 // StartEnrollment membuat card instance dan mencatat enrollment.started di transaksi yang sama.
 func (s *Store) StartEnrollment(ctx context.Context, deviceID, siteID string, at time.Time) (string, error) {
 	var id string
@@ -150,12 +137,13 @@ func (s *Store) StartEnrollment(ctx context.Context, deviceID, siteID string, at
 
 // StartEnrollment di dalam transaksi idempotency.
 func (t *Tx) StartEnrollment(ctx context.Context, deviceID, siteID string, at time.Time) (string, error) {
-	id, err := addCardInstance(ctx, t.tx, deviceID, siteID)
+	id, device, site, err := addCardInstance(ctx, t.tx, deviceID, siteID)
 	if err != nil {
 		return "", err
 	}
+	// ID kanonik dari database, bukan dari klien (review audit C1).
 	err = t.AppendAudit(ctx, AuditEvent{
-		SiteID: siteID, Actor: "device:" + deviceID, Action: "enrollment.started", Subject: "card_instance:" + id, At: at,
+		SiteID: site, Actor: "device:" + device, Action: "enrollment.started", Subject: "card_instance:" + id, At: at,
 	})
 	if err != nil {
 		return "", err
@@ -163,14 +151,10 @@ func (t *Tx) StartEnrollment(ctx context.Context, deviceID, siteID string, at ti
 	return id, nil
 }
 
-// AddCardInstance di dalam transaksi idempotency (satu koneksi per permintaan).
-func (t *Tx) AddCardInstance(ctx context.Context, deviceID, siteID string) (string, error) {
-	return addCardInstance(ctx, t.tx, deviceID, siteID)
-}
-
-func addCardInstance(ctx context.Context, tx pgx.Tx, deviceID, siteID string) (string, error) {
-	id := newUUID()
-	err := func() error {
+// addCardInstance mengembalikan id card instance serta device/site dalam bentuk kanonik.
+func addCardInstance(ctx context.Context, tx pgx.Tx, deviceID, siteID string) (id, device, site string, err error) {
+	id = newUUID()
+	err = func() error {
 		var locked string
 		if !looksLikeUUID(deviceID) || !looksLikeUUID(siteID) {
 			return ErrNotFound
@@ -188,13 +172,13 @@ func addCardInstance(ctx context.Context, tx pgx.Tx, deviceID, siteID string) (s
 		if active >= MaxActiveCardsPerDevice {
 			return ErrCardLimit
 		}
-		_, err := tx.Exec(ctx, `INSERT INTO card_instances (id, device_id, site_id, status) VALUES ($1, $2, $3, 'PROVISIONING')`, id, deviceID, siteID)
-		return err
+		return tx.QueryRow(ctx, `INSERT INTO card_instances (id, device_id, site_id, status) VALUES ($1, $2, $3, 'PROVISIONING') RETURNING device_id::text, site_id::text`,
+			id, deviceID, siteID).Scan(&device, &site)
 	}()
 	if err != nil {
-		return "", err
+		return "", "", "", err
 	}
-	return id, nil
+	return id, device, site, nil
 }
 
 func (s *Store) ActiveCardCount(ctx context.Context, deviceID string) (int, error) {

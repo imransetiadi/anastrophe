@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"testing"
+	"time"
 )
 
 func TestSeedLab(t *testing.T) {
@@ -23,7 +24,7 @@ func TestSeedLab(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cardID, err := s.AddCardInstance(ctx, out.DeviceID, out.SiteID)
+	cardID, err := s.StartEnrollment(ctx, out.DeviceID, out.SiteID, time.Now())
 	if err != nil {
 		t.Fatalf("perangkat/gedung seed tidak bisa dipakai: %v", err)
 	}
@@ -90,7 +91,7 @@ func TestAddLabDeviceUntukSiteAda(t *testing.T) {
 	if again.SiteID != first.SiteID || again.DeviceID == first.DeviceID {
 		t.Fatalf("perangkat baru: %+v vs %+v", again, first)
 	}
-	if _, err := s.AddCardInstance(ctx, again.DeviceID, again.SiteID); err != nil {
+	if _, err := s.StartEnrollment(ctx, again.DeviceID, again.SiteID, time.Now()); err != nil {
 		t.Fatalf("perangkat baru tidak bisa dipakai: %v", err)
 	}
 	if _, err := s.AddLabDevice(ctx, []byte{9, 9, 9, 9, 9, 9, 9, 9}); !errors.Is(err, ErrNotFound) {
@@ -108,7 +109,7 @@ func TestSeedLabTanpaZonaTidakNull(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cardID, err := s.AddCardInstance(ctx, out.DeviceID, out.SiteID)
+	cardID, err := s.StartEnrollment(ctx, out.DeviceID, out.SiteID, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}

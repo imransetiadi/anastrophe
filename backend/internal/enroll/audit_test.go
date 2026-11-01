@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -79,8 +81,15 @@ func TestProvisioningDanRenewMencatatAudit(t *testing.T) {
 }
 
 func TestAuditTanpaDataPribadi(t *testing.T) {
-	// Review Focus 4: hanya field yang diizinkan (CLAUDE.md aturan 6, FR-54).
+	// Review Focus 4: hanya field yang diizinkan (CLAUDE.md aturan 6, FR-54), termasuk perpanjangan.
 	f := provisionedForRenewal(t)
+	nonce := f.challenge(t, f.credID)
+	if rec := f.renew(t, f.credID, nonce, renewalSignature(t, f.key, f.credID, nonce), "renew-pii"); rec.Code != http.StatusOK {
+		t.Fatalf("renew: %d", rec.Code)
+	}
+	if got := actions(f.audit(t)); len(got) != 3 {
+		t.Fatalf("aksi: %v", got)
+	}
 	for _, e := range f.audit(t) {
 		for k := range e.Data {
 			if k != "channel" && k != "not_after" {
@@ -116,11 +125,57 @@ func TestAuditGagalMembatalkanProvisioning(t *testing.T) {
 	f := newFixture(t)
 	id := f.enroll(t)
 	f.exec(t, `ALTER TABLE audit_events ADD CONSTRAINT tolak_uji CHECK (action <> 'credential.provisioned')`)
-	rec := f.do(t, http.MethodPost, "/v1/enrollments/"+id+"/credentials", "prov-fail", map[string]string{"channel": "ble", "public_key": encodeKey(phoneKey(t))})
+	body := map[string]string{"channel": "ble", "public_key": encodeKey(phoneKey(t))}
+	rec := f.do(t, http.MethodPost, "/v1/enrollments/"+id+"/credentials", "prov-fail", body)
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status %d, ingin 500", rec.Code)
 	}
 	if n, _ := f.store.CredentialCount(context.Background(), id); n != 0 {
 		t.Fatalf("kredensial tersimpan tanpa audit: %d", n)
+	}
+	// Setelah gangguan hilang, retry dengan key yang sama berhasil tepat sekali.
+	f.exec(t, `ALTER TABLE audit_events DROP CONSTRAINT tolak_uji`)
+	if rec := f.do(t, http.MethodPost, "/v1/enrollments/"+id+"/credentials", "prov-fail", body); rec.Code != http.StatusOK {
+		t.Fatalf("retry: %d %s", rec.Code, rec.Body)
+	}
+	if n, _ := f.store.CredentialCount(context.Background(), id); n != 1 {
+		t.Fatalf("kredensial setelah retry: %d", n)
+	}
+}
+
+func TestEnrolmentHurufBesarSatuRantai(t *testing.T) {
+	// Review audit C1: UUID huruf besar (mis. UUID.uuidString Swift) tidak membelah rantai gedung.
+	f := newFixture(t)
+	rec := f.do(t, http.MethodPost, "/v1/enrollments", "enr-upper", map[string]string{"device_id": strings.ToUpper(f.deviceID), "site_id": strings.ToUpper(f.siteID)})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("enrol: %d %s", rec.Code, rec.Body)
+	}
+	var out struct {
+		EnrollmentID string `json:"enrollment_id"`
+	}
+	json.Unmarshal(rec.Body.Bytes(), &out)
+	if rec := f.do(t, http.MethodPost, "/v1/enrollments/"+out.EnrollmentID+"/credentials", "prov-upper", map[string]string{"channel": "ble", "public_key": encodeKey(phoneKey(t))}); rec.Code != http.StatusOK {
+		t.Fatalf("provisioning: %d", rec.Code)
+	}
+	events := f.audit(t)
+	if got := actions(events); len(got) != 2 || events[0].Actor != "device:"+strings.ToLower(f.deviceID) {
+		t.Fatalf("audit: %+v", events)
+	}
+	upper, _ := f.store.AuditEvents(context.Background(), "site:"+strings.ToUpper(f.siteID))
+	if len(upper) != 0 {
+		t.Fatalf("rantai huruf besar terbentuk: %d baris", len(upper))
+	}
+}
+
+func TestRetryEnrolmentBerkunciTidakMenggandakanAudit(t *testing.T) {
+	f := newFixture(t)
+	body := map[string]string{"device_id": f.deviceID, "site_id": f.siteID}
+	for i := 0; i < 2; i++ {
+		if rec := f.do(t, http.MethodPost, "/v1/enrollments", "enr-retry", body); rec.Code != http.StatusCreated {
+			t.Fatalf("enrol %d: %d", i, rec.Code)
+		}
+	}
+	if got := actions(f.audit(t)); len(got) != 1 {
+		t.Fatalf("aksi: %v", got)
 	}
 }
