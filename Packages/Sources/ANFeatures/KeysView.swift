@@ -14,12 +14,9 @@ public struct KeysView: View {
     @State private var deleteMessage: String?
     @State private var deleting: Card.ID?
     /// Alur Tambah Kartu (FR-10): dari tombol atau dari tautan undangan yang dibuka sistem.
-    @State private var addCard: AddCardEntry?
+    @State private var addCard: AddCardRequest?
     #if DEBUG
     @State private var labMessage: String?
-    /// E2e alur Tambah Kartu di simulator (`-ANLabAddCode`, `-ANLabOpenURL`).
-    @State private var labAddCode: String?
-    @State private var labAutoSubmit = false
     #endif
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -57,7 +54,7 @@ public struct KeysView: View {
                 }
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
-                        Button { addCard = .start } label: {
+                        Button { addCard = AddCardRequest(entry: .start) } label: {
                             Label(localized("keys.add"), systemImage: "plus")
                         }
                         .disabled(!model.canAddCard || services.storageFailed)
@@ -89,12 +86,10 @@ public struct KeysView: View {
             }
             if let url = services.pendingLabOpenURL {
                 services.pendingLabOpenURL = nil
-                labAutoSubmit = true
-                addCard = AddCardEntry.entry(for: url)
+                addCard = AddCardEntry.entry(for: url).map { AddCardRequest(entry: $0, labAutoSubmit: true) }
             } else if let code = services.pendingLabAddCode {
                 services.pendingLabAddCode = nil
-                labAddCode = code
-                addCard = .start
+                addCard = AddCardRequest(entry: .start, labAutoCode: code)
             }
             #endif
             openDemoScreen()
@@ -102,10 +97,13 @@ public struct KeysView: View {
         .onOpenURL { url in
             // Tautan undangan https://<host>/i/<token> (FR-12). Tidak menyela presentasi yang sedang berjalan.
             guard let entry = AddCardEntry.entry(for: url), presentation.request == nil else { return }
-            addCard = entry
+            addCard = AddCardRequest(entry: entry)
         }
-        .sheet(item: $addCard) { entry in
-            addCardSheet(entry)
+        .sheet(item: $addCard) { request in
+            AddCardView(services: services, entry: request.entry, reader: services.makeCardReader(),
+                        labAutoCode: request.labAutoCode, labAutoSubmit: request.labAutoSubmit) {
+                Task { await model.load() }
+            }
         }
         .alert(deleteMessage ?? "", isPresented: Binding(get: { deleteMessage != nil }, set: { if !$0 { deleteMessage = nil } })) {
             Button(localized("present.done"), role: .cancel) {}
@@ -155,7 +153,7 @@ public struct KeysView: View {
             } description: {
                 Text(localized("keys.empty.message"))
             } actions: {
-                Button(localized("keys.add")) { addCard = .start }
+                Button(localized("keys.add")) { addCard = AddCardRequest(entry: .start) }
                     .buttonStyle(ANPrimaryButtonStyle())
                     .disabled(!model.canAddCard)
                     .padding(.horizontal)
@@ -168,18 +166,6 @@ public struct KeysView: View {
             }
             .scrollContentBackground(.hidden)
         }
-    }
-
-    private func addCardSheet(_ entry: AddCardEntry) -> some View {
-        #if DEBUG
-        AddCardView(services: services, entry: entry, reader: services.makeCardReader(), labAutoCode: labAddCode, labAutoSubmit: labAutoSubmit) {
-            Task { await model.load() }
-        }
-        #else
-        AddCardView(services: services, entry: entry, reader: services.makeCardReader()) {
-            Task { await model.load() }
-        }
-        #endif
     }
 
     #if DEBUG

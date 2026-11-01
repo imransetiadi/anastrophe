@@ -4,6 +4,16 @@ import ANNetworking
 import ANNFCEnroll
 import SwiftUI
 
+/// Permintaan menampilkan lembar Tambah Kartu. Data otomasi lab (DEBUG) ikut di dalam item: konten
+/// `sheet(item:)` dibangun dari item yang dipresentasikan, bukan dari `@State` lain yang bisa masih bernilai
+/// lama saat sheet pertama kali dibuka.
+struct AddCardRequest: Identifiable {
+    let id = UUID()
+    let entry: AddCardEntry
+    var labAutoCode: String?
+    var labAutoSubmit = false
+}
+
 /// Lembar Tambah Kartu Akses (FR-10–FR-13, ADR-0043). Mengikuti `pages/ios-app.md`:
 /// - satu tindakan utama per layar;
 /// - label terlihat di atas field, galat di dekat field;
