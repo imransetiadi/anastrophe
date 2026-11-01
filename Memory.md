@@ -12,10 +12,10 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 ## Status terkini
 
 - Branch kerja: `feat/r1-scaffold`, di-push ke GitHub private `imransetiadi/anastrophe` (origin) atas permintaan pengguna; belum di-merge.
-- Suite terakhir: Swift host 244 test (1 dilewati, tanpa gagal) dan simulator 242 test (1 dilewati). Backend Go 7 paket lulus pada iterasi hapus kartu; belum ada perubahan backend sejak itu.
+- Suite terakhir: Swift host 253 test (1 dilewati, tanpa gagal), simulator 251 test (1 dilewati), backend Go 10 paket lulus dengan PostgreSQL.
 - Menunggu keputusan pengguna:
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
-  - Tinjauan 6 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap (`docs/adr/jev-log/*-gate.json`).
+  - Tinjauan 7 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu (`docs/adr/jev-log/*-gate.json`).
   - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
 
@@ -30,6 +30,35 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Audit | Rantai hash per gedung, append-only, pseudonim sejak ditulis, perintah `anastrophe-audit` | ADR-0024, ADR-0025 |
 | Hapus kartu | Bukti kepemilikan, kartu ditangguhkan, kartu tanpa kunci | ADR-0026, ADR-0027, ADR-0028, FR-31 |
 | Riwayat tap | Log lokal 30 hari: lima terbaru di detail, "Lihat semua" ke riwayat penuh, store pulih sendiri bila rusak | FR-30, ADR-0029, ADR-0030 |
+| Registri kartu | Enrolment hanya untuk kartu terdaftar (HMAC per gedung), alasan FR-13, perangkat tambahan menunggu operator, enrolment yang belum selesai dilanjutkan, CLI `anastrophe-registry` | FR-11, FR-13, FR-52, ADR-0031, ADR-0032, ADR-0034 |
+
+## API-2026-11-01-2257 - Registri kartu fisik dan enrolment berbasis kartu, beserta perbaikan review (Selesai, commit lokal; gate tereskalasi)
+
+Fokus dari ADR-0031 (JEV 0,88), dengan aturan perangkat tambahan ADR-0032 (JEV 0,71, provisional).
+
+Isi pekerjaan:
+- **Paket `internal/registry`:** identitas kartu kanonik per teknologi, normalisasi kontak, dan MAC per gedung (HKDF dev; KMS menyusul).
+- **Migrasi 0007:** `physical_cards` yang hanya menyimpan HMAC.
+- **`POST /v1/enrollments`:** mewajibkan kartu, dengan galat `ENR-NOT-REGISTERED`, `ENR-SITE-UNSUPPORTED`, dan `ENR-DUPLICATE`, serta provisioning `PENDING_APPROVAL` → 409. Hash idempotency memakai HMAC.
+- **CLI `anastrophe-registry`:** perintah `import`, `approve`, dan `reject`; devseed mendaftarkan kartu lab.
+- **App:** `CardIdentity` dengan deskripsi disamarkan, `EnrollmentStart`, teks FR-13 dalam ID/EN, dan argumen `-ANLabCard`.
+
+Review akhir: "with fixes". Semua perbaikan berikut dikerjakan:
+- **C1:** perpanjangan sempat memakai zona kebijakan gedung, bukan zona kartu (*fail-open*). Kini satu helper zona dipakai bersama penerbitan dan perpanjangan.
+- **I1 (ADR-0034, JEV 0,81):** perangkat yang sama melanjutkan enrolment yang belum selesai, dan `PROVISIONING` tanpa kredensial menjadi `ABANDONED` setelah 15 menit (migrasi 0008, sapuan per jam).
+- **I2:** test kebocoran tidak lagi menggantung.
+- **I3:** impor CSV menerima BOM dan membatalkan impor saat tanda kutip rusak.
+- **Minor:** perangkat penuh tanpa oracle registri, pemindaian seluruh tabel, normalisasi ID gedung, urutan impor tanpa deadlock, hex tanpa tanda `+`/`-`, `--operator` sebagai pegangan buram, CSV di-ignore, devseed `-new-device` tanpa kunci, serta drift SDD dan GLOSSARY.
+
+Bukti:
+- Go 10 paket lulus; host 253 test dan simulator 251 test (1 dilewati).
+- Uji mutasi tertangkap untuk kunci baris kartu, penandaan terbengkalai, urutan batas, hash idempotency, dan kebocoran CLI.
+- Lab simulator end-to-end dua kali. Yang terakhir: perangkat 2 `PENDING_APPROVAL` → disetujui operator → app diluncurkan ulang → instance yang sama dilanjutkan → `ACTIVE` dengan kredensial; log API tanpa identitas kartu.
+- `jev_gate` tereskalasi (composite 0,55). Klaim 1 terlalu luas karena perangkat penuh sengaja menerima `ENR-LIMIT`.
+
+Juga: ADR-0033 (JEV 0,89) memilih fokus berikutnya, enrolment via undangan. Spesifikasi dan rencananya sudah ditulis. Backlog minor diverifikasi ulang terhadap kode: sebagian besar catatan lama ternyata sudah selesai.
+
+Commit unit ini: `8398997`, `d30efd2`, `24eecbd`, `fc22ebd`, `694b34e`, `6b2d943`, `f221d58`, `6d8a3f1`, `2eaa044`, `e6ff15d`, dan commit ini. Obsidian: `sessions/2026-11-01-registri-kartu.md`, `decisions/ADR-0033…`, `decisions/ADR-0034…`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
 
 ## IOS-2026-11-01-1902 - Minor riwayat tap selesai: review akhir dan perbaikannya (Selesai, commit lokal; gate tereskalasi)
 

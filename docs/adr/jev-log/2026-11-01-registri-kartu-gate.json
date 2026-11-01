@@ -1,0 +1,51 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "label": "registri-kartu-completion",
+  "date": "2026-11-01",
+  "request": "Plan 2026-11-01-registri-kartu (8398997..6b2d943) + final-review fixes C1 (6d8a3f1), I1/minor 1 (2eaa044, ADR-0034), I2/I3/minors (e6ff15d)",
+  "runs": [
+    {
+      "note": "run tunggal; log uji sebagai butir evidence. Klaim 1 terlalu luas: perangkat penuh (8 kartu) sengaja menerima ENR-LIMIT untuk kartu tak dikenal (perbaikan minor 1, tanpa oracle registri), jadi 'kartu tak dikenal → ENR-NOT-REGISTERED' hanya berlaku di bawah batas.",
+      "action": "escalate",
+      "review": {
+        "safe_to_apply": 0.23,
+        "composite": 0.547,
+        "limiting": "correctness"
+      },
+      "claims": [
+        [
+          "enrolment wajib kartu terdaftar; NOT-REGISTERED/SITE-UNSUPPORTED; identitas tidak tersimpan/tercatat",
+          "contradicted",
+          0.58
+        ],
+        [
+          "enrolment bersamaan: satu PROVISIONING satu PENDING; mutasi kunci tertangkap",
+          "contradicted",
+          0.16
+        ],
+        [
+          "zona dari kartu saat terbit dan perpanjangan",
+          "verified",
+          0.19
+        ],
+        [
+          "melanjutkan enrolment, ABANDONED 15 menit, perangkat disetujui mendapat kredensial",
+          "verified",
+          0.42
+        ],
+        [
+          "CLI impor: HMAC saja, BOM/CRLF, kutip rusak dibatalkan, tanpa deadlock",
+          "verified",
+          0.14
+        ],
+        [
+          "suite Go 10 paket, host, simulator",
+          "verified",
+          0.16
+        ]
+      ]
+    }
+  ],
+  "status": "Eskalasi ke pengguna; tidak diulang (ADR-0018). Klaim 1 perlu dibaca dengan pengecualian perangkat penuh (ENR-LIMIT by design)."
+}
