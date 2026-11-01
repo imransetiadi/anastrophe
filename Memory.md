@@ -20,7 +20,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
   - ADR-0046: kontrol enumerasi identitas kartu lewat enrolment, yang menjadi **gerbang pra-pilot** bersama App Attest; rekomendasi deteksi per gedung + pembatas per perangkat yang di-attest, JEV 0,49.
   - ADR-0047: kedaluwarsa permintaan `PENDING_APPROVAL` (batas 4 per kartu sudah diterapkan), JEV 0,51.
 
-  - Tinjauan 15 gate JEV (13 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu (`docs/adr/jev-log/*-gate.json`).
+  - Tinjauan 16 gate JEV (14 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan (`docs/adr/jev-log/*-gate.json`).
   - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
 
@@ -39,10 +39,36 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Undangan | Token sekali pakai (32 byte acak, hanya hash yang disimpan), CLI `invite` dengan identitas kartu dari berkas atau stdin, enrolment `{device_id, invitation}`, dan undangan berkartu yang menyetujui enrolment perangkat yang masih menunggu; app mengurai tautan `/i/<token>` | FR-12, FR-53, ADR-0033, ADR-0035 |
 | Siklus hidup kartu | Operator: `list` (filter status, kanal, awalan id), `suspend`, `resume`, `revoke` (audit, denylist); app membaca status kartu dengan token baca status tanpa Face ID/passcode. Keterbatasan terbuka: pendaftaran ulang kartu fisik bisa membatalkan suspend/revoke (ADR-0038) | FR-38, FR-50 (sebagian), FR-51, ADR-0036, ADR-0037, ADR-0038 |
 | Provisioning aman | Rahasia enrolment dari app (hanya hash di server) wajib untuk kredensial pertama; tambah kanal ke kartu aktif ditolak. Risiko sisa: id perangkat + identitas kartu bisa mengambil alih enrolment yang belum selesai (ADR-0041) | FR-16, ADR-0039, ADR-0040, ADR-0041 |
-| Ketahanan | Update dijaga status, urutan kunci instance → kredensial, denylist dari sertifikat terpanjang + purge, pembaruan kartu atomik, jam monotonik yang ikut berjalan saat tidur | ADR-0042 |
+| Ketahanan | Update dijaga status, urutan kunci instance → kredensial, denylist dari sertifikat terpanjang + purge, pembaruan kartu atomik, jam monotonik yang ikut berjalan saat tidur; audit enrolment dan sapuan ditulis sesudah semua kunci baris, berurutan per rantai, dengan baris gedung `KEY SHARE` sebelum kunci rantai (tanpa deadlock 40P01) | ADR-0042, ADR-0051 |
 | Tambah Kartu | Alur produksi di semua build: kode gedung + tempel kartu (pembaca identifier saja) atau tautan undangan, kanal otomatis, perangkat dibuat saat enrolment, batas 4 permintaan menunggu per kartu. Gerbang pra-pilot terbuka: App Attest + kontrol enumerasi kartu (ADR-0046) | FR-05, FR-10–FR-13, ADR-0043–ADR-0047 |
 | Bantuan | Tombol Bantuan di tab Kunci: FAQ sepuluh topik (ID/EN), status cara akses di iPhone ini, iPhone yang didukung, laporan diagnostik tanpa rahasia | FR-60, FR-02, FR-27, FR-63, ADR-0048 |
 | Kebijakan gedung | CLI `policy` untuk masa berlaku sertifikat dan kanal per gedung; kanal efektif gedung di lookup/enrolment dan ditegakkan saat provisioning; app memilih kanal yang diizinkan | FR-55 (sebagian), FR-05, ADR-0049 |
+
+## API-2026-11-02-0647 - Deadlock enrolment–sapuan per jam (Selesai, commit lokal; gate eskalasi)
+
+Fokus dari ADR-0051 (JEV 0,96). Enrolment kartu dan undangan sesekali gagal 500 karena deadlock PostgreSQL 40P01 dengan sapuan per jam. Penyebabnya, enrolment memegang kunci rantai audit gedung sambil menunggu baris instance yang dipegang sapuan.
+
+Perubahan:
+- **Penahanan audit:** `Tx` bisa menahan event audit (`deferAudits`/`flushAudits`/`withDeferredAudits`). `EnrollCard`, `EnrollInvitation`, dan `AbandonStaleEnrollments` menulis audit di akhir pemanggilan store, berurutan stabil per rantai. Isi, hash, dan `seq` audit tidak berubah.
+- **Jalur galat:** event tetap ditulis saat enrolment gagal, jadi ikut ter-commit atau di-rollback bersama perubahannya.
+- **Lanjutan `PENDING_APPROVAL`:** di jalur kartu, instance ini kini dikunci di dalam enrolment (dijaga status, diulang sekali). Pemasangan rahasia enrolment sesudahnya tidak lagi menunggu baris sambil memegang kunci rantai, yang sebelumnya bisa membentuk siklus dengan `DecideEnrollment`.
+- **Review akhir (opus, "With fixes"):** `AppendAudit` kini mengunci baris gedung `FOR KEY SHARE` sebelum kunci rantai. Tanpa itu, `policy`/`site-code` yang memegang `sites FOR UPDATE` bisa deadlock dengan enrolment. Masalah ini sudah ada sebelumnya, dan reviewer mereproduksinya dengan `UpdateSitePolicy`/`RotateSiteJoinCode` asli.
+
+Bukti:
+- 10 test baru di `deadlock_test.go` dengan pola deterministik: transaksi lain menahan baris, polling `pg_stat_activity`, lalu `pg_try_advisory_lock` dari koneksi lain.
+- 10 mutasi tertangkap.
+- Probe operator: 40P01 tanpa perbaikan, lulus dengan perbaikan.
+- Go 10 paket lulus; 5× `-race` lulus; `check_docs` 0 masalah.
+- `jev_gate`: eskalasi (safe_to_apply 0,53, pembatas `test_gap`; 9 klaim verified), tidak diajukan ulang.
+
+Minor ditunda di backlog:
+- penolakan bersamaan kini membuat permintaan baru (201);
+- celah test jalur galat `withDeferredAudits`;
+- test urutan sapuan ±69/70;
+- lanjutan `PENDING_APPROVAL` jalur undangan (tak terjangkau);
+- sisa tabrakan `hashtext`.
+
+Commit unit ini: `2dcba48`, `d2499f4`, `0a6b18b`, `ba6282c`, dan commit ini. Obsidian: `sessions/2026-11-02-deadlock-enrolment-sapuan.md`, `decisions/ADR-0051…`, `lessons/kunci-implisit-foreign-key.md`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
 
 ## API-2026-11-02-0613 - Filter kanal dan pencarian daftar kartu (Selesai, commit lokal; gate review)
 

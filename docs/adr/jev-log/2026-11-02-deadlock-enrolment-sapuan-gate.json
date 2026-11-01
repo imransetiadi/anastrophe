@@ -1,0 +1,112 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "action": "escalate",
+  "label": "deadlock-enrolment-sapuan-plan-close-gate",
+  "request": "Close plan 2026-11-02-deadlock-enrolment-sapuan (ADR-0051, NFR-R02): enrolment and the hourly sweep must not deadlock (40P01) on the per-site audit chain lock, without changing audit content; including the final-review fix pass.",
+  "evidence_ids": [
+    "red-green-log",
+    "test-semantics",
+    "mutations",
+    "operator-probe",
+    "suite-race-docs",
+    "final-review"
+  ],
+  "reason_codes": [
+    "safe_to_apply_below_auto_accept",
+    "confidence_below_auto_accept",
+    "review_required",
+    "claims_contradicted",
+    "claim_confidence_low",
+    "claim_confidence_below_auto_accept"
+  ],
+  "review": {
+    "action": "review",
+    "safe_to_apply": 0.53,
+    "composite": 0.785,
+    "limiting_rubrics": [
+      "test_gap"
+    ],
+    "scores": {
+      "correctness": 1.77,
+      "spec_match": 1.91,
+      "test_gap": 0.32,
+      "blast_radius": 1.75
+    }
+  },
+  "verification": {
+    "action": "escalate",
+    "verified": 9,
+    "contradicted": 1,
+    "unsupported": 0,
+    "needs_review": 6,
+    "results": [
+      {
+        "claim": "Selama enrolment kartu menunggu baris instance yang dipegang transaksi lain, kunci advisory rantai audit gedung bebas (Review Focus 1); test-nya gagal sebelum perbaikan dan lulus sesudahnya.",
+        "verdict": "verified",
+        "confidence": 1.0,
+        "action": "auto"
+      },
+      {
+        "claim": "Selama enrolment undangan menunggu baris instance yang dipegang transaksi lain, kunci advisory rantai audit gedung bebas (Review Focus 2); test-nya gagal sebelum perbaikan dan lulus sesudahnya.",
+        "verdict": "verified",
+        "confidence": 0.98,
+        "action": "auto"
+      },
+      {
+        "claim": "Saat enrolment diulang karena instance yang dilanjutkan berubah, event audit dari percobaan pertama (enrollment.abandoned) dan dari percobaan kedua (enrollment.started) masing-masing ditulis tepat sekali (Review Focus 3).",
+        "verdict": "verified",
+        "confidence": 0.97,
+        "action": "auto"
+      },
+      {
+        "claim": "Event audit yang ditahan ditulis berurutan stabil per rantai dengan urutan di dalam rantai dipertahankan, dan sapuan per jam menulis audit berurutan per rantai (Review Focus 4, Tujuan 3).",
+        "verdict": "verified",
+        "confidence": 0.94,
+        "action": "auto"
+      },
+      {
+        "claim": "Event yang ditahan tetap ditulis saat enrolment gagal (galat fn didahulukan), sehingga pemanggil yang meng-commit perubahan sebelum galat tidak kehilangan audit; pemanggil saat ini me-rollback.",
+        "verdict": "verified",
+        "confidence": 0.34,
+        "action": "escalate"
+      },
+      {
+        "claim": "Instance PENDING_APPROVAL yang dilanjutkan di jalur kartu dikunci di dalam enrolment dengan penjaga status dan pengulangan sekali, sehingga pemasangan rahasia enrolment sesudahnya tidak menunggu baris sambil memegang kunci rantai audit; instance yang disetujui saat menunggu dilanjutkan sebagai PROVISIONING.",
+        "verdict": "verified",
+        "confidence": 0.46,
+        "action": "escalate"
+      },
+      {
+        "claim": "AppendAudit mengunci baris gedung FOR KEY SHARE sebelum kunci rantai, sehingga perintah operator policy/site-code yang memegang sites FOR UPDATE tidak lagi deadlock dengan enrolment; probe dengan UpdateSitePolicy dan RotateSiteJoinCode asli mereproduksi 40P01 tanpa perbaikan dan lulus dengan perbaikan.",
+        "verdict": "verified",
+        "confidence": 0.73,
+        "action": "review"
+      },
+      {
+        "claim": "Isi, hash, aktor, subjek, dan seq audit tidak berubah; yang berubah hanya kapan event ditulis di dalam transaksi dan satu kunci KEY SHARE baris gedung sebelum kunci rantai.",
+        "verdict": "verified",
+        "confidence": 0.64,
+        "action": "review"
+      },
+      {
+        "claim": "Seluruh suite Go lulus, test deadlock lulus 5 kali dengan -race, 10 mutasi tertangkap oleh test, dan check_docs melaporkan 0 masalah.",
+        "verdict": "verified",
+        "confidence": 0.6,
+        "action": "review"
+      },
+      {
+        "claim": "Review akhir independen (opus): 0 Critical; satu Important diperbaiki dengan test RED→GREEN; Minor dokumen dikoreksi, sisa Minor (#2, #4, #6, #7) ditunda dan dicatat.",
+        "verdict": "contradicted",
+        "confidence": 0.09,
+        "action": "escalate"
+      }
+    ]
+  },
+  "note": "Tidak diajukan ulang (ADR-0018); masuk daftar gate yang menunggu tinjauan pengguna. Klaim ringkasan review (contradicted 0,39 vs verified 0,38) bertumpu pada ledger yang tidak disertakan sebagai evidence; 'galat fn didahulukan' memang belum dipin test (minor #4 ditunda).",
+  "usage": {
+    "input_tokens": 7112,
+    "output_tokens": 481
+  }
+}

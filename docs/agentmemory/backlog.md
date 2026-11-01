@@ -43,7 +43,7 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
   - Perpanjangan dan `KeysViewModel.load` masih menulis ulang seluruh kartu, sehingga perubahan status dari penyegar bisa terbalik sampai penyegaran berikutnya (review perbaikan minor 5).
   - Purge denylist belum memberi margin toleransi jam reader ±5 menit; belum berdampak sebelum Site Sync ada (review perbaikan minor 4).
   - Belum ada indeks `denylist_entries.expires_at` (review perbaikan minor 9).
-- **Provisioning (sisa):** penolakan operator yang bersamaan dengan perangkat melanjutkan instance menunggu dijawab `ENR-DUPLICATE` (review perbaikan minor 7); rahasia dan hash-nya sama-sama `Data`, jadi tertukar di pemanggil tetap terkompilasi; bawaan `update(id:)` non-atomik bisa terpakai diam-diam oleh store pembungkus baru (review perbaikan minor 9).
+- **Provisioning (sisa):** penolakan operator yang bersamaan dengan perangkat melanjutkan instance menunggu kini membuat permintaan `PENDING_APPROVAL` baru (201), sama dengan pengiriman ulang sesudah penolakan; dulu `ENR-DUPLICATE` (review perbaikan minor 7). Perilaku ini direproduksi reviewer ADR-0051 tetapi belum dipin test; rahasia dan hash-nya sama-sama `Data`, jadi tertukar di pemanggil tetap terkompilasi; bawaan `update(id:)` non-atomik bisa terpakai diam-diam oleh store pembungkus baru (review perbaikan minor 9).
 - **Test konkurensi:** tiga test baru memakai jeda 300 ms; di runner lambat bisa lulus tanpa menguji balapan (tidak pernah gagal palsu); ganti dengan polling `pg_stat_activity` (review perbaikan minor 8).
 - **Undangan (sisa):**
   - Melanjutkan instance ditolak setelah undangan kedaluwarsa, walau instance masih `PROVISIONING` (M2).
@@ -94,5 +94,10 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
   - Aturan status kredensial (ACTIVE/SUSPENDED) tertulis dua kali di query (kolom KANAL dan filter `--channel`).
   - Bantuan `--channel` menyebut "kredensial aktif" padahal mencakup SUSPENDED.
   - Awalan id belum divalidasi posisinya sebagai UUID: tanda hubung salah tempat menghasilkan daftar kosong, bukan galat yang jelas.
+- **Deadlock enrolment–sapuan (minor review akhir, ADR-0051):**
+  - `withDeferredAudits`: belum ada test bahwa galat fn menang atas galat flush; galat flush sisi Go (marshal/NUL) di jalur galat dibuang (payload saat ini tidak bisa memicunya); `deferAudits` tanpa flush tidak dijaga.
+  - `TestSapuanMenulisAuditBerurutanPerRantai` menangkap mutasi "tanpa urut" ±69/70 kali (4+4 UUID acak kadang sudah terurut).
+  - Lanjutan `PENDING_APPROVAL` di jalur undangan belum dikunci. Cabang ini tak terjangkau saat ini, dan pengerasannya cukup 3 baris seperti jalur kartu.
+  - Sisa risiko: kunci rantai memakai `hashtext(chain)`, sedangkan urutan memakai nama rantai; tabrakan hash (±2⁻³² per pasangan) masih bisa memicu 40P01 yang dideteksi PostgreSQL.
 - **Test flaky:** `BLETapTests.autentikasiBatalMembatalkanPemindaian` sesekali gagal (pembatalan pemindaian bergantung waktu); lulus 6/6 saat diulang.
 - **Riwayat tap:** judul baris "Ditolak · alasan" dirakit di kode (M8; dikerjakan saat bahasa ketiga ditambahkan); VoiceOver baris Status belum diperiksa dengan Accessibility Inspector.
