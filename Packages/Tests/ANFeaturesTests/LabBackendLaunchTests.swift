@@ -145,6 +145,7 @@ struct LabBackendLaunchTests {
     @Test func backendTidakTerjangkauMemberiPesanGagal() async {
         let services = AppServices.inMemory()
         let message = await services.provisionFromLabBackend(target, channel: .ble, transport: SequenceTransport([]))
-        #expect(message == localized("lab.backend.failed"))
+        // Review lab M4c: kode URLError membantu diagnosis (mis. -1004 = host tak terjangkau).
+        #expect(message == "\(localized("lab.backend.failed")) (URLError -1004)")
     }
 }

@@ -49,6 +49,7 @@ enum LabProvisioning {
         do {
             let enrollmentID = try await api.createEnrollment(deviceID: deviceID, siteID: siteID, idempotencyKey: UUID())
             let provisioned = try await api.submitCredentialKey(enrollmentID: enrollmentID, channel: channel, publicKey: publicKey, idempotencyKey: UUID())
+            guard provisioned.channel == channel else { throw ANError.invalidData }
             try keys.moveKey(from: localID, to: provisioned.credentialID)
             movedTo = provisioned.credentialID
             return try await store(provisioned, keys: keys, records: records, cards: cards, renewalURL: api.baseURL)

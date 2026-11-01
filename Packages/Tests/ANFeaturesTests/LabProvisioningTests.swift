@@ -53,9 +53,9 @@ func configBody(_ channels: [String] = ["ble"]) -> (status: Int, body: String, c
     (200, #"{"enabled_channels":[\#(channels.map { "\"\($0)\"" }.joined(separator: ",")) ],"wallet_program_enabled":false}"#, "application/json")
 }
 
-func provisionedBody(credentialID: Data, groupKey: String? = nil, notAfter: String = "2026-11-08T00:00:00Z", notBefore: String? = nil) -> String {
+func provisionedBody(credentialID: Data, groupKey: String? = nil, notAfter: String = "2026-11-08T00:00:00Z", notBefore: String? = nil, channel: String = "ble") -> String {
     let groupKey = groupKey ?? P256.Signing.PrivateKey().publicKey.x963Representation.base64EncodedString()
-    return #"{"credential_id":"\#(credentialID.base64EncodedString())","channel":"ble","certificate":"\#(Data(repeating: 0xCE, count: 188).base64EncodedString())",\#(notBefore.map { #""not_before":"\#($0)","# } ?? "")"not_after":"\#(notAfter)","site_name":"Gedung Lab","zones":["Pintu Lab"],"group_keys":{"a1a2a3a4a5a6a7a8":["\#(groupKey)"]}}"#
+    return #"{"credential_id":"\#(credentialID.base64EncodedString())","channel":"\#(channel)","certificate":"\#(Data(repeating: 0xCE, count: 188).base64EncodedString())",\#(notBefore.map { #""not_before":"\#($0)","# } ?? "")"not_after":"\#(notAfter)","site_name":"Gedung Lab","zones":["Pintu Lab"],"group_keys":{"a1a2a3a4a5a6a7a8":["\#(groupKey)"]}}"#
 }
 
 @Suite("Provisioning lab lewat backend dev (rencana lab end-to-end)")
@@ -111,6 +111,23 @@ struct LabBackendProvisioningTests {
         let cards = try SwiftDataCardStore(directory: temporaryDirectory())
         let transport = SequenceTransport(replies.map { (status: $0.0, body: $0.1, contentType: $0.2) })
         await #expect(throws: (any Error).self) {
+            try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", channel: .ble, keys: keys, records: records, cards: cards)
+        }
+        #expect(secrets.storedKeyCount == 0)
+        #expect(try await cards.all().isEmpty)
+    }
+
+    @Test func provisionViaBackendKanalResponsBerbedaDitolak() async throws {
+        // Review lab M7: server menjawab kanal lain → tidak ada kartu atau kunci tersisa.
+        let secrets = InMemorySecretStore()
+        let keys = DeviceKeyStore(store: secrets, factory: SoftwareKeyFactory())
+        let cards = try SwiftDataCardStore(directory: temporaryDirectory())
+        let transport = SequenceTransport([
+            configBody(["ble", "nfcHCE"]),
+            (201, #"{"enrollment_id":"e1"}"#, "application/json"),
+            (200, provisionedBody(credentialID: Data(repeating: 0x5E, count: 16), channel: "nfcHCE"), "application/json"),
+        ])
+        await #expect(throws: ANError.invalidData) {
             try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", channel: .ble, keys: keys, records: records, cards: cards)
         }
         #expect(secrets.storedKeyCount == 0)

@@ -56,11 +56,18 @@ public struct KeysView: View {
                 }
         }
         .task {
-            #if DEBUG
-            if let message = await services.runPendingLabBackendProvisioning() { labMessage = message }
-            if let message = await services.runPendingLabRenewal() { labMessage = message }
-            #endif
             await model.load()
+            #if DEBUG
+            // Daftar tampil dulu; alur lab berjalan sesudahnya agar host lambat tidak menahan layar.
+            if let message = await services.runPendingLabBackendProvisioning() {
+                labMessage = message
+                await model.load()
+            }
+            if let message = await services.runPendingLabRenewal() {
+                labMessage = message
+                await model.load()
+            }
+            #endif
             openDemoScreen()
         }
         .onChange(of: scenePhase) { _, phase in

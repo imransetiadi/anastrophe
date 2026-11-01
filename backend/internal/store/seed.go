@@ -35,7 +35,11 @@ type SeedOutput struct {
 // SeedLab membuat organisasi, gedung (dengan kebijakan zona), reader group, dan satu
 // perangkat dalam satu transaksi.
 func (s *Store) SeedLab(ctx context.Context, in SeedInput) (SeedOutput, error) {
-	policy, err := json.Marshal(map[string]any{"zones": in.Zones, "zones_bitmap": in.ZonesBitmap})
+	zones := in.Zones
+	if zones == nil {
+		zones = []string{} // "zones": null tidak bisa dibaca jsonb_array_elements_text
+	}
+	policy, err := json.Marshal(map[string]any{"zones": zones, "zones_bitmap": in.ZonesBitmap})
 	if err != nil {
 		return SeedOutput{}, err
 	}

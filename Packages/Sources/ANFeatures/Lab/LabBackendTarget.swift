@@ -37,6 +37,16 @@ struct LabBackendTarget: Equatable, Sendable {
     }
 }
 
+/// Backend dev lokal: batas 10 dtk per permintaan agar host yang tidak menjawab tidak
+/// menahan alur lab selama timeout bawaan 60 dtk.
+enum LabNetwork {
+    static let session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 10
+        return URLSession(configuration: configuration)
+    }()
+}
+
 extension AppServices {
     /// Membaca argumen peluncuran lab; provisioning berjalan saat layar Kunci pertama tampil.
     public func configureLabBackend(arguments: [String]) {
@@ -45,7 +55,7 @@ extension AppServices {
     }
 
     /// Perpanjangan dari `-ANLabRenew`, sekali per peluncuran; nil bila tidak diminta.
-    func runPendingLabRenewal(transport: any HTTPTransport = URLSession.shared) async -> String? {
+    func runPendingLabRenewal(transport: any HTTPTransport = LabNetwork.session) async -> String? {
         guard pendingLabRenewal else { return nil }
         pendingLabRenewal = false
         guard let card = try? await cards.all().first(where: { $0.credentials[.ble] != nil || $0.credentials[.nfcHCE] != nil }) else { return nil }
@@ -54,7 +64,7 @@ extension AppServices {
 
     /// Memperpanjang sertifikat kartu tanpa menunggu tap (lab). Di simulator kunci perangkat
     /// lunak tidak memakai konteks; di iPhone konteks baru memunculkan Face ID/passcode.
-    func labRenew(card: Card, transport: any HTTPTransport = URLSession.shared) async -> String {
+    func labRenew(card: Card, transport: any HTTPTransport = LabNetwork.session) async -> String {
         guard let channel = [ChannelKind.ble, .nfcHCE].first(where: { card.credentials[$0] != nil }) else {
             return localized("lab.renew_failed")
         }
@@ -70,7 +80,7 @@ extension AppServices {
     }
 
     /// Provisioning lab dari argumen peluncuran, sekali per peluncuran; nil bila tidak ada.
-    func runPendingLabBackendProvisioning(transport: any HTTPTransport = URLSession.shared) async -> String? {
+    func runPendingLabBackendProvisioning(transport: any HTTPTransport = LabNetwork.session) async -> String? {
         guard let target = pendingLabBackend else { return nil }
         pendingLabBackend = nil
         // Tanpa penyimpanan, kartu dari server pasti ditolak lokal dan slot server terbuang.
@@ -82,7 +92,7 @@ extension AppServices {
     }
 
     /// Mengambil kartu dari backend dev; mengembalikan pesan untuk penguji.
-    func provisionFromLabBackend(_ target: LabBackendTarget, channel: ChannelKind, transport: any HTTPTransport = URLSession.shared) async -> String {
+    func provisionFromLabBackend(_ target: LabBackendTarget, channel: ChannelKind, transport: any HTTPTransport = LabNetwork.session) async -> String {
         do {
             _ = try await LabProvisioning.provisionViaBackend(
                 api: APIClient(baseURL: target.baseURL, transport: transport),
@@ -96,6 +106,8 @@ extension AppServices {
             return localized("lab.backend.channel_disabled")
         } catch let problem as ProblemDetails {
             return "\(localized("lab.backend.failed")) (\(problem.type))"
+        } catch let error as URLError {
+            return "\(localized("lab.backend.failed")) (URLError \(error.code.rawValue))"
         } catch {
             return localized("lab.backend.failed")
         }

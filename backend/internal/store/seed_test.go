@@ -97,3 +97,32 @@ func TestAddLabDeviceUntukSiteAda(t *testing.T) {
 		t.Fatalf("site tak dikenal: err = %v", err)
 	}
 }
+
+func TestSeedLabTanpaZonaTidakNull(t *testing.T) {
+	// Review lab M3 (nit): zona nil disimpan sebagai [] agar kebijakan tetap terbaca.
+	s := freshStore(t)
+	ctx := context.Background()
+	in := labSeedInput(t, 1)
+	in.Zones = nil
+	out, err := s.SeedLab(ctx, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cardID, err := s.AddCardInstance(ctx, out.DeviceID, out.SiteID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = s.Idempotent(ctx, "seed-nil-zones", []byte("h"), func(ctx context.Context, tx *Tx) (int, []byte, error) {
+		e, err := tx.EnrollmentForUpdate(ctx, cardID)
+		if err != nil {
+			return 0, nil, err
+		}
+		if len(e.Zones) != 0 {
+			t.Errorf("zona = %v", e.Zones)
+		}
+		return 200, []byte("{}"), nil
+	})
+	if err != nil {
+		t.Fatalf("kebijakan tanpa zona tidak terbaca: %v", err)
+	}
+}

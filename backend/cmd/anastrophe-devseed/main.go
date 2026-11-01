@@ -24,8 +24,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/imransetiadi/anastrophe/backend/internal/store"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func main() {
@@ -41,11 +43,15 @@ func run() error {
 	zone := flag.String("zone", "Pintu Lab", "nama zona")
 	labDir := flag.String("lab-dir", "", "direktori site.json lab_ca.py (opsional)")
 	newDevice := flag.Bool("new-device", false, "hanya buat perangkat baru untuk -site-code yang sudah ada (mis. slot kartu perangkat lama habis)")
+	allowRemote := flag.Bool("allow-remote", false, "izinkan database bukan lokal (hati-hati: devseed menulis data lab)")
 	flag.Parse()
 
 	dsn := os.Getenv("ANASTROPHE_DATABASE_URL")
 	if dsn == "" {
 		return errors.New("ANASTROPHE_DATABASE_URL wajib diisi")
+	}
+	if local, err := localDatabase(dsn); err != nil || (!local && !*allowRemote) {
+		return errors.New("hanya untuk database lokal (localhost, 127.0.0.1, ::1, atau socket Unix); pakai -allow-remote bila memang disengaja")
 	}
 	code, err := hex.DecodeString(*siteCode)
 	if err != nil || len(code) != 8 {
@@ -129,4 +135,18 @@ func readerGroup(labDir string) ([]byte, []byte, error) {
 		return nil, nil, err
 	}
 	return id, pub.Bytes(), nil
+}
+
+// localDatabase: host DSN adalah loopback atau socket Unix (devseed hanya untuk lab lokal).
+func localDatabase(dsn string) (bool, error) {
+	cfg, err := pgconn.ParseConfig(dsn)
+	if err != nil {
+		return false, err
+	}
+	switch host := cfg.Host; {
+	case strings.HasPrefix(host, "/"), host == "localhost", host == "127.0.0.1", host == "::1":
+		return true, nil
+	default:
+		return false, nil
+	}
 }
