@@ -3,9 +3,12 @@ package store
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/imransetiadi/anastrophe/backend/internal/testpg"
 )
 
 func seed(t *testing.T, s *Store) (siteID, deviceID string) {
@@ -210,6 +213,60 @@ func bytesOf(b byte) []byte {
 	out := make([]byte, 16)
 	out[15] = b
 	return out
+}
+
+func TestMigrateParalelAman(t *testing.T) {
+	// Minor 2: beberapa replika memigrasi database baru bersamaan.
+	if adminDSN == "" {
+		t.Skip("PostgreSQL tidak tersedia")
+	}
+	ctx := context.Background()
+	dsn, err := testpg.NewDatabase(ctx, adminDSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	errs := make([]error, 4)
+	for i := range errs {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			s, err := Open(ctx, dsn)
+			if err != nil {
+				errs[i] = err
+				return
+			}
+			defer s.Close()
+			errs[i] = s.Migrate(ctx)
+		}(i)
+	}
+	wg.Wait()
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("replika %d: %v", i, err)
+		}
+	}
+}
+
+func TestMigrateDiDatabaseReadOnlyDilewati(t *testing.T) {
+	// Minor 2: app yang diarahkan ke hot standby (read-only, ADR-0014) tetap bisa start.
+	s := freshStore(t)
+	ctx := context.Background()
+	var name string
+	if err := s.pool.QueryRow(ctx, `SELECT current_database()`).Scan(&name); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.pool.Exec(ctx, "ALTER DATABASE "+name+" SET default_transaction_read_only = on"); err != nil {
+		t.Fatal(err)
+	}
+	ro, err := Open(ctx, strings.Replace(adminDSN, "/postgres?", "/"+name+"?", 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ro.Close()
+	if err := ro.Migrate(ctx); err != nil {
+		t.Fatalf("migrasi di database read-only: %v", err)
+	}
 }
 
 func TestMigrateIdempoten(t *testing.T) {

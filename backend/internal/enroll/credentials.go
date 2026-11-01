@@ -27,7 +27,18 @@ type Handler struct {
 	Store    *store.Store
 	Signers  SignerSource
 	Now      func() time.Time
-	Validity time.Duration // default ADR-0010: 7 hari
+	Validity time.Duration // default ADR-0010: 7 hari; gedung bisa mengatur 1–30 hari
+	// EnabledChannels = kanal yang diizinkan /v1/config (kill switch per kanal, FR-04).
+	EnabledChannels []string
+}
+
+func (h *Handler) channelEnabled(channel string) bool {
+	for _, c := range h.EnabledChannels {
+		if c == channel {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {
@@ -109,6 +120,10 @@ func (h *Handler) issueCredential(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req, failure := parseCredentialRequest(body)
+	if failure == nil && !h.channelEnabled(req.Channel) {
+		p := problem("ENR-INVALID-CHANNEL", http.StatusBadRequest)
+		failure = &p
+	}
 	if failure != nil {
 		httpapi.WriteProblem(w, *failure)
 		return
@@ -215,8 +230,12 @@ func (h *Handler) issue(ctx context.Context, tx *store.Tx, enrollmentID string, 
 	if _, err := rand.Read(credID); err != nil {
 		return 0, nil, err
 	}
+	validity := h.Validity
+	if enrollment.CertValidityDays > 0 {
+		validity = time.Duration(enrollment.CertValidityDays) * 24 * time.Hour
+	}
 	notBefore := h.Now().UTC().Truncate(time.Second)
-	notAfter := notBefore.Add(h.Validity)
+	notAfter := notBefore.Add(validity)
 	cert, err := certs.Issue(signer, certs.Request{
 		CredentialID: credID, SiteID: enrollment.SiteCode, PublicKey: pub,
 		Zones: enrollment.ZonesBitmap, Channel: req.Channel, NotBefore: notBefore, NotAfter: notAfter,

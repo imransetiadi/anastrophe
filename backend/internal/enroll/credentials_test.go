@@ -41,6 +41,7 @@ func TestMain(m *testing.M) {
 }
 
 type fixture struct {
+	h        *Handler
 	handler  http.Handler
 	store    *store.Store
 	signer   *certs.SoftwareSigner
@@ -91,12 +92,14 @@ func newFixtureWithPool(t *testing.T, poolParams string) fixture {
 	caKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	signer := certs.NewSoftwareSigner(caKey)
 	h := &Handler{
-		Store:    s,
-		Signers:  func(string) (certs.Signer, error) { return signer, nil },
-		Now:      func() time.Time { return time.Unix(1_794_000_000, 0) },
-		Validity: 7 * 24 * time.Hour,
+		Store:           s,
+		Signers:         func(string) (certs.Signer, error) { return signer, nil },
+		Now:             func() time.Time { return time.Unix(1_794_000_000, 0) },
+		Validity:        7 * 24 * time.Hour,
+		EnabledChannels: []string{"ble", "nfcHCE"},
 	}
 	return fixture{
+		h:        h,
 		handler:  httpapi.New(httpapi.Config{}, httpapi.Deps{Routes: h.Register}),
 		store:    s,
 		signer:   signer,
@@ -104,6 +107,11 @@ func newFixtureWithPool(t *testing.T, poolParams string) fixture {
 		deviceID: deviceID,
 		groupID:  groupID,
 	}
+}
+
+func (f fixture) handlerConfig(t *testing.T, channels []string) {
+	t.Helper()
+	f.h.EnabledChannels = channels
 }
 
 func (f fixture) do(t *testing.T, method, path, idempotencyKey string, body any) *httptest.ResponseRecorder {
@@ -373,6 +381,67 @@ func TestRespons4xxTidakDisimpanSebagaiIdempoten(t *testing.T) {
 	f.do(t, http.MethodPost, "/v1/enrollments/"+id+"/credentials", "salah", map[string]string{"channel": "ble", "public_key": "bukan-base64"})
 	if n, err := f.store.IdempotencyKeyCount(context.Background()); err != nil || n != 0 {
 		t.Fatalf("baris idempotency = %d (err %v), ingin 0", n, err)
+	}
+}
+
+func provision(t *testing.T, f fixture, key string) (*httptest.ResponseRecorder, certs.Request) {
+	t.Helper()
+	id := f.enroll(t)
+	rec := f.do(t, http.MethodPost, "/v1/enrollments/"+id+"/credentials", key, map[string]string{"channel": "ble", "public_key": base64.StdEncoding.EncodeToString(phoneKey(t))})
+	var body struct {
+		Certificate []byte `json:"certificate"`
+	}
+	json.Unmarshal(rec.Body.Bytes(), &body)
+	cert, _ := certs.Verify(body.Certificate, f.signer.Public())
+	return rec, cert
+}
+
+func TestZonaTanpaKebijakanTertutup(t *testing.T) {
+	// Minor 6: gedung tanpa kebijakan zona tidak boleh memberi akses ke bit 0 (fail-closed).
+	f := newFixture(t)
+	rec, cert := provision(t, f, "zona-0")
+	if rec.Code != http.StatusOK || cert.Zones != 0 {
+		t.Fatalf("status %d, zones %d (ingin 0)", rec.Code, cert.Zones)
+	}
+	if !strings.Contains(rec.Body.String(), `"zones":[]`) {
+		t.Fatalf("zones harus [] bukan null: %s", rec.Body)
+	}
+}
+
+func TestZonaDariKebijakanTermasukBit63(t *testing.T) {
+	f := newFixture(t)
+	if err := f.store.SetSitePolicy(context.Background(), f.siteID, []byte(`{"zones":["Lobi","Parkir"],"zones_bitmap":9223372036854775809}`)); err != nil {
+		t.Fatal(err)
+	}
+	rec, cert := provision(t, f, "zona-63")
+	if rec.Code != http.StatusOK || cert.Zones != 1<<63|1 {
+		t.Fatalf("status %d, zones %d", rec.Code, cert.Zones)
+	}
+	if !strings.Contains(rec.Body.String(), `"zones":["Lobi","Parkir"]`) {
+		t.Fatalf("zones: %s", rec.Body)
+	}
+}
+
+func TestMasaBerlakuDariKebijakanGedung(t *testing.T) {
+	// Minor 7: ADR-0010 — 1–30 hari per gedung, default 7.
+	f := newFixture(t)
+	if err := f.store.SetSitePolicy(context.Background(), f.siteID, []byte(`{"cert_validity_days":3}`)); err != nil {
+		t.Fatal(err)
+	}
+	_, cert := provision(t, f, "berlaku-3")
+	if got := cert.NotAfter.Sub(cert.NotBefore); got != 72*time.Hour {
+		t.Fatalf("masa berlaku %v, ingin 72h", got)
+	}
+}
+
+func TestKanalDimatikanDitolak(t *testing.T) {
+	// Minor 7: kill switch kanal (/v1/config) juga ditegakkan saat provisioning.
+	f := newFixture(t)
+	f.handlerConfig(t, []string{"ble"})
+	id := f.enroll(t)
+	rec := f.do(t, http.MethodPost, "/v1/enrollments/"+id+"/credentials", "hce-mati", map[string]string{"channel": "nfcHCE", "public_key": base64.StdEncoding.EncodeToString(phoneKey(t))})
+	if rec.Code != http.StatusBadRequest || problemType(t, rec) != "ENR-INVALID-CHANNEL" {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
 	}
 }
 

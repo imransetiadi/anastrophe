@@ -57,11 +57,13 @@ func run() error {
 	}
 	devCA := certs.NewSoftwareSigner(caKey)
 	slog.Warn("memakai Site CA perangkat lunak sementara; sertifikat tidak berlaku setelah restart")
+	enabledChannels := []string{"ble"}
 	handlers := &enroll.Handler{
-		Store:    db,
-		Signers:  func(string) (certs.Signer, error) { return devCA, nil },
-		Now:      time.Now,
-		Validity: 7 * 24 * time.Hour,
+		Store:           db,
+		Signers:         func(string) (certs.Signer, error) { return devCA, nil },
+		Now:             time.Now,
+		Validity:        7 * 24 * time.Hour,
+		EnabledChannels: enabledChannels,
 	}
 	go func() {
 		for range time.Tick(time.Hour) {
@@ -79,7 +81,7 @@ func run() error {
 	server := &http.Server{
 		Addr:              addr,
 		WriteTimeout:      httpapi.RequestTimeout + 5*time.Second,
-		Handler:           httpapi.New(httpapi.Config{EnabledChannels: []string{"ble"}}, httpapi.Deps{Routes: handlers.Register}),
+		Handler:           httpapi.New(httpapi.Config{EnabledChannels: enabledChannels}, httpapi.Deps{Routes: handlers.Register}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	// SIGTERM (deploy/failover ADR-0014): berhenti menerima permintaan baru dan tunggu

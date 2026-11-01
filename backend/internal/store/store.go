@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,9 +46,30 @@ func Open(ctx context.Context, dsn string) (*Store, error) {
 
 func (s *Store) Close() { s.pool.Close() }
 
+// migrationLockKey adalah kunci advisory sesi untuk menyerialkan migrasi antar-replika.
+const migrationLockKey = 0x414E_5354_4D49_47 // "ANSTMIG"
+
 // Migrate menjalankan migrasi yang belum diterapkan, masing-masing dalam satu transaksi.
+// Replika yang start bersamaan diserialkan dengan advisory lock; di database read-only
+// (hot standby ADR-0014) migrasi dilewati karena primer yang memigrasi.
 func (s *Store) Migrate(ctx context.Context) error {
-	if _, err := s.pool.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())`); err != nil {
+	var readOnly bool
+	if err := s.pool.QueryRow(ctx, `SELECT pg_is_in_recovery() OR current_setting('transaction_read_only') = 'on'`).Scan(&readOnly); err != nil {
+		return err
+	}
+	if readOnly {
+		return nil
+	}
+	conn, err := s.pool.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Release()
+	if _, err := conn.Exec(ctx, `SELECT pg_advisory_lock($1)`, int64(migrationLockKey)); err != nil {
+		return err
+	}
+	defer conn.Exec(context.Background(), `SELECT pg_advisory_unlock($1)`, int64(migrationLockKey))
+	if _, err := conn.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())`); err != nil {
 		return err
 	}
 	entries, err := migrations.ReadDir("migrations")
@@ -64,7 +86,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		err = pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 			tag, err := tx.Exec(ctx, `INSERT INTO schema_migrations (name) VALUES ($1) ON CONFLICT DO NOTHING`, name)
 			if err != nil || tag.RowsAffected() == 0 {
 				return err // sudah diterapkan
@@ -169,13 +191,17 @@ func (s *Store) AddReaderGroup(ctx context.Context, groupID []byte, siteID strin
 
 // Enrollment adalah card instance yang sedang diprovisikan beserta data gedungnya.
 type Enrollment struct {
-	ID          string
-	Status      string
-	SiteID      string
-	SiteName    string
-	SiteCode    []byte
+	ID       string
+	Status   string
+	SiteID   string
+	SiteName string
+	SiteCode []byte
+	// Zones dan ZonesBitmap berasal dari sites.policy. Tanpa kebijakan zona, bitmap = 0
+	// (fail-closed: sertifikat tidak membuka zona mana pun).
 	Zones       []string
 	ZonesBitmap uint64
+	// CertValidityDays dari sites.policy (ADR-0010: 1–30); 0 = pakai default.
+	CertValidityDays int
 }
 
 // Credential yang diterbitkan untuk satu kanal.
@@ -203,14 +229,15 @@ func (t *Tx) EnrollmentForUpdate(ctx context.Context, id string) (Enrollment, er
 	}
 	var e Enrollment
 	var zones []string
-	var bitmap *int64
+	var bitmap, validity *string
 	err := t.tx.QueryRow(ctx, `
 		SELECT ci.id, ci.status, s.id, s.name, s.site_code,
 		       COALESCE(ARRAY(SELECT jsonb_array_elements_text(s.policy -> 'zones')), '{}'),
-		       (s.policy ->> 'zones_bitmap')::bigint
+		       s.policy ->> 'zones_bitmap',
+		       s.policy ->> 'cert_validity_days'
 		FROM card_instances ci JOIN sites s ON s.id = ci.site_id
 		WHERE ci.id = $1
-		FOR UPDATE OF ci`, id).Scan(&e.ID, &e.Status, &e.SiteID, &e.SiteName, &e.SiteCode, &zones, &bitmap)
+		FOR UPDATE OF ci`, id).Scan(&e.ID, &e.Status, &e.SiteID, &e.SiteName, &e.SiteCode, &zones, &bitmap, &validity)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Enrollment{}, ErrNotFound
 	}
@@ -218,9 +245,16 @@ func (t *Tx) EnrollmentForUpdate(ctx context.Context, id string) (Enrollment, er
 		return Enrollment{}, err
 	}
 	e.Zones = append([]string{}, zones...)
-	e.ZonesBitmap = 1
-	if bitmap != nil && *bitmap > 0 {
-		e.ZonesBitmap = uint64(*bitmap)
+	if bitmap != nil {
+		// Dibaca sebagai teks: nilai ≥ 2^63 (bit 63) tidak muat di bigint.
+		if v, err := strconv.ParseUint(*bitmap, 10, 64); err == nil {
+			e.ZonesBitmap = v
+		}
+	}
+	if validity != nil {
+		if days, err := strconv.Atoi(*validity); err == nil && days >= 1 && days <= 30 {
+			e.CertValidityDays = days
+		}
 	}
 	return e, nil
 }
@@ -330,6 +364,15 @@ func looksLikeUUID(s string) bool {
 		}
 	}
 	return true
+}
+
+// SetSitePolicy menyimpan kebijakan gedung (JSON; mis. zones, zones_bitmap, cert_validity_days).
+func (s *Store) SetSitePolicy(ctx context.Context, siteID string, policy []byte) error {
+	tag, err := s.pool.Exec(ctx, `UPDATE sites SET policy = $2::jsonb WHERE id = $1`, siteID, string(policy))
+	if err == nil && tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return err
 }
 
 // SetCardInstanceStatus mengubah status card instance (aksi admin/lifecycle, SDD §8.2).
