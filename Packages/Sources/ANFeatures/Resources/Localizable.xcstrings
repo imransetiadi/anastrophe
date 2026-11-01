@@ -145,6 +145,22 @@
         }
       }
     },
+    "card.renewal_offline": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Internet connection needed. This card must be renewed: connect your iPhone to the internet, then use the card."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perlu terhubung ke internet. Kartu ini harus diperbarui: sambungkan iPhone ke internet, lalu gunakan kartu."
+          }
+        }
+      }
+    },
     "card.status.active": {
       "localizations": {
         "en": {

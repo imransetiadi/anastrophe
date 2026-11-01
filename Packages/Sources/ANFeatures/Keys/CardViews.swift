@@ -86,6 +86,7 @@ struct CardRow: View {
 struct CardDetailView: View {
     let card: Card
     let presentability: Presentability
+    var notice: RenewalNotice?
     let onUse: () -> Void
 
     var body: some View {
@@ -112,9 +113,9 @@ struct CardDetailView: View {
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
-                if presentability.canPresent, card.displayStatus() == .needsRenewal {
+                if let notice {
                     // TC-DEV-10: perpanjangan butuh internet saat kartu dipakai berikutnya.
-                    Text(localized("card.renewal_hint"))
+                    Text(notice == .needsInternet ? localized("card.renewal_offline") : localized("card.renewal_hint"))
                         .font(.footnote)
                         .foregroundStyle(ANColor.mutedForeground)
                         .listRowBackground(Color.clear)

@@ -1,6 +1,15 @@
 import ANCore
 import ANStorage
+import Foundation
 import Observation
+
+/// Petunjuk perpanjangan di detail kartu (TC-DEV-10).
+public enum RenewalNotice: Equatable, Sendable {
+    /// Diperbarui otomatis saat kartu dipakai berikutnya.
+    case renewsOnNextUse
+    /// Perangkat offline: perlu terhubung ke internet agar bisa diperbarui.
+    case needsInternet
+}
 
 /// Daftar kartu di tab Kunci. Saat dimuat, kartu yang kuncinya hilang ditandai
 /// "Perlu dipindahkan" (SDD §5.3).
@@ -10,6 +19,7 @@ public final class KeysViewModel {
     public private(set) var cards: [Card] = []
     public private(set) var availability: [ChannelKind: ChannelAvailability] = [:]
     public private(set) var isLoading = true
+    public private(set) var isOnline = true
     /// Kartu yang record-nya punya backend penerbit (dibaca sekali saat dimuat, bukan per render).
     private var renewable: Set<Card.ID> = []
     private let services: AppServices
@@ -31,6 +41,7 @@ public final class KeysViewModel {
             card.credentials.values.contains { (try? services.records.record(for: $0))?.renewalURL != nil }
         }.map(\.id))
         availability = await services.availability()
+        isOnline = services.connectivity.isOnline
         isLoading = false
     }
 
@@ -48,6 +59,12 @@ public final class KeysViewModel {
     /// Memuat ulang ketersediaan kanal (mis. setelah Bluetooth dinyalakan atau izin diberikan).
     public func refreshAvailability() async {
         availability = await services.availability()
+    }
+
+    /// Hanya untuk kartu yang bisa dipakai dan perlu diperbarui (sisa < 24 jam atau sudah lewat).
+    public func renewalNotice(for card: Card, now: Date = .now) -> RenewalNotice? {
+        guard card.displayStatus(now: now) == .needsRenewal, presentability(of: card).canPresent else { return nil }
+        return isOnline ? .renewsOnNextUse : .needsInternet
     }
 
     public func presentability(of card: Card) -> Presentability {

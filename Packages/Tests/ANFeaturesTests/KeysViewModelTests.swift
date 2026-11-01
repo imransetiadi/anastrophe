@@ -49,5 +49,30 @@ struct KeysViewModelTests {
         #expect(model.cards.first?.notAfter == renewedUntil)
         #expect(try await services.cards.all().first?.notAfter == renewedUntil)
     }
+
+    func nearExpiryModel(online: Bool, hoursLeft: Double) async throws -> (KeysViewModel, Card) {
+        let services = AppServices.inMemory(events: [.waitingForReader], connectivity: FixedConnectivity(isOnline: online))
+        _ = try services.keys.createKey(for: credentialID)
+        let notAfter = Date.now.addingTimeInterval(hoursLeft * 3_600)
+        try services.records.save(CredentialRecord(credentialID: credentialID, certificate: Data(repeating: 0xAA, count: 188), notAfter: notAfter, groupKeys: [:], renewalURL: URL(string: "http://127.0.0.1:8080")))
+        let card = Card(id: UUID(), name: "Gedung Lab", siteName: "Gedung Lab", zones: [], status: .active, credentials: [.ble: credentialID], notAfter: notAfter)
+        try await services.cards.add(card)
+        let model = KeysViewModel(services: services)
+        await model.load()
+        return (model, card)
+    }
+
+    @Test func peringatanOfflineSaatPerluDiperbarui() async throws {
+        // TC-DEV-10: sisa < 24 jam dan offline → "Perlu terhubung ke internet".
+        let (offline, card) = try await nearExpiryModel(online: false, hoursLeft: 12)
+        #expect(offline.renewalNotice(for: card) == .needsInternet)
+        let (online, sameCard) = try await nearExpiryModel(online: true, hoursLeft: 12)
+        #expect(online.renewalNotice(for: sameCard) == .renewsOnNextUse)
+    }
+
+    @Test func tanpaPeringatanBilaMasihLama() async throws {
+        let (model, card) = try await nearExpiryModel(online: false, hoursLeft: 5 * 24)
+        #expect(model.renewalNotice(for: card) == nil)
+    }
 }
 

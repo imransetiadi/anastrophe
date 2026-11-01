@@ -49,6 +49,7 @@ public final class AppServices {
     let launcher: any PresentationLaunching
     public let foreground: ForegroundState
     public let cardsRevision: CardsRevision
+    let connectivity: any ConnectivityStatus
     /// Store kartu tidak bisa dibuka; UI memberi tahu alih-alih menampilkan daftar kosong.
     public let storageFailed: Bool
     #if DEBUG
@@ -68,6 +69,7 @@ public final class AppServices {
         launcher: any PresentationLaunching,
         foreground: ForegroundState,
         cardsRevision: CardsRevision = CardsRevision(),
+        connectivity: any ConnectivityStatus = FixedConnectivity(isOnline: true),
         storageFailed: Bool = false
     ) {
         self.cards = cards
@@ -77,6 +79,7 @@ public final class AppServices {
         self.launcher = launcher
         self.foreground = foreground
         self.cardsRevision = cardsRevision
+        self.connectivity = connectivity
         self.storageFailed = storageFailed
     }
 
@@ -128,7 +131,8 @@ public final class AppServices {
             availability: { await liveAvailability(config: config, nfcEmulationEntitled: nfcEmulationEntitled, bluetoothPoweredOn: launcher.bluetoothPoweredOn) },
             launcher: launcher,
             foreground: foreground,
-            cardsRevision: revision
+            cardsRevision: revision,
+            connectivity: LiveConnectivity(onChange: { Task { @MainActor in revision.bump() } })
         )
     }
 
@@ -137,7 +141,7 @@ public final class AppServices {
         inMemory(events: [.waitingForReader])
     }
 
-    static func inMemory(events: [PresentmentEvent]) -> AppServices {
+    static func inMemory(events: [PresentmentEvent], connectivity: any ConnectivityStatus = FixedConnectivity(isOnline: true)) -> AppServices {
         let secrets = InMemorySecretStore()
         let keys = DeviceKeyStore(store: secrets, factory: SoftwareKeyFactory())
         let directory = FileManager.default.temporaryDirectory.appending(path: "anastrophe-\(UUID().uuidString)")
@@ -147,7 +151,8 @@ public final class AppServices {
             records: KeychainCredentialRecordStore(store: secrets),
             availability: { [.ble: .available, .nfcHCE: .notEligible] },
             launcher: ScriptedPresentationLauncher(events: events),
-            foreground: ForegroundState()
+            foreground: ForegroundState(),
+            connectivity: connectivity
         )
     }
 

@@ -32,7 +32,7 @@ public struct KeysView: View {
                 .navigationTitle(localized("keys.title"))
                 .navigationDestination(for: Card.ID.self) { id in
                     if let card = model.cards.first(where: { $0.id == id }) {
-                        CardDetailView(card: card, presentability: model.presentability(of: card)) { use(card) }
+                        CardDetailView(card: card, presentability: model.presentability(of: card), notice: model.renewalNotice(for: card)) { use(card) }
                             #if DEBUG
                             .toolbar {
                                 ToolbarItem(placement: .primaryAction) {
