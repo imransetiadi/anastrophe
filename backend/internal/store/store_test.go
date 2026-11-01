@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"time"
 )
 
 func seed(t *testing.T, s *Store) (siteID, deviceID string) {
@@ -41,7 +42,9 @@ func TestBatasDelapanKartu(t *testing.T) {
 }
 
 func TestRaceBatasDelapan(t *testing.T) {
-	// Review Focus 3, TC-ENR-12: dua permintaan paralel saat 7 kartu → tepat satu sukses.
+	// Review Focus 3, TC-ENR-12 (uji beban): banyak permintaan paralel saat 7 kartu → tepat
+	// satu sukses. Bukti deterministik protokol kunci ada di TestKunciPerangkatMenyerialkanPenambahan.
+	const contenders = 6
 	s := freshStore(t)
 	siteID, deviceID := seed(t, s)
 	ctx := context.Background()
@@ -50,36 +53,148 @@ func TestRaceBatasDelapan(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for round := 0; round < 5; round++ {
-		var wg sync.WaitGroup
-		results := make([]error, 2)
-		for i := range results {
-			wg.Add(1)
-			go func(i int) {
-				defer wg.Done()
-				_, results[i] = s.AddCardInstance(ctx, deviceID, siteID)
-			}(i)
+	warm := make([]interface{ Release() }, 0, contenders)
+	for i := 0; i < contenders; i++ {
+		conn, err := s.pool.Acquire(ctx)
+		if err != nil {
+			t.Fatal(err)
 		}
-		wg.Wait()
-		successes := 0
-		for _, err := range results {
-			if err == nil {
-				successes++
-			} else if !errors.Is(err, ErrCardLimit) {
-				t.Fatal(err)
-			}
+		warm = append(warm, conn)
+	}
+	for _, conn := range warm {
+		conn.Release()
+	}
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	results := make([]error, contenders)
+	for i := range results {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			_, results[i] = s.AddCardInstance(ctx, deviceID, siteID)
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+	successes := 0
+	for _, err := range results {
+		if err == nil {
+			successes++
+		} else if !errors.Is(err, ErrCardLimit) {
+			t.Fatal(err)
 		}
-		want := 0
-		if round == 0 {
-			want = 1
-		}
-		if successes != want {
-			t.Fatalf("putaran %d: %d sukses, ingin %d", round, successes, want)
-		}
+	}
+	if successes != 1 {
+		t.Fatalf("%d sukses dari %d kontender, ingin tepat 1", successes, contenders)
 	}
 	if n, err := s.ActiveCardCount(ctx, deviceID); err != nil || n != 8 {
 		t.Fatalf("jumlah aktif = %d (err %v), ingin 8", n, err)
 	}
+}
+
+func TestKunciPerangkatMenyerialkanPenambahan(t *testing.T) {
+	// TC-ENR-12 secara deterministik: selama transaksi lain memegang kunci baris perangkat,
+	// AddCardInstance harus menunggu, lalu melihat kartu ke-8 dan ditolak.
+	s := freshStore(t)
+	siteID, deviceID := seed(t, s)
+	ctx := context.Background()
+	for i := 0; i < 7; i++ {
+		if _, err := s.AddCardInstance(ctx, deviceID, siteID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	holder, err := s.pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer holder.Rollback(ctx)
+	var locked string
+	if err := holder.QueryRow(ctx, `SELECT id FROM devices WHERE id = $1 FOR UPDATE`, deviceID).Scan(&locked); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := s.AddCardInstance(ctx, deviceID, siteID)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		t.Fatalf("penambahan paralel tidak menunggu kunci perangkat (err %v)", err)
+	case <-time.After(300 * time.Millisecond):
+	}
+	if _, err := holder.Exec(ctx, `INSERT INTO card_instances (id, device_id, site_id, status) VALUES ($1, $2, $3, 'PROVISIONING')`, newUUID(), deviceID, siteID); err != nil {
+		t.Fatal(err)
+	}
+	if err := holder.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; !errors.Is(err, ErrCardLimit) {
+		t.Fatalf("err = %v, ingin ErrCardLimit", err)
+	}
+	if n, _ := s.ActiveCardCount(ctx, deviceID); n != 8 {
+		t.Fatalf("jumlah aktif = %d, ingin 8", n)
+	}
+}
+
+func TestIdempotentGagalTidakMenyimpanApaPun(t *testing.T) {
+	// Temuan review I1: kredensial dan baris idempotency harus satu transaksi.
+	s := freshStore(t)
+	siteID, deviceID := seed(t, s)
+	ctx := context.Background()
+	cardID, err := s.AddCardInstance(ctx, deviceID, siteID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub := append([]byte{0x04}, make([]byte, 64)...)
+	_, _, err = s.Idempotent(ctx, "k-gagal", []byte("hash"), func(ctx context.Context, tx *Tx) (int, []byte, error) {
+		if err := tx.SaveCredential(ctx, Credential{CardInstanceID: cardID, Channel: "ble", CredID: make([]byte, 16), PubKey: pub, Cert: []byte{1}, NotAfter: time.Now()}); err != nil {
+			return 0, nil, err
+		}
+		return 0, nil, errors.New("koneksi klien putus")
+	})
+	if err == nil {
+		t.Fatal("error dari fn harus diteruskan")
+	}
+	if n, _ := s.CredentialCount(ctx, cardID); n != 0 {
+		t.Fatalf("kredensial tersimpan walau permintaan gagal: %d", n)
+	}
+	status, _, err := s.Idempotent(ctx, "k-gagal", []byte("hash"), func(ctx context.Context, tx *Tx) (int, []byte, error) {
+		return 200, []byte("ok"), nil
+	})
+	if err != nil || status != 200 {
+		t.Fatalf("retry setelah gagal harus dijalankan ulang: status %d err %v", status, err)
+	}
+}
+
+func TestSatuKredensialAktifPerKanal(t *testing.T) {
+	// Temuan review I2: satu card instance tidak boleh memegang banyak kredensial aktif per kanal.
+	s := freshStore(t)
+	siteID, deviceID := seed(t, s)
+	ctx := context.Background()
+	cardID, _ := s.AddCardInstance(ctx, deviceID, siteID)
+	pub := append([]byte{0x04}, make([]byte, 64)...)
+	save := func(credByte byte) error {
+		_, _, err := s.Idempotent(ctx, "k-"+string(rune('a'+credByte)), []byte{credByte}, func(ctx context.Context, tx *Tx) (int, []byte, error) {
+			return 200, []byte("{}"), tx.SaveCredential(ctx, Credential{CardInstanceID: cardID, Channel: "ble", CredID: bytesOf(credByte), PubKey: pub, Cert: []byte{1}, NotAfter: time.Now()})
+		})
+		return err
+	}
+	if err := save(1); err != nil {
+		t.Fatal(err)
+	}
+	if err := save(2); err == nil {
+		t.Fatal("kredensial aktif kedua untuk kanal yang sama diterima")
+	}
+	if n, _ := s.CredentialCount(ctx, cardID); n != 1 {
+		t.Fatalf("kredensial = %d, ingin 1", n)
+	}
+}
+
+func bytesOf(b byte) []byte {
+	out := make([]byte, 16)
+	out[15] = b
+	return out
 }
 
 func TestMigrateIdempoten(t *testing.T) {

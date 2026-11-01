@@ -51,6 +51,12 @@ type fixture struct {
 
 func newFixture(t *testing.T) fixture {
 	t.Helper()
+	return newFixtureWithPool(t, "")
+}
+
+// newFixtureWithPool membuka store dengan parameter pool tertentu (mis. "pool_max_conns=2").
+func newFixtureWithPool(t *testing.T, poolParams string) fixture {
+	t.Helper()
 	if adminDSN == "" {
 		t.Skip("PostgreSQL tidak tersedia")
 	}
@@ -58,6 +64,9 @@ func newFixture(t *testing.T) fixture {
 	dsn, err := testpg.NewDatabase(ctx, adminDSN)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if poolParams != "" {
+		dsn += "&" + poolParams
 	}
 	s, err := store.Open(ctx, dsn)
 	if err != nil {
@@ -238,6 +247,72 @@ func TestKunciPublikTidakValidDitolak(t *testing.T) {
 	}
 	if n, _ := f.store.CredentialCount(context.Background(), id); n != 0 {
 		t.Fatalf("kredensial diterbitkan untuk kunci tidak valid: %d", n)
+	}
+}
+
+func TestTidakDeadlockSaatPermintaanMelebihiPool(t *testing.T) {
+	// Temuan review C1: Idempotent tidak boleh butuh koneksi kedua selagi memegang lock.
+	f := newFixtureWithPool(t, "pool_max_conns=2")
+	const requests = 6
+	ids := make([]string, requests)
+	for i := range ids {
+		ids[i] = f.enroll(t)
+	}
+	done := make(chan int, requests)
+	for i := 0; i < requests; i++ {
+		go func(i int) {
+			rec := f.do(t, http.MethodPost, "/v1/enrollments/"+ids[i]+"/credentials", fmt.Sprintf("pool-%d", i), map[string]string{"channel": "ble", "public_key": base64.StdEncoding.EncodeToString(phoneKey(t))})
+			done <- rec.Code
+		}(i)
+	}
+	deadline := time.After(10 * time.Second)
+	for i := 0; i < requests; i++ {
+		select {
+		case code := <-done:
+			if code != http.StatusOK {
+				t.Fatalf("status %d", code)
+			}
+		case <-deadline:
+			t.Fatalf("deadlock: hanya %d dari %d permintaan selesai", i, requests)
+		}
+	}
+}
+
+func TestStatusKartuTidakBolehDiprovisikan(t *testing.T) {
+	// Temuan review I2: kartu ditangguhkan/dicabut tidak mendapat sertifikat baru (SDD §8.2).
+	f := newFixture(t)
+	for _, status := range []string{"PENDING_APPROVAL", "SUSPENDED", "REVOKED", "DELETED"} {
+		id := f.enroll(t)
+		if err := f.store.SetCardInstanceStatus(context.Background(), id, status); err != nil {
+			t.Fatal(err)
+		}
+		rec := f.do(t, http.MethodPost, "/v1/enrollments/"+id+"/credentials", "status-"+status, map[string]string{"channel": "ble", "public_key": base64.StdEncoding.EncodeToString(phoneKey(t))})
+		if rec.Code != http.StatusConflict || problemType(t, rec) != "ENR-NOT-PROVISIONABLE" {
+			t.Fatalf("%s: status %d: %s", status, rec.Code, rec.Body)
+		}
+		if n, _ := f.store.CredentialCount(context.Background(), id); n != 0 {
+			t.Fatalf("%s: kredensial diterbitkan", status)
+		}
+	}
+}
+
+func TestSatuKredensialPerKanal(t *testing.T) {
+	// Temuan review I2: kunci lain untuk kanal yang sama tidak boleh mendapat sertifikat kedua.
+	f := newFixture(t)
+	id := f.enroll(t)
+	path := "/v1/enrollments/" + id + "/credentials"
+	if rec := f.do(t, http.MethodPost, path, "c-1", map[string]string{"channel": "ble", "public_key": base64.StdEncoding.EncodeToString(phoneKey(t))}); rec.Code != http.StatusOK {
+		t.Fatalf("pertama: %d %s", rec.Code, rec.Body)
+	}
+	rec := f.do(t, http.MethodPost, path, "c-2", map[string]string{"channel": "ble", "public_key": base64.StdEncoding.EncodeToString(phoneKey(t))})
+	if rec.Code != http.StatusConflict || problemType(t, rec) != "ENR-CHANNEL-EXISTS" {
+		t.Fatalf("kedua: %d %s", rec.Code, rec.Body)
+	}
+	if rec := f.do(t, http.MethodPost, path, "c-3", map[string]string{"channel": "nfcHCE", "public_key": base64.StdEncoding.EncodeToString(phoneKey(t))}); rec.Code != http.StatusOK {
+		t.Fatalf("kanal lain harus boleh: %d %s", rec.Code, rec.Body)
+	}
+	if n, _ := f.store.CredentialCount(context.Background(), id); n != 2 {
+		t.Fatalf("kredensial = %d, ingin 2", n)
 	}
 }
 

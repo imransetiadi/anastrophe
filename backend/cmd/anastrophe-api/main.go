@@ -17,6 +17,8 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/imransetiadi/anastrophe/backend/internal/certs"
@@ -67,9 +69,25 @@ func run() error {
 	}
 	server := &http.Server{
 		Addr:              addr,
+		WriteTimeout:      httpapi.RequestTimeout + 5*time.Second,
 		Handler:           httpapi.New(httpapi.Config{EnabledChannels: []string{"ble"}}, httpapi.Deps{Routes: handlers.Register}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	slog.Info("listening", "addr", addr)
-	return server.ListenAndServe()
+	// SIGTERM (deploy/failover ADR-0014): berhenti menerima permintaan baru dan tunggu
+	// permintaan berjalan selesai, agar transaksi tidak terputus di tengah.
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
+	errs := make(chan error, 1)
+	go func() {
+		slog.Info("listening", "addr", addr)
+		errs <- server.ListenAndServe()
+	}()
+	select {
+	case err := <-errs:
+		return err
+	case <-stop:
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), httpapi.RequestTimeout+5*time.Second)
+		defer cancel()
+		return server.Shutdown(shutdownCtx)
+	}
 }

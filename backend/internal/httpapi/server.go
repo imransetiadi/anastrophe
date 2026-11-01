@@ -2,8 +2,10 @@
 package httpapi
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
+	"time"
 )
 
 // Config adalah konfigurasi per lingkungan yang dikembalikan GET /v1/config (FR-04).
@@ -39,7 +41,19 @@ func New(cfg Config, deps Deps) http.Handler {
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		WriteProblem(w, Problem{Type: "NOT-FOUND", Title: "Not found", Status: http.StatusNotFound})
 	})
-	return recoverer(mux)
+	return recoverer(withDeadline(mux))
+}
+
+// RequestTimeout membatasi setiap permintaan; query database ikut dibatalkan lewat context,
+// sehingga tidak ada permintaan yang menggantung selamanya (review backend C1).
+const RequestTimeout = 15 * time.Second
+
+func withDeadline(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), RequestTimeout)
+		defer cancel()
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 // recoverer mengubah panik menjadi 500 tanpa membocorkan detail ke klien.

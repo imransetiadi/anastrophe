@@ -171,19 +171,39 @@ type Enrollment struct {
 	ZonesBitmap uint64
 }
 
-func (s *Store) Enrollment(ctx context.Context, id string) (Enrollment, error) {
+// Credential yang diterbitkan untuk satu kanal.
+type Credential struct {
+	CardInstanceID string
+	Channel        string
+	CredID         []byte
+	PubKey         []byte
+	Cert           []byte
+	NotAfter       time.Time
+}
+
+// ErrNotProvisionable: status card instance tidak mengizinkan penerbitan kredensial (SDD §8.2).
+var ErrNotProvisionable = errors.New("store: card instance tidak dapat diprovisikan")
+
+// Tx adalah transaksi yang memegang advisory lock idempotency. Semua kerja satu permintaan
+// berjalan di koneksi ini, sehingga permintaan tidak pernah butuh koneksi kedua (review C1)
+// dan hasilnya ter-commit atomik bersama baris idempotency (review I1).
+type Tx struct{ tx pgx.Tx }
+
+// EnrollmentForUpdate membaca card instance dan mengunci barisnya sampai transaksi selesai.
+func (t *Tx) EnrollmentForUpdate(ctx context.Context, id string) (Enrollment, error) {
 	if !looksLikeUUID(id) {
 		return Enrollment{}, ErrNotFound
 	}
 	var e Enrollment
 	var zones []string
 	var bitmap *int64
-	err := s.pool.QueryRow(ctx, `
+	err := t.tx.QueryRow(ctx, `
 		SELECT ci.id, ci.status, s.id, s.name, s.site_code,
 		       COALESCE(ARRAY(SELECT jsonb_array_elements_text(s.policy -> 'zones')), '{}'),
 		       (s.policy ->> 'zones_bitmap')::bigint
 		FROM card_instances ci JOIN sites s ON s.id = ci.site_id
-		WHERE ci.id = $1`, id).Scan(&e.ID, &e.Status, &e.SiteID, &e.SiteName, &e.SiteCode, &zones, &bitmap)
+		WHERE ci.id = $1
+		FOR UPDATE OF ci`, id).Scan(&e.ID, &e.Status, &e.SiteID, &e.SiteName, &e.SiteCode, &zones, &bitmap)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Enrollment{}, ErrNotFound
 	}
@@ -199,8 +219,8 @@ func (s *Store) Enrollment(ctx context.Context, id string) (Enrollment, error) {
 }
 
 // ReaderGroupKeys: hex group_id → [kunci aktif, kunci berikutnya] untuk satu gedung.
-func (s *Store) ReaderGroupKeys(ctx context.Context, siteID string) (map[string][][]byte, error) {
-	rows, err := s.pool.Query(ctx, `SELECT id, pubkey, next_pubkey FROM reader_groups WHERE site_id = $1`, siteID)
+func (t *Tx) ReaderGroupKeys(ctx context.Context, siteID string) (map[string][][]byte, error) {
+	rows, err := t.tx.Query(ctx, `SELECT id, pubkey, next_pubkey FROM reader_groups WHERE site_id = $1`, siteID)
 	if err != nil {
 		return nil, err
 	}
@@ -220,26 +240,25 @@ func (s *Store) ReaderGroupKeys(ctx context.Context, siteID string) (map[string]
 	return keys, rows.Err()
 }
 
-// Credential yang diterbitkan untuk satu kanal.
-type Credential struct {
-	CardInstanceID string
-	Channel        string
-	CredID         []byte
-	PubKey         []byte
-	Cert           []byte
-	NotAfter       time.Time
+func (t *Tx) HasActiveCredential(ctx context.Context, cardInstanceID, channel string) (bool, error) {
+	var exists bool
+	err := t.tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM credentials WHERE card_instance_id = $1 AND channel = $2 AND status = 'ACTIVE')`, cardInstanceID, channel).Scan(&exists)
+	return exists, err
 }
 
-// SaveCredential menyimpan kredensial dan mengaktifkan card instance dalam satu transaksi.
-func (s *Store) SaveCredential(ctx context.Context, c Credential) error {
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `INSERT INTO credentials (id, card_instance_id, channel, cred_id, pubkey, cert, not_after) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-			newUUID(), c.CardInstanceID, c.Channel, c.CredID, c.PubKey, c.Cert, c.NotAfter); err != nil {
-			return err
-		}
-		_, err := tx.Exec(ctx, `UPDATE card_instances SET status = 'ACTIVE' WHERE id = $1 AND status = 'PROVISIONING'`, c.CardInstanceID)
+// SaveCredential menyimpan kredensial dan mengaktifkan card instance (hanya dari
+// PROVISIONING atau ACTIVE). Indeks unik parsial menolak kredensial aktif kedua per kanal.
+func (t *Tx) SaveCredential(ctx context.Context, c Credential) error {
+	tag, err := t.tx.Exec(ctx, `UPDATE card_instances SET status = 'ACTIVE' WHERE id = $1 AND status IN ('PROVISIONING', 'ACTIVE')`, c.CardInstanceID)
+	if err != nil {
 		return err
-	})
+	}
+	if tag.RowsAffected() != 1 {
+		return ErrNotProvisionable
+	}
+	_, err = t.tx.Exec(ctx, `INSERT INTO credentials (id, card_instance_id, channel, cred_id, pubkey, cert, not_after) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		newUUID(), c.CardInstanceID, c.Channel, c.CredID, c.PubKey, c.Cert, c.NotAfter)
+	return err
 }
 
 func (s *Store) CredentialCount(ctx context.Context, cardInstanceID string) (int, error) {
@@ -248,9 +267,11 @@ func (s *Store) CredentialCount(ctx context.Context, cardInstanceID string) (int
 	return n, err
 }
 
-// Idempotent menjalankan fn paling banyak sekali per key. Permintaan dengan key yang sama
-// diserialkan lewat advisory lock; ulangan dengan isi sama mendapat respons tersimpan.
-func (s *Store) Idempotent(ctx context.Context, key string, requestHash []byte, fn func() (int, []byte, error)) (int, []byte, error) {
+// Idempotent menjalankan fn paling banyak sekali per key, di dalam satu transaksi yang
+// memegang advisory lock key tersebut. Bila fn gagal (error atau status ≥ 500) seluruh
+// transaksi di-rollback sehingga retry aman; selain itu respons disimpan dan di-commit
+// bersama hasil kerja fn.
+func (s *Store) Idempotent(ctx context.Context, key string, requestHash []byte, fn func(ctx context.Context, tx *Tx) (int, []byte, error)) (int, []byte, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return 0, nil, err
@@ -271,14 +292,15 @@ func (s *Store) Idempotent(ctx context.Context, key string, requestHash []byte, 
 	case !errors.Is(err, pgx.ErrNoRows):
 		return 0, nil, err
 	}
-	status, body, err = fn()
-	if err != nil {
-		return 0, nil, err
+	status, body, err = fn(ctx, &Tx{tx: tx})
+	if err != nil || status >= 500 {
+		return status, body, err // rollback lewat defer: tidak ada yang tersimpan
 	}
-	if status < 500 {
-		if _, err := tx.Exec(ctx, `INSERT INTO idempotency_keys (key, request_hash, status, body) VALUES ($1, $2, $3, $4)`, key, requestHash, status, body); err != nil {
-			return 0, nil, err
-		}
+	if body == nil {
+		body = []byte{}
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO idempotency_keys (key, request_hash, status, body) VALUES ($1, $2, $3, $4)`, key, requestHash, status, body); err != nil {
+		return 0, nil, err
 	}
 	return status, body, tx.Commit(ctx)
 }
@@ -298,4 +320,13 @@ func looksLikeUUID(s string) bool {
 		}
 	}
 	return true
+}
+
+// SetCardInstanceStatus mengubah status card instance (aksi admin/lifecycle, SDD §8.2).
+func (s *Store) SetCardInstanceStatus(ctx context.Context, id, status string) error {
+	tag, err := s.pool.Exec(ctx, `UPDATE card_instances SET status = $2 WHERE id = $1`, id, status)
+	if err == nil && tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return err
 }

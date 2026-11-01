@@ -70,3 +70,16 @@ func TestErrorTidakMembocorkanDetail(t *testing.T) {
 		t.Fatalf("problem = %+v", p)
 	}
 }
+
+func TestSetiapPermintaanPunyaDeadline(t *testing.T) {
+	var hasDeadline bool
+	h := New(Config{}, Deps{Routes: func(mux *http.ServeMux) {
+		mux.HandleFunc("GET /probe", func(w http.ResponseWriter, r *http.Request) {
+			_, hasDeadline = r.Context().Deadline()
+		})
+	}})
+	serve(t, h, http.MethodGet, "/probe")
+	if !hasDeadline {
+		t.Fatal("permintaan tanpa deadline bisa menggantung selamanya")
+	}
+}

@@ -78,8 +78,8 @@ func (h *Handler) issueCredential(w http.ResponseWriter, r *http.Request) {
 	}
 	id := r.PathValue("id")
 	hash := sha256.Sum256(append([]byte(r.URL.Path+"\n"), body...))
-	status, resp, err := h.Store.Idempotent(r.Context(), key, hash[:], func() (int, []byte, error) {
-		return h.issue(r.Context(), id, body)
+	status, resp, err := h.Store.Idempotent(r.Context(), key, hash[:], func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
+		return h.issue(ctx, tx, id, body)
 	})
 	switch {
 	case errors.Is(err, store.ErrIdempotencyConflict):
@@ -110,7 +110,9 @@ type provisioned struct {
 }
 
 // issue mengembalikan (status, body JSON); error hanya untuk kegagalan infrastruktur.
-func (h *Handler) issue(ctx context.Context, enrollmentID string, body []byte) (int, []byte, error) {
+// Semua kerja berjalan di transaksi idempotency, sehingga gagal di tengah tidak menyisakan
+// kredensial yatim.
+func (h *Handler) issue(ctx context.Context, tx *store.Tx, enrollmentID string, body []byte) (int, []byte, error) {
 	var req struct {
 		Channel   string `json:"channel"`
 		PublicKey string `json:"public_key"`
@@ -128,18 +130,30 @@ func (h *Handler) issue(ctx context.Context, enrollmentID string, body []byte) (
 	if _, err := anp1.ParsePublicKey(pub); err != nil {
 		return problemBody("ENR-INVALID-KEY", http.StatusBadRequest)
 	}
-	enrollment, err := h.Store.Enrollment(ctx, enrollmentID)
+	enrollment, err := tx.EnrollmentForUpdate(ctx, enrollmentID)
 	if errors.Is(err, store.ErrNotFound) {
 		return problemBody("ENR-NOT-FOUND", http.StatusNotFound)
 	}
 	if err != nil {
 		return 0, nil, err
 	}
+	// SDD §8.2: hanya kartu yang sedang diprovisikan (atau aktif untuk kanal baru) yang
+	// boleh mendapat sertifikat.
+	if enrollment.Status != "PROVISIONING" && enrollment.Status != "ACTIVE" {
+		return problemBody("ENR-NOT-PROVISIONABLE", http.StatusConflict)
+	}
+	exists, err := tx.HasActiveCredential(ctx, enrollment.ID, req.Channel)
+	if err != nil {
+		return 0, nil, err
+	}
+	if exists {
+		return problemBody("ENR-CHANNEL-EXISTS", http.StatusConflict)
+	}
 	signer, err := h.Signers(enrollment.SiteID)
 	if err != nil {
 		return 0, nil, err
 	}
-	groupKeys, err := h.Store.ReaderGroupKeys(ctx, enrollment.SiteID)
+	groupKeys, err := tx.ReaderGroupKeys(ctx, enrollment.SiteID)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -156,7 +170,7 @@ func (h *Handler) issue(ctx context.Context, enrollmentID string, body []byte) (
 	if err != nil {
 		return 0, nil, err
 	}
-	if err := h.Store.SaveCredential(ctx, store.Credential{
+	if err := tx.SaveCredential(ctx, store.Credential{
 		CardInstanceID: enrollment.ID, Channel: req.Channel, CredID: credID, PubKey: pub, Cert: cert, NotAfter: notAfter,
 	}); err != nil {
 		return 0, nil, err
