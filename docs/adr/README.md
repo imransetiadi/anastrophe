@@ -41,3 +41,4 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0035](0035-undangan-berkartu-menyetujui-instance.md) | Undangan berkartu menyetujui instance yang belum selesai milik perangkat yang sama | Diterima | `promote_existing` | 0.94 |
 | [ADR-0036](0036-fokus-siklus-hidup-kartu-operator.md) | Fokus berikutnya: siklus hidup kartu oleh operator dan status kartu di app | Diterima | `operator_lifecycle_status` | 0.98 |
 | [ADR-0037](0037-token-baca-status-kartu.md) | App membaca status kartu dengan token baca status | Diterima | `status_read_token` | 0.96 |
+| [ADR-0038](0038-cegah-pembatalan-tindakan-operator.md) | Pemegang kartu tidak boleh membatalkan suspend/revoke operator (terbuka) | Diusulkan — butuh keputusan manusia (eskalasi) | — (escalate) | 0.45 |

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Go 1.27 + PostgreSQL 16 (pgx v5), Swift 6 / SwiftUI / Swift Testing, CryptoKit.
 
-**Spec:** [`docs/superpowers/specs/2026-11-01-siklus-hidup-kartu-design.md`](../specs/2026-11-01-siklus-hidup-kartu-design.md); ADR-0036, ADR-0037; FR-38, FR-50, FR-51; SDD §8.1, §8.4.3, §8.5; QA TC-ADM-03, TC-MGT-11, TC-MGT-12 (baru).
+**Spec:** [`docs/superpowers/specs/2026-11-01-siklus-hidup-kartu-design.md`](../specs/2026-11-01-siklus-hidup-kartu-design.md); ADR-0036, ADR-0037; FR-38, FR-50, FR-51; SDD §8.1, §8.4.3, §8.5; QA TC-ADM-03, TC-MGT-11, TC-MGT-15 (baru; semula ditulis TC-MGT-12 yang ternyata sudah dipakai, review akhir I2).
 
 ## Global Constraints
 
@@ -95,4 +95,4 @@
 - [ ] Test gagal: `statusServerMenangguhkanKartu`, `statusServerMemulihkanKartu`, `statusServerMencabutKartu`, `statusServerTidakMenimpaPerluDipindahkan`, `offlineMempertahankanStatus`, `refreshDibatasiSekaliPerMenit`, `kartuTanpaTokenDilewati`.
 - [ ] Implementasi; panggil saat app masuk foreground dan pemuatan pertama layar Kunci, lalu muat ulang daftar bila berubah.
 - [ ] Suite host dan simulator; e2e lab: provisioning → `suspend` → buka ulang app → Ditangguhkan dan presentasi diblokir → `resume` → Aktif → `revoke` → Dicabut; denylist terisi; token tidak di log/DB.
-- [ ] QA TC-MGT-12 baru (FR-38, FR-51) + traceability §14; SDD §8.1/§8.4.3/§8.5; commit.
+- [ ] QA TC-MGT-15 baru (FR-38, FR-51) + traceability §14; SDD §8.1/§8.4.3/§8.5; commit.

@@ -29,8 +29,8 @@
 | 2.13 | 2026-11-01 | Catatan implementasi enrolment sebelum akun (§8.4.1), `ENR-NOT-REGISTERED` di diagram, struktur modul `CardIdentity`. |
 | 2.14 | 2026-11-01 | Undangan sekali pakai (ADR-0033): tabel `invitations`, `card_instances.invitation_id`, aturan terpakai dan zona (§8.1). |
 | 2.15 | 2026-11-01 | `POST /enrollments` menerima `invitation` sebagai alternatif `card`; galat `ENR-INVITATION-INVALID` (§8.5, §15). |
-| 2.17 | 2026-11-02 | Siklus hidup kartu oleh operator (suspend/resume/revoke, ADR-0036), denylist dari pencabutan, token baca status dan `GET /cards/{id}/status` (ADR-0037) (§8.1, §8.4.3, §8.5, §15). |
 | 2.16 | 2026-11-01 | Undangan berkartu menyetujui instance perangkat itu yang belum selesai (ADR-0035); kartu yang tidak lagi `ACTIVE` membuat undangannya tidak berlaku; kolom `invitations` dan `card_instances.invitation_id` di model data (§8.1). |
+| 2.17 | 2026-11-02 | Siklus hidup kartu oleh operator (suspend/resume/revoke, ADR-0036), denylist dari pencabutan, token baca status dan `GET /cards/{id}/status` (ADR-0037); provisioning hanya memasang hash bila belum ada; `:renew` memeriksa status setelah bukti kepemilikan; celah pembatalan suspend/revoke tercatat di ADR-0038 (§8.1, §8.4.2, §8.4.3, §8.5, §15). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -658,12 +658,12 @@ Implementasi saat ini (sebelum akun ada): cabang PRIMARY dan MEMBER_CANDIDATE be
 
 1. App meminta nonce lewat `POST /v1/credentials/{cred}:challenge`. Nonce 32 B, berlaku 120 dtk, sekali pakai, dan terikat ke satu kredensial. Nonce yang sama dipakai untuk perpanjangan dan hapus kartu (ADR-0026). Challenge diizinkan untuk kredensial dan kartu ACTIVE atau SUSPENDED (ADR-0027); respons memuat `card_instance_id`; kredensial atau kartu yang sudah dicabut dijawab 410 `CARD-GONE`.
 2. App mengirim `POST /v1/credentials/{cred}:renew` (`Idempotency-Key` wajib) berisi nonce dan tanda tangan kunci kredensial (ECDSA P-256, raw r‖s) atas `"ANP1-RENEW"` ‖ `cred_id` ‖ `nonce` sebagai bukti kepemilikan. App Attest assertion menyusul (belum dikirim di tracer). Prefix memisahkan domain pesan dari transcript ANP/1.
-3. Dalam satu transaksi, server memeriksa berurutan: kredensial ada (404 `CRED-NOT-FOUND`); kredensial dan card instance ACTIVE serta kanalnya masih diizinkan kill switch FR-04 (409 `CRED-NOT-RENEWABLE`, termasuk SUSPENDED/REVOKED; kill switch hanya ditegakkan di `:renew`, agar kartu di kanal mati tetap bisa dihapus); nonce valid (400 `CRED-CHALLENGE-INVALID`); tanda tangan valid (400 `CRED-PROOF-INVALID`).
+3. Dalam satu transaksi, server memeriksa berurutan: kredensial ada (404 `CRED-NOT-FOUND`); nonce valid (400 `CRED-CHALLENGE-INVALID`); tanda tangan valid (400 `CRED-PROOF-INVALID`); kredensial dan card instance ACTIVE serta kanalnya masih diizinkan kill switch FR-04 (409 `CRED-NOT-RENEWABLE`, termasuk SUSPENDED/REVOKED; kill switch hanya ditegakkan di `:renew`, agar kartu di kanal mati tetap bisa dihapus). Status diperiksa setelah bukti kepemilikan, sehingga tanpa kunci kredensial kartu ditangguhkan dan aktif dijawab sama (ADR-0037).
 4. Server menerbitkan sertifikat baru untuk kunci, `cred_id`, dan kanal yang sama. Zona diambil dari kartu terdaftar bila card instance tertaut (FR-52, sama dengan penerbitan pertama), selain itu dari kebijakan gedung saat ini; masa berlaku dari kebijakan gedung. Nonce ditandai terpakai hanya bila perpanjangan (atau hapus kartu) sukses. Respons memakai kontrak provisioning (termasuk `not_before`).
 
 Kapan app memicu alur ini diatur ADR-0023 (§5.5).
 
-**Catatan keamanan tracer.** `:challenge` belum terautentikasi. Siapa pun yang mengetahui `cred_id` (ada di sertifikat yang dibaca reader) dapat membuat baris nonce dan membedakan status kredensial lewat 201/404/409. `DELETE /cards/{id}` juga belum terautentikasi: tanpa bukti apa pun, jawaban 410/409/400 membedakan status kartu dan apakah sebuah kredensial milik kartu itu. Sebelum produksi wajib ada autentikasi sesi dan rate limit di edge. Batas per kredensial tidak dipakai, karena penyerang bisa memakainya untuk memblokir perpanjangan pemilik sah. App Attest belum diimplementasikan karena butuh tim pengembang Apple dan perangkat fisik.
+**Catatan keamanan tracer.** `:challenge` belum terautentikasi. Siapa pun yang mengetahui `cred_id` (ada di sertifikat yang dibaca reader) dapat membuat baris nonce dan membedakan status kredensial lewat 201/404/409. `DELETE /cards/{id}` juga belum terautentikasi: tanpa bukti apa pun, jawaban 410/409/400 membedakan status kartu dan apakah sebuah kredensial milik kartu itu. `POST /enrollments/{id}/credentials` hanya dilindungi id card instance, padahal id itu dikembalikan `:challenge` kepada siapa pun yang tahu `cred_id`. Akibatnya kredensial bisa diterbitkan untuk kanal aktif yang belum diprovisikan pada instance ACTIVE milik orang lain (review akhir siklus hidup, *declined to judge*; prioritas tinggi di backlog). Karena itu hash token baca status hanya dipasang provisioning bila belum ada, dan penggantiannya hanya lewat `:renew` (ADR-0037). Sebelum produksi wajib ada autentikasi sesi dan rate limit di edge. Batas per kredensial tidak dipakai, karena penyerang bisa memakainya untuk memblokir perpanjangan pemilik sah. App Attest belum diimplementasikan karena butuh tim pengembang Apple dan perangkat fisik.
 
 #### 8.4.3 Propagasi pencabutan (G4, NFR-R04)
 
@@ -693,7 +693,7 @@ Semua POST mutasi menerima header `Idempotency-Key`. Error memakai RFC 9457 (`ty
 | `GET /config` | Wilayah, kanal aktif, kebijakan, versi minimum | FR-01, FR-04, FR-05 |
 | `POST /enrollments` | Mulai enrolment (kartu fisik/undangan). Body `device_id`, `site_id`, `card` `{tech, id}` (ADR-0031): identitas hanya dipakai untuk HMAC per gedung lalu dibuang; hash idempotency memakai HMAC itu. Respons 201 `{enrollment_id, status}` dengan status `PROVISIONING` atau `PENDING_APPROVAL` (ADR-0032). Alternatif: body `device_id` + `invitation` (token 43 karakter base64url; ADR-0033), tepat satu dari `card`/`invitation`; hash idempotency memakai hash token | FR-11, FR-12, FR-13 |
 | `POST /enrollments/{id}/security-code` · `/verify-code` | Buat/verifikasi code | FR-14, FR-32 |
-| `POST /enrollments/{id}/credentials` | Kirim pubkey per kanal → sertifikat; field opsional `status_token_hash` (base64 SHA-256 token baca status, ADR-0037) | FR-16, FR-38 |
+| `POST /enrollments/{id}/credentials` | Kirim pubkey per kanal → sertifikat; field opsional `status_token_hash` (base64 SHA-256 token baca status, ADR-0037), dipasang hanya bila instance belum punya hash | FR-16, FR-38 |
 | `GET /cards/{id}/status` | Status card instance dengan header `Authorization: Bearer <token baca status base64url>` (ADR-0037); id tak dikenal, token salah, atau tanpa token → 404 `CARD-NOT-FOUND` identik; `Cache-Control: no-store` | FR-38 |
 | `POST /enrollments/{id}/se-personalization` | Sesi personalisasi applet (N-SE) | FR-16 |
 | `GET /cards` · `GET /cards/{id}` | Daftar & detail kartu | FR-30, FR-38 |
@@ -837,7 +837,7 @@ Tidak ada GPS, tidak ada tracking lintas app (ATT tidak dipakai). Privacy Manife
 | `CRED-NOT-RENEWABLE` | Kredensial atau kartu ditangguhkan/dicabut | "Kartu sedang ditangguhkan. Hubungi pengelola gedung." | Hubungi admin |
 | `CRED-CHALLENGE-INVALID` | Nonce tidak dikenal, terpakai, kedaluwarsa, atau milik kredensial lain | — (diulang otomatis pada tap berikutnya) | Minta nonce baru |
 | `CRED-PROOF-INVALID` | Tanda tangan bukti kepemilikan tidak valid | "Kartu perlu didaftarkan ulang." | Enrolment ulang |
-| `CARD-NOT-FOUND` (404) | Token baca status tidak cocok, tidak ada, atau card id tak dikenal; semuanya dijawab identik (ADR-0037) | — (app mempertahankan status terakhir) | Tidak ada |
+| `CARD-NOT-FOUND` (404) | Token baca status tidak cocok, tidak ada, atau card id tak dikenal; semuanya dijawab identik (ADR-0037) | — (app mempertahankan status terakhir dan menghapus token lokal, sehingga perpanjangan berikutnya memasang token baru) | Tidak ada |
 | `CARD-GONE` (410) | Kartu atau kredensial sudah dicabut/dihapus, atau kartu tidak dikenal | — (app menghapus kartu lokal; ADR-0027) | Tidak ada |
 | `CARD-NOT-REMOVABLE` | Kartu belum aktif (mis. masih diprovisikan) saat hapus kartu | "Kartu belum bisa dihapus. Coba lagi nanti." | Coba lagi |
 | `DEV-KEY-MISSING` | Restore/passcode dimatikan | "Kartu perlu dipindahkan ke iPhone ini." | Alur transfer |

@@ -53,7 +53,7 @@ Operator baru bisa menyetujui atau menolak perangkat tambahan. Kartu yang hilang
 ## Token baca status (ADR-0037)
 
 - App membuat 32 byte acak per card instance dan menyimpannya di Keychain dengan `afterFirstUnlockThisDeviceOnly`, dengan kunci per id card instance server.
-- Provisioning `POST /v1/enrollments/{id}/credentials` menerima field opsional `status_token_hash` (base64 dari 32 byte) dan menyimpannya ke instance, menimpa nilai lama. Field ini opsional agar klien lama tetap berfungsi.
+- Provisioning `POST /v1/enrollments/{id}/credentials` menerima field opsional `status_token_hash` (base64 dari 32 byte) dan memasangnya hanya bila instance belum punya hash (review akhir I1: id instance bukan rahasia). Field ini opsional agar klien lama tetap berfungsi, dan app memakai ulang token yang sudah ada untuk instance itu.
 - Perpanjangan `POST /v1/credentials/{cred}:renew` menerima field opsional yang sama. Permintaan ini sudah bertanda tangan kunci kredensial. App mengirimnya bila kartu belum punya token, misalnya kartu yang diprovisikan sebelum fitur ini.
 - Hash idempotency kedua endpoint mencakup `status_token_hash`, sehingga pengulangan dengan hash berbeda tidak memakai respons lama.
 - `GET /v1/cards/{id}/status` dengan header `Authorization: Bearer <token base64url>`:
@@ -67,7 +67,7 @@ Operator baru bisa menyetujui atau menolak perangkat tambahan. Kartu yang hilang
   - `SUSPENDED` → Ditangguhkan;
   - `REVOKED` atau `DELETED` → Dicabut;
   - `ACTIVE` → Aktif, hanya bila status lokal Ditangguhkan. Status lokal lain seperti "Perlu dipindahkan" tidak ditimpa.
-  - Galat jaringan atau 404 → status lokal tetap.
+  - Galat jaringan atau 404 → status lokal tetap. Pada 404 `CARD-NOT-FOUND`, token lokal dihapus agar perpanjangan berikutnya memasang token baru (review akhir I1).
 - Pemeriksaan berjalan saat app masuk foreground dan saat layar Kunci pertama dimuat, paling sering sekali per 60 detik (*keputusan builder*). Presentasi tidak menunggunya.
 - Token dibuat saat provisioning dan, bila belum ada, saat perpanjangan. Hapus kartu juga menghapus tokennya.
 - Token dibaca tanpa `LAContext`, jadi tidak ada prompt autentikasi.

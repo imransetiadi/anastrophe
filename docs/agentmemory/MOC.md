@@ -11,6 +11,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Sesi
 
+- [2026-11-02 — Siklus hidup kartu oleh operator dan status kartu di app](sessions/2026-11-02-siklus-hidup-kartu.md)
 - [2026-11-01 — Enrolment via undangan](sessions/2026-11-01-undangan.md)
 - [2026-11-01 — Registri kartu fisik dan enrolment berbasis kartu](sessions/2026-11-01-registri-kartu.md)
 - [2026-11-01 — Minor riwayat tap, fokus registri, push ke GitHub](sessions/2026-11-01-minor-riwayat-tap-dan-registri.md)
@@ -20,6 +21,9 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Keputusan
 
+- [ADR-0038 — Pemegang kartu tidak boleh membatalkan suspend/revoke operator](decisions/ADR-0038-cegah-pembatalan-tindakan-operator.md) · JEV 0,45 (eskalasi)
+- [ADR-0037 — Token baca status kartu](decisions/ADR-0037-token-baca-status-kartu.md) · JEV 0,96
+- [ADR-0036 — Fokus berikutnya: siklus hidup kartu oleh operator](decisions/ADR-0036-fokus-siklus-hidup-kartu-operator.md) · JEV 0,98
 - [ADR-0035 — Undangan berkartu menyetujui instance yang belum selesai](decisions/ADR-0035-undangan-berkartu-menyetujui-instance.md) · JEV 0,94
 - [ADR-0034 — Enrolment yang belum selesai dilanjutkan](decisions/ADR-0034-lanjutkan-enrolment-belum-selesai.md) · JEV 0,81
 - [ADR-0033 — Fokus berikutnya: enrolment via undangan](decisions/ADR-0033-fokus-enrolment-undangan.md) · JEV 0,89
@@ -40,7 +44,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Menunggu pengguna
 
-- ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
-- Tinjauan gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan.
+- ADR-0017 (entitas hukum untuk entitlement), ADR-0022 (bentuk reader uji BLE), dan ADR-0038 (cegah pembatalan suspend/revoke; rekomendasi `hold_pending_approval`).
+- Tinjauan gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu.
 - Integrasi branch `feat/r1-scaffold`: merge ke `main` atau PR (sudah di-push ke GitHub private).
 - `DEVELOPMENT_TEAM` serta iPhone dan reader untuk uji bertipe H.

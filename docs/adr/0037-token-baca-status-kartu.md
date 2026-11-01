@@ -29,6 +29,13 @@ Setiap card instance punya **token baca status** 32 byte acak, dipakai sebagai b
 - Kartu yang diprovisikan sebelum fitur ini mendapat token pada perpanjangan berikutnya.
 - Token yang dicuri hanya bisa membaca status kartu itu.
 
+## Pembaruan setelah review akhir (2026-11-02)
+
+- **Provisioning tidak mengganti hash** (review I1). `POST /v1/enrollments/{id}/credentials` hanya dilindungi id card instance, yang dikembalikan `:challenge` kepada siapa pun yang tahu `cred_id`. Karena itu provisioning hanya memasang hash bila instance belum punya. Penggantian hanya lewat `:renew`.
+- **App memulihkan diri.** Bila server menjawab `CARD-NOT-FOUND` untuk token yang ada, app menghapus token lokal, sehingga perpanjangan berikutnya memasang token baru. Provisioning memakai ulang token yang sudah ada untuk instance itu.
+- **`:renew` tidak membocorkan penangguhan** (review M2). Status dan kill switch diperiksa setelah nonce dan tanda tangan valid, sehingga tanpa kunci kredensial kartu ditangguhkan dan aktif dijawab sama.
+- **Koreksi kata** (review M9). Tanda tangan perpanjangan mencakup `cred_id` dan nonce, tetapi tidak `status_token_hash`. Permintaan itu hanya bisa dibuat pemegang kunci, sedangkan integritas hash di dalamnya bergantung pada TLS.
+
 ## Catatan keputusan JEV
 
 - **Alat:** `jev_decide` (model `jev-1.14.0`), `escalate_on_contradiction: true`

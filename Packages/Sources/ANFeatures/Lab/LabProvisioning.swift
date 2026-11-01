@@ -59,8 +59,12 @@ enum LabProvisioning {
             // ADR-0032: perangkat tambahan menunggu operator; tidak ada provisioning sampai disetujui.
             guard start.status == .provisioning else { throw ANError.enrollmentRejected(.pendingApproval) }
             let enrollmentID = start.enrollmentID
-            // ADR-0037: token baca status dibuat di perangkat; server hanya menerima hash-nya.
-            let statusToken = statusTokens == nil ? nil : try StatusToken.generate()
+            // ADR-0037: token baca status dibuat di perangkat; server hanya menerima hash-nya dan hanya
+            // memasangnya bila belum ada, jadi token yang sudah ada untuk instance ini dipakai ulang.
+            var statusToken: Data?
+            if let statusTokens {
+                statusToken = try (try? statusTokens.token(forCard: enrollmentID)) ?? StatusToken.generate()
+            }
             let provisioned = try await api.submitCredentialKey(enrollmentID: enrollmentID, channel: channel, publicKey: publicKey,
                                                                 statusTokenHash: statusToken.map(StatusToken.hash), idempotencyKey: UUID())
             guard provisioned.channel == channel else { throw ANError.invalidData }

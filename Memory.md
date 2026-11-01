@@ -12,10 +12,10 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 ## Status terkini
 
 - Branch kerja: `feat/r1-scaffold`, di-push ke GitHub private `imransetiadi/anastrophe` (origin) atas permintaan pengguna; belum di-merge.
-- Suite terakhir: Swift host 260 test (1 dilewati, tanpa gagal), simulator 258 test (1 dilewati), backend Go 10 paket lulus dengan PostgreSQL.
+- Suite terakhir: Swift host 281 test (1 dilewati, tanpa gagal), simulator 279 test (1 dilewati), backend Go 10 paket lulus dengan PostgreSQL.
 - Menunggu keputusan pengguna:
-  - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
-  - Tinjauan 8 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan (`docs/adr/jev-log/*-gate.json`).
+  - ADR-0017 (entitas hukum untuk entitlement), ADR-0022 (bentuk reader uji BLE), dan ADR-0038 (cara mencegah pemegang kartu membatalkan suspend/revoke operator; rekomendasi `hold_pending_approval`, JEV 0,45).
+  - Tinjauan 9 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu (`docs/adr/jev-log/*-gate.json`).
   - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
 
@@ -32,6 +32,39 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Riwayat tap | Log lokal 30 hari: lima terbaru di detail, "Lihat semua" ke riwayat penuh, store pulih sendiri bila rusak | FR-30, ADR-0029, ADR-0030 |
 | Registri kartu | Enrolment hanya untuk kartu terdaftar (HMAC per gedung), alasan FR-13, perangkat tambahan menunggu operator, enrolment yang belum selesai dilanjutkan, CLI `anastrophe-registry` | FR-11, FR-13, FR-52, ADR-0031, ADR-0032, ADR-0034 |
 | Undangan | Token sekali pakai (32 byte acak, hanya hash yang disimpan), CLI `invite` dengan identitas kartu dari berkas atau stdin, enrolment `{device_id, invitation}`, dan undangan berkartu yang menyetujui enrolment perangkat yang masih menunggu; app mengurai tautan `/i/<token>` | FR-12, FR-53, ADR-0033, ADR-0035 |
+| Siklus hidup kartu | Operator: `list`, `suspend`, `resume`, `revoke` (audit, denylist); app membaca status kartu dengan token baca status tanpa Face ID/passcode. Keterbatasan terbuka: pendaftaran ulang kartu fisik bisa membatalkan suspend/revoke (ADR-0038) | FR-38, FR-50 (sebagian), FR-51, ADR-0036, ADR-0037, ADR-0038 |
+
+## API-2026-11-02-0044 - Siklus hidup kartu oleh operator dan status kartu di app (Selesai dengan keterbatasan terbuka, commit lokal; C1 dan gate tereskalasi)
+
+Fokus dari ADR-0036 (JEV 0,98). Mekanisme status dari ADR-0037 (JEV 0,96): token baca status yang dibuat app, dan server hanya menyimpan hash-nya.
+
+Isi pekerjaan:
+- **Store dan migrasi 0010:** `status_token_hash` dan `denylist_entries`.
+  - `SuspendCard`, `ResumeCard`, `RevokeCardInstance`: instance dikunci dan status asal diperiksa; kredensial mengikuti status; audit `card.*`; alasan pencabutan berupa kode.
+  - Hapus kartu dan pencabutan operator memakai helper yang sama, jadi keduanya mengisi denylist.
+- **HTTP:** `status_token_hash` opsional di provisioning (hanya dipasang bila belum ada) dan di `:renew` (boleh mengganti). `GET /v1/cards/{id}/status` dengan bearer token, dan semua kegagalan dijawab 404 `CARD-NOT-FOUND` yang identik. `:renew` memeriksa status setelah bukti kepemilikan.
+- **CLI:** `list`, `suspend`, `resume`, `revoke --reason <kode>`, dengan peringatan ADR-0038 setelah suspend/revoke.
+- **App:** token di Keychain `afterFirstUnlockThisDeviceOnly`. `CardStatusRefresher` berjalan saat layar Kunci dimuat dan saat app kembali aktif, paling sering sekali per menit:
+  - Ditangguhkan, Aktif, atau Dicabut mengikuti server.
+  - "Perlu dipindahkan" tidak ditimpa, dan galat jaringan mempertahankan status.
+  - Token yang ditolak server dihapus agar perpanjangan berikutnya memasang token baru.
+
+Review akhir (opus): siap merge setelah perbaikan.
+- **C1 (pemegang kartu bisa membatalkan suspend/revoke dengan mendaftar ulang kartu fisik):** JEV 0,45, jadi dieskalasi sebagai **ADR-0038**. Rekomendasi: `hold_pending_approval`. FR-51 belum dinyatakan terpenuhi.
+- **Diperbaiki dengan test RED → GREEN:**
+  - I1: hash token bisa ditimpa lewat provisioning tanpa autentikasi.
+  - I2: ID QA ganda; `check_docs.py` kini mendeteksinya.
+  - M2: `:renew` membocorkan penangguhan.
+
+Bukti:
+- Go 10 paket lulus, `go vet` bersih.
+- Swift host 281 test, simulator 279 test.
+- `check_docs` 0 masalah.
+- Lab simulator: `suspend` lalu buka ulang app → Suspended; `resume` → Active; `revoke --reason hilang` → Revoked. Kredensial `REVOKED`, satu baris denylist (`expires_at` = `not_after`), audit lengkap, dan log API tanpa token.
+
+`jev_gate` tereskalasi (composite 0,74, `test_gap`); 9 klaim terverifikasi. Celah pra-ada yang ditemukan reviewer: kredensial bisa diterbitkan lewat id instance yang didapat dari `:challenge`. Celah ini tercatat di SDD dan menjadi prioritas tinggi di [backlog](docs/agentmemory/backlog.md).
+
+Commit unit ini: `f1f0611`, `203161e`, `f06f6cc`, `d02e59e`, `2ab4477`, `613c278`, dan commit ini. Obsidian: `sessions/2026-11-02-siklus-hidup-kartu.md`, `decisions/ADR-0036…`, `ADR-0037…`, `ADR-0038…`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
 
 ## API-2026-11-01-2348 - Enrolment via undangan dan perbaikan review akhirnya (Selesai, commit lokal; gate tereskalasi)
 

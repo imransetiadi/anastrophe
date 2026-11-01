@@ -188,6 +188,17 @@ func (t *Tx) SetStatusTokenHash(ctx context.Context, cardInstanceID string, hash
 	return nil
 }
 
+// InitStatusTokenHash memasang hash token baca status hanya bila instance belum punya. Provisioning hanya
+// dilindungi id instance (yang bisa didapat dari :challenge), jadi tidak boleh mengganti hash milik
+// pemegang kartu (review akhir I1); penggantian hanya lewat perpanjangan bertanda tangan.
+func (t *Tx) InitStatusTokenHash(ctx context.Context, cardInstanceID string, hash []byte) error {
+	if len(hash) != 32 {
+		return ErrInvalidTokenHash
+	}
+	_, err := t.tx.Exec(ctx, `UPDATE card_instances SET status_token_hash = $2 WHERE id = $1 AND status_token_hash IS NULL`, cardInstanceID, hash)
+	return err
+}
+
 // CardStatusByToken mengembalikan status card instance bila hash token cocok (ADR-0037). Id tak dikenal,
 // instance tanpa token, dan token salah sama-sama ErrNotFound.
 func (s *Store) CardStatusByToken(ctx context.Context, cardInstanceID string, tokenHash []byte) (string, error) {

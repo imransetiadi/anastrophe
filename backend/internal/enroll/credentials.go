@@ -353,7 +353,7 @@ func (h *Handler) issue(ctx context.Context, tx *store.Tx, enrollmentID string, 
 		return 0, nil, err
 	}
 	if req.StatusTokenHash != nil {
-		if err := tx.SetStatusTokenHash(ctx, enrollment.ID, req.StatusTokenHash); err != nil {
+		if err := tx.InitStatusTokenHash(ctx, enrollment.ID, req.StatusTokenHash); err != nil {
 			return 0, nil, err
 		}
 	}

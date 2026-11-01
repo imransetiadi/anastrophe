@@ -113,7 +113,6 @@ public struct APIClient: Sendable {
         _ = try await perform(request)
     }
 
-    /// `cred_id` dalam hex huruf kecil, diikuti `:aksi` (SDD §8.5).
     /// `GET /v1/cards/{id}/status` dengan token baca status sebagai bearer (ADR-0037). Tanpa tanda tangan
     /// kunci kredensial, jadi tidak ada prompt autentikasi.
     public func cardStatus(cardID: String, token: Data) async throws -> String {
@@ -127,6 +126,7 @@ public struct APIClient: Sendable {
         return try Self.decoder.decode(Reply.self, from: try await perform(request)).status
     }
 
+    /// `cred_id` dalam hex huruf kecil, diikuti `:aksi` (SDD §8.5).
     private func credentialURL(_ credentialID: Data, action: String) -> URL {
         baseURL.appending(path: "v1/credentials/\(credentialID.hexString):\(action)")
     }

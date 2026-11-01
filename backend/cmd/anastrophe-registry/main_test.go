@@ -590,3 +590,20 @@ func TestReasonHanyaUntukRevoke(t *testing.T) {
 		t.Fatalf("suspend --reason: %d %s", code, errOut.String())
 	}
 }
+
+func TestSuspendRevokeMemperingatkanPendaftaranUlang(t *testing.T) {
+	// ADR-0038 (terbuka): sampai diputuskan, operator diberi tahu bahwa pendaftaran ulang kartu fisik
+	// yang sama belum diblokir.
+	db, dsn := freshStore(t)
+	site := siteWithZones(t, db)
+	id := activeInstance(t, db, site)
+	for _, args := range [][]string{
+		{"suspend", "--card-instance", id, "--operator", "staf-01"},
+		{"revoke", "--card-instance", id, "--operator", "staf-01"},
+	} {
+		var out, errOut bytes.Buffer
+		if code := run(context.Background(), args, &out, &errOut, env(dsn)); code != 0 || !strings.Contains(errOut.String(), "ADR-0038") {
+			t.Fatalf("%s: kode %d, peringatan tidak ada: %s", args[0], code, errOut.String())
+		}
+	}
+}

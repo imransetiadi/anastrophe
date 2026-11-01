@@ -134,10 +134,6 @@ func (h *Handler) renew(ctx context.Context, tx *store.Tx, credID, nonce, sig, s
 	if err != nil {
 		return 0, nil, err
 	}
-	// Kill switch kanal (FR-04) juga menghentikan perpanjangan, bukan hanya penerbitan baru.
-	if !cred.Renewable() || !h.channelEnabled(cred.Channel) {
-		return problemBody("CRED-NOT-RENEWABLE", http.StatusConflict)
-	}
 	now := h.Now().UTC().Truncate(time.Second)
 	valid, err := tx.RenewalChallengeValid(ctx, cred.ID, nonce, now)
 	if err != nil {
@@ -152,6 +148,11 @@ func (h *Handler) renew(ctx context.Context, tx *store.Tx, credID, nonce, sig, s
 	}
 	if !anp1.VerifyRaw(pub, RenewalMessage(cred.CredID, nonce), sig) {
 		return problemBody("CRED-PROOF-INVALID", http.StatusBadRequest)
+	}
+	// Status dan kill switch kanal (FR-04) baru diperiksa setelah bukti kepemilikan: tanpa kunci
+	// kredensial, kartu ditangguhkan dan aktif dijawab sama (ADR-0037, review akhir M2).
+	if !cred.Renewable() || !h.channelEnabled(cred.Channel) {
+		return problemBody("CRED-NOT-RENEWABLE", http.StatusConflict)
 	}
 	signer, err := h.Signers(cred.Site.SiteID)
 	if err != nil {

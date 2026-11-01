@@ -392,6 +392,10 @@ func lifecycle(ctx context.Context, action string, args []string, stdout, stderr
 		return fail(err)
 	}
 	fmt.Fprintf(stdout, "card instance %s %s\n", instance, verdict)
+	if action != "resume" {
+		// Keterbatasan terbuka sampai ADR-0038 diputuskan.
+		fmt.Fprintln(stderr, "anastrophe-registry: peringatan: pendaftaran ulang kartu fisik yang sama belum diblokir (ADR-0038, menunggu keputusan)")
+	}
 	return 0
 }
 

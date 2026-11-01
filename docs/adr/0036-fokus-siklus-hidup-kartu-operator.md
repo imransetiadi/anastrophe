@@ -24,6 +24,7 @@ Iterasi berikutnya membangun **siklus hidup kartu oleh operator** dan **status k
 - Operator punya tindakan dasar FR-51 sebelum portal admin ada.
 - Status di app mengikuti server tanpa menunggu push.
 - Sinkron denylist ke reader tetap menunggu keputusan reader uji (ADR-0022).
+- Keterbatasan terbuka (review akhir C1): pemegang kartu bisa membatalkan suspend/revoke dengan mendaftar ulang kartu fisik yang sama. Cara mencegahnya menunggu keputusan pengguna di ADR-0038.
 
 ## Catatan keputusan JEV
 

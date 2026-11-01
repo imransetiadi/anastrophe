@@ -208,3 +208,52 @@ func TestTokenStatusTidakBocor(t *testing.T) {
 		}
 	}
 }
+
+func TestProvisioningTidakMenimpaHashTokenStatus(t *testing.T) {
+	// Review akhir I1: provisioning hanya dilindungi id instance (bisa didapat dari :challenge), jadi
+	// hanya boleh memasang hash bila belum ada. Penggantian hanya lewat perpanjangan bertanda tangan.
+	f := newFixture(t)
+	_, header, hashB64 := newStatusToken(t)
+	card := f.provisionWithStatusToken(t, hashB64)
+	_, attackerHeader, attackerHash := newStatusToken(t)
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	rec := f.do(t, http.MethodPost, "/v1/enrollments/"+card.enrollmentID+"/credentials", "prov-kanal-kedua", map[string]string{
+		"channel": "nfcHCE", "public_key": base64.StdEncoding.EncodeToString(mustPub(t, key)), "status_token_hash": attackerHash,
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("provisioning kanal kedua: %d %s", rec.Code, rec.Body)
+	}
+	if got := statusValue(t, f.cardStatus(t, card.enrollmentID, header)); got != "ACTIVE" {
+		t.Fatalf("token pemilik = %q", got)
+	}
+	if rec := f.cardStatus(t, card.enrollmentID, attackerHeader); rec.Code != http.StatusNotFound {
+		t.Fatalf("hash pengganti diterima: %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestPerpanjanganTidakMembocorkanPenangguhan(t *testing.T) {
+	// Review akhir M2 (ADR-0037 requirement 1): tanpa kunci kredensial, kartu ditangguhkan dan aktif
+	// dijawab sama; status hanya terlihat setelah nonce dan tanda tangan valid.
+	answers := map[string][]string{}
+	for _, suspended := range []bool{false, true} {
+		f := newFixture(t)
+		_, _, hashB64 := newStatusToken(t)
+		card := f.provisionWithStatusToken(t, hashB64)
+		if suspended {
+			if err := f.store.SuspendCard(context.Background(), card.enrollmentID, "staf-01", f.h.Now()); err != nil {
+				t.Fatal(err)
+			}
+		}
+		nonce := card.challenge(t, card.credID)
+		badSig := card.renew(t, card.credID, nonce, make([]byte, 64), "renew-sig-sampah")
+		badNonce := card.renew(t, card.credID, make([]byte, 32), renewalSignature(t, card.key, card.credID, make([]byte, 32)), "renew-nonce-sampah")
+		key := map[bool]string{false: "aktif", true: "ditangguhkan"}[suspended]
+		answers[key] = []string{badSig.Body.String(), badNonce.Body.String()}
+		if badSig.Code != http.StatusBadRequest || badNonce.Code != http.StatusBadRequest {
+			t.Errorf("%s: tanda tangan sampah %d, nonce sampah %d", key, badSig.Code, badNonce.Code)
+		}
+	}
+	if strings.Join(answers["aktif"], "|") != strings.Join(answers["ditangguhkan"], "|") {
+		t.Fatalf("jawaban berbeda: %v vs %v", answers["aktif"], answers["ditangguhkan"])
+	}
+}

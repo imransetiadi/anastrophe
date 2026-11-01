@@ -65,6 +65,17 @@ struct CardStatusRefresherTests {
         let (_, cards) = try await setUp(status: .suspended)
         #expect(await !refresher(cards).refresh(now: t0, transport: SequenceTransport([])))
         #expect(try await cards.all().first?.status == .suspended)
+        #expect(try tokens.token(forCard: serverCardID) != nil)  // galat jaringan bukan penolakan token
+    }
+
+    @Test func tokenDitolakServerDihapus() async throws {
+        // Review akhir I1: token yang tidak lagi dikenali server dihapus lokal, sehingga perpanjangan
+        // bertanda tangan berikutnya memasang token baru; status lokal tetap.
+        let (_, cards) = try await setUp(status: .suspended)
+        let transport = SequenceTransport([(404, #"{"type":"CARD-NOT-FOUND","status":404}"#, "application/problem+json")])
+        #expect(await !refresher(cards).refresh(now: t0, transport: transport))
+        #expect(try await cards.all().first?.status == .suspended)
+        #expect(try tokens.token(forCard: serverCardID) == nil)
     }
 
     @Test func refreshDibatasiSekaliPerMenit() async throws {

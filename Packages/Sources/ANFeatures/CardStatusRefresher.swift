@@ -31,9 +31,19 @@ final class CardStatusRefresher {
         var changed = false
         for card in all {
             guard let (backend, serverCardID) = server(of: card),
-                  let token = try? tokens.token(forCard: serverCardID),
-                  let status = try? await APIClient(baseURL: backend, transport: transport).cardStatus(cardID: serverCardID, token: token)
+                  let token = try? tokens.token(forCard: serverCardID)
             else { continue }
+            let status: String
+            do {
+                status = try await APIClient(baseURL: backend, transport: transport).cardStatus(cardID: serverCardID, token: token)
+            } catch let problem as ProblemDetails where problem.type == "CARD-NOT-FOUND" {
+                // Server tidak mengenali token ini (mis. hash belum terpasang): hapus lokal agar
+                // perpanjangan bertanda tangan berikutnya memasang token baru (review akhir I1).
+                try? tokens.delete(forCard: serverCardID)
+                continue
+            } catch {
+                continue  // offline atau galat lain: status terakhir tetap dipakai (FR-25)
+            }
             // Baca ulang: kartu bisa berubah atau terhapus selama permintaan berjalan.
             guard var current = try? await cards.all().first(where: { $0.id == card.id }),
                   let next = Self.localStatus(server: status, current: current.status)

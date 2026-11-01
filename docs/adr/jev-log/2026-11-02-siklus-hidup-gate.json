@@ -1,0 +1,94 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "action": "escalate",
+  "label": "siklus-hidup-plan-close-gate",
+  "request": "Close the plan 2026-11-01-siklus-hidup-kartu (FR-38, FR-50 subset, FR-51; ADR-0036/0037) plus the final-review fix pass (C1 escalated as ADR-0038, I1, I2, M2).",
+  "reason_codes": [
+    "confidence_below_review",
+    "safe_to_apply_below_review",
+    "review_escalated",
+    "claim_confidence_below_auto_accept"
+  ],
+  "review": {
+    "safe_to_apply": 0.25,
+    "composite": 0.73975,
+    "limiting_rubrics": [
+      "test_gap"
+    ],
+    "scores": {
+      "correctness": 1.79,
+      "spec_match": 1.73,
+      "test_gap": 0.38,
+      "blast_radius": 1.99
+    }
+  },
+  "verification": {
+    "verified": 9,
+    "contradicted": 0,
+    "unsupported": 0,
+    "needs_review": 3,
+    "results": [
+      {
+        "claim": "Go suite 10/10 ok after fix pass",
+        "verdict": "verified",
+        "confidence": 0.98,
+        "action": "auto"
+      },
+      {
+        "claim": "Swift host 281 exit 0; simulator TEST SUCCEEDED 279",
+        "verdict": "verified",
+        "confidence": 1.0,
+        "action": "auto"
+      },
+      {
+        "claim": "I1: TestProvisioningTidakMenimpaHashTokenStatus RED then GREEN; hash set only when NULL",
+        "verdict": "verified",
+        "confidence": 0.72,
+        "action": "review"
+      },
+      {
+        "claim": "M2: TestPerpanjanganTidakMembocorkanPenangguhan RED (409) then GREEN",
+        "verdict": "verified",
+        "confidence": 0.61,
+        "action": "review"
+      },
+      {
+        "claim": "I1 app: tokenDitolakServerDihapus RED then GREEN; offline keeps token",
+        "verdict": "verified",
+        "confidence": 0.88,
+        "action": "auto"
+      },
+      {
+        "claim": "C1 not fixed: escalated as ADR-0038 (JEV 0.45); CLI warning test RED then GREEN",
+        "verdict": "verified",
+        "confidence": 0.96,
+        "action": "auto"
+      },
+      {
+        "claim": "E2E: Suspended/Active/Revoked after relaunch; DB REVOKED/hilang; denylist 1; audit sequence",
+        "verdict": "verified",
+        "confidence": 0.74,
+        "action": "review"
+      },
+      {
+        "claim": "Status endpoint identical 404 for 8 classes; token not in logs/tables",
+        "verdict": "verified",
+        "confidence": 0.97,
+        "action": "auto"
+      },
+      {
+        "claim": "check_docs: [dup] TC-MGT-12 before renumbering, 0 problems after",
+        "verdict": "verified",
+        "confidence": 0.97,
+        "action": "auto"
+      }
+    ]
+  },
+  "note": "Tidak diajukan ulang (ADR-0018). C1 terbuka (ADR-0038) menjelaskan rubrik test_gap; menunggu tinjauan pengguna.",
+  "usage": {
+    "input_tokens": 5907,
+    "output_tokens": 438
+  }
+}

@@ -1,0 +1,40 @@
+{
+ "tool": "jev_decide",
+ "label": "D38-cegah-pembatalan-tindakan-operator",
+ "decision": "After an operator suspends or revokes a card instance (FR-51, ADR-0036), the holder can currently get a fresh working credential for the same registered physical card: delete the suspended card (allowed by ADR-0027) and re-enrol, or simply re-enrol after a revoke. How should the server prevent this bypass?",
+ "candidates": [
+  {
+   "id": "hold_pending_approval",
+   "description": "Operator suspend or revoke sets a hold on the instance's registered physical card (new column on physical_cards). While the hold is set, every new card-path enrolment for that card gets PENDING_APPROVAL regardless of other holders, and card-bound invitations for it are invalid. Resume of the suspended instance clears a suspend hold; operator approve of a pending instance clears the hold. Deleting a suspended card keeps the hold."
+  },
+  {
+   "id": "revoke_removes_card",
+   "description": "Operator revoke also marks the physical card REMOVED in the registry (re-enrolment answers ENR-NOT-REGISTERED, bound invitations become invalid). For suspend, the server refuses user deletion of a SUSPENDED card (409) so the suspension cannot be erased. Re-admission after revoke requires re-importing the card."
+  },
+  {
+   "id": "explicit_registry_remove",
+   "description": "Add an anastrophe-registry remove command that marks a card REMOVED, and document that suspend/revoke alone do not block re-enrolment. No automatic blocking."
+  },
+  {
+   "id": "block_reenrol_code",
+   "description": "While the latest instance of a physical card was suspended or revoked by an operator, card-path enrolment returns 409 with a new code ENR-CARD-BLOCKED and creates no instance. The operator clears the block with resume or a new unblock command."
+  }
+ ],
+ "evidence_refs": [
+  "review akhir siklus hidup C1 (direproduksi lewat HTTP)",
+  "store.EnrollCard activeStatuses",
+  "ADR-0026/0027",
+  "ADR-0031 (REMOVED)",
+  "ADR-0032",
+  "ADR-0035",
+  "FR-51, US-11, FR-39",
+  "GLOSSARY Revoke"
+ ],
+ "priorities": "1) The holder cannot bypass an operator suspend or revoke without a new operator action (FR-51 intent). 2) The operator has a clear CLI path to re-admit the holder later. 3) Reuse existing mechanisms (PENDING_APPROVAL with approve/reject, registry REMOVED, existing error codes) and keep messages truthful. 4) Minimal schema and API changes.",
+ "requirements": [
+  "After an operator suspends or revokes a card instance, the holder cannot obtain a new working credential for the same physical card, by deleting and re-enrolling or by re-enrolling directly, without a new operator action.",
+  "The operator has a CLI path to re-admit the holder of that physical card later.",
+  "Other holders' card instances and unrelated registry cards are unaffected."
+ ],
+ "escalate_on_contradiction": true
+}

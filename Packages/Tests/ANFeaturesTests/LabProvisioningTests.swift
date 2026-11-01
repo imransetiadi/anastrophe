@@ -131,6 +131,25 @@ struct LabBackendProvisioningTests {
         #expect(body["status_token_hash"] == StatusToken.hash(token).base64EncodedString())
     }
 
+    @Test func provisionViaBackendMemakaiTokenYangAda() async throws {
+        // Review akhir I1: server hanya memasang hash bila belum ada, jadi app memakai ulang tokennya.
+        let cards = try SwiftDataCardStore(directory: temporaryDirectory())
+        let tokens = KeychainStatusTokenStore(store: InMemorySecretStore())
+        let existing = Data(repeating: 0x44, count: 32)
+        try tokens.save(existing, forCard: "e1")
+        let transport = SequenceTransport([
+            configBody(),
+            (201, #"{"enrollment_id":"e1","status":"PROVISIONING"}"#, "application/json"),
+            (200, provisionedBody(credentialID: Data(repeating: 0x5D, count: 16)), "application/json"),
+        ])
+        _ = try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", card: labTestCard, channel: .ble,
+                                                          keys: keys, records: records, cards: cards, statusTokens: tokens)
+        let raw = try #require(transport.bodies[2])
+        let body = try #require(try JSONSerialization.jsonObject(with: raw) as? [String: String])
+        #expect(body["status_token_hash"] == StatusToken.hash(existing).base64EncodedString())
+        #expect(try tokens.token(forCard: "e1") == existing)
+    }
+
     @Test func provisionViaBackendMenyimpanRenewalURL() async throws {
         // ADR-0023: record mengingat backend penerbit dan awal masa berlaku untuk perpanjangan.
         let cards = try SwiftDataCardStore(directory: temporaryDirectory())
