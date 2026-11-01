@@ -29,3 +29,4 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0023](0023-perpanjangan-sertifikat-autentikasi-tap.md) | Perpanjangan sertifikat memakai autentikasi tap | Diterima | `renew_on_user_auth` | 0.98 |
 | [ADR-0024](0024-rantai-audit-per-gedung.md) | Rantai hash audit per gedung | Diterima | `per_site_chain` | 0.95 |
 | [ADR-0025](0025-audit-pseudonim-sejak-ditulis.md) | Audit pseudonim sejak ditulis | Diterima | `pseudonymous_at_write` | 0.96 |
+| [ADR-0026](0026-hapus-kartu-bukti-kepemilikan.md) | Hapus kartu dengan bukti kepemilikan kunci | Diterima | `pop_revoke` | 0.98 |

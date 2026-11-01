@@ -1,0 +1,35 @@
+{
+  "tool": "jev_decide",
+  "label": "D26-hapus-kartu",
+  "decision": "How should the Anastrophe tracer backend authorize card deletion (FR-31, SDD DELETE /cards/{id}) before user session authentication exists?",
+  "candidates": [
+    {
+      "id": "pop_revoke",
+      "description": "DELETE /v1/cards/{card_instance_id} carries a proof of possession for one of the card's credentials: cred_id, a nonce from the existing POST /v1/credentials/{cred}:challenge, and a credential-key signature over \"ANP1-REVOKE\" ‖ cred_id ‖ nonce ‖ card_instance_id. The server verifies it, revokes the card instance and all its credentials (frees the 8-card slot), and writes credential.revoked audit events. The app signs after the user's confirmation and Face ID/passcode (FR-31 already requires authentication), and stores the server card id at provisioning."
+    },
+    {
+      "id": "bearer_card_id",
+      "description": "DELETE /v1/cards/{card_instance_id} with no proof: the random card-instance UUID known to the device acts as a capability. The server revokes the card instance and its credentials."
+    },
+    {
+      "id": "local_only_until_auth",
+      "description": "Implement only local deletion in the app now (delete key, record, card); revoke on the server later, once session authentication exists. The server keeps the card instance and credential ACTIVE until certificate expiry and the slot stays used."
+    }
+  ],
+  "evidence_refs": [
+    "FR-31",
+    "TC-MGT-02",
+    "SDD §8.2, §8.3, §8.5",
+    "ADR-0023",
+    "ADR-0009",
+    "FR-15",
+    "ADR-0024/0025"
+  ],
+  "priorities": "1) FR-31 must revoke the credential server-side (reader refuses after sync) and free the 8-card slot. 2) A third party must not be able to delete someone else's card. 3) Reuse the accepted renewal pattern (ADR-0023) instead of inventing a new mechanism. 4) Keep it simple and buildable now without session auth. The user approved autonomous iteration; decisions under 0.60 go back to the user.",
+  "requirements": [
+    "The server revokes the card instance and its credentials, freeing the device's card slot.",
+    "Deleting a card requires proof that the caller holds the card's credential private key.",
+    "No mechanism beyond what the backend and app already have (nonce challenge, credential-key signatures) is needed."
+  ],
+  "escalate_on_contradiction": true
+}

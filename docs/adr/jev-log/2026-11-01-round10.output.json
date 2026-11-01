@@ -1,0 +1,71 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "label": "D26-hapus-kartu",
+  "recommendation": {
+    "selected": "pop_revoke",
+    "escaped": false,
+    "confidence": 0.98,
+    "probabilities": {
+      "pop_revoke": 0.98,
+      "bearer_card_id": 0,
+      "local_only_until_auth": 0,
+      "ask_user": 0.01,
+      "investigate": 0.01,
+      "none": 0
+    },
+    "contradicted_requirements": []
+  },
+  "checks": [
+    {
+      "candidate": "pop_revoke",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "pop_revoke",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "pop_revoke",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "bearer_card_id",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "bearer_card_id",
+      "requirement": 1,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "bearer_card_id",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "local_only_until_auth",
+      "requirement": 0,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "local_only_until_auth",
+      "requirement": 1,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "local_only_until_auth",
+      "requirement": 2,
+      "answer": "unknown"
+    }
+  ],
+  "usage": {
+    "input_tokens": 2627,
+    "output_tokens": 461
+  },
+  "status": "≥ 0,80 → Diterima (ADR-0018)."
+}
