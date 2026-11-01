@@ -78,6 +78,7 @@ Backend (Go, ADR-0020; butuh PostgreSQL 16 lokal untuk test integrasi):
 ```bash
 (cd backend && go test ./... && go vet ./...)
 ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_SOFTWARE_CA=1 go -C backend run ./cmd/anastrophe-api   # dev/lab saja
+ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-audit   # verifikasi rantai audit (FR-54); keluar 1 bila ada yang rusak
 ```
 
 Lab end-to-end (build DEBUG; kartu diterbitkan backend dev, tanpa `lab_ca.py issue`):
