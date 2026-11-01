@@ -22,7 +22,8 @@ public enum EnrollmentOutcome: Equatable, Sendable {
 /// (FR-05, SDD §4.2).
 enum ChannelChoice: Sendable {
     case fixed(ChannelKind)
-    case automatic([ChannelKind: ChannelAvailability])
+    /// `siteChannels`: kanal gedung yang sudah diketahui sebelum enrolment (lookup kode gedung, ADR-0049).
+    case automatic([ChannelKind: ChannelAvailability], siteChannels: Set<ChannelKind>? = nil)
 }
 
 /// Enrolment, provisioning kredensial, lalu penyimpanan kartu. Kunci dipindah ke `cred_id` dari server.
@@ -53,17 +54,14 @@ struct CardProvisioner {
         // Kanal dipilih sebelum enrolment: setiap enrolment memakai satu dari 8 slot kartu perangkat di
         // server, juga bila langkah berikutnya gagal.
         let enabled = try await api.fetchConfig().enabledChannels
-        let channel: ChannelKind
+        var channel: ChannelKind
         switch choice {
         case .fixed(let fixed):
             guard enabled.contains(fixed) else { throw ANError.channelUnavailable(.regionBlocked) }
             channel = fixed
-        case .automatic(let availability):
+        case .automatic(let availability, let siteChannels):
             guard !enabled.intersection(Self.inAppChannels).isEmpty else { throw ANError.channelUnavailable(.regionBlocked) }
-            guard let selected = Self.provisionableChannel(enabled: enabled, availability: availability) else {
-                throw ANError.channelUnavailable(.notEligible)
-            }
-            channel = selected
+            channel = try Self.select(enabled: enabled, siteChannels: siteChannels, availability: availability)
         }
         let (localID, publicKey) = try Self.makeKey(keys: keys)
         var movedTo: Data?
@@ -82,6 +80,10 @@ struct CardProvisioner {
             guard start.status == .provisioning else {
                 try? keys.deleteKey(for: localID)
                 return .pendingApproval
+            }
+            // ADR-0049: respons enrolment membawa kanal gedung (satu-satunya sumber untuk jalur undangan).
+            if case .automatic(let availability, _) = choice, let siteChannels = start.channels, !siteChannels.contains(channel) {
+                channel = try Self.select(enabled: enabled, siteChannels: siteChannels, availability: availability)
             }
             let enrollmentID = start.enrollmentID
             // ADR-0037: token baca status dibuat di perangkat; server hanya menerima hash-nya dan hanya
@@ -105,6 +107,17 @@ struct CardProvisioner {
             if let movedTo { try? keys.deleteKey(for: movedTo) }
             throw error
         }
+    }
+
+    /// Kanal terbaik dari kanal global ∩ kanal gedung. Bila kanal gedung tidak bisa dipakai tetapi kanal
+    /// global bisa, galatnya `siteChannelUnavailable` agar pengguna tahu batasannya dari gedung.
+    static func select(enabled: Set<ChannelKind>, siteChannels: Set<ChannelKind>?, availability: [ChannelKind: ChannelAvailability]) throws -> ChannelKind {
+        let allowed = siteChannels.map { enabled.intersection($0) } ?? enabled
+        if let selected = provisionableChannel(enabled: allowed, availability: availability) { return selected }
+        if siteChannels != nil, provisionableChannel(enabled: enabled, availability: availability) != nil {
+            throw ANError.siteChannelUnavailable
+        }
+        throw ANError.channelUnavailable(.notEligible)
     }
 
     /// Kunci kredensial baru dengan `cred_id` lokal sementara (16 byte acak).

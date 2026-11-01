@@ -101,6 +101,16 @@ struct AddCardModelTests {
         #expect(model.step == .failed(.init(message: localized("enroll.error.pending_limit"), offersInvitation: false)))
     }
 
+    @Test func kanalGedungDariKodeGedungDipakai() async {
+        // ADR-0049: gedung hanya mengizinkan "Tempel ke pembaca", iPhone ini hanya punya Bluetooth.
+        let site = (200, #"{"site_id":"\#(Self.siteID)","name":"Menara Uji","channels":["nfcHCE"]}"#, "application/json")
+        let (model, transport, _) = make([site, configBody(["ble", "nfcHCE"])])
+        await confirmed(model)
+        await model.confirmAndRead()
+        #expect(model.step == .failed(.init(message: localized("add.error.site_channel_unavailable"), offersInvitation: false)))
+        #expect(transport.paths == ["/v1/sites/lookup", "/v1/config"])
+    }
+
     @Test func kartuTakTerbacaMenawarkanUndangan() async {
         let (model, transport, _) = make([site], reader: .failure(.cardUnreadable))
         await confirmed(model)

@@ -16,6 +16,7 @@ enum EnrollmentMessages {
         case .cardUnreadable: return localized("add.error.unreadable")
         case .cardReaderUnavailable: return localized("add.error.reader_unavailable")
         case .serviceUnavailable: return localized("add.error.service_unavailable")
+        case .siteChannelUnavailable: return localized("add.error.site_channel_unavailable")
         case .channelUnavailable: return localized("add.error.channel_unavailable")
         default: return nil
         }

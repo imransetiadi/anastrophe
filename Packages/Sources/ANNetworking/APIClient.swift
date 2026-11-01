@@ -172,13 +172,30 @@ public struct APIClient: Sendable {
 public struct SiteSummary: Equatable, Sendable, Decodable {
     public let siteID: String
     public let name: String
+    /// Kanal efektif gedung (ADR-0049); nil bila server belum mengirimnya (= semua kanal global).
+    public let channels: Set<ChannelKind>?
 
-    public init(siteID: String, name: String) {
+    public init(siteID: String, name: String, channels: Set<ChannelKind>? = nil) {
         self.siteID = siteID
         self.name = name
+        self.channels = channels
     }
 
-    enum CodingKeys: String, CodingKey { case siteID = "site_id", name }
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        siteID = try container.decode(String.self, forKey: .siteID)
+        name = try container.decode(String.self, forKey: .name)
+        channels = try container.decodeIfPresent([String].self, forKey: .channels).map(ChannelKind.known)
+    }
+
+    enum CodingKeys: String, CodingKey { case siteID = "site_id", name, channels }
+}
+
+extension ChannelKind {
+    /// Kanal yang dikenal app dari daftar nama di respons server; nama lain diabaikan.
+    static func known(_ names: [String]) -> Set<ChannelKind> {
+        Set(names.compactMap(ChannelKind.init(rawValue:)))
+    }
 }
 
 /// Hasil `POST /v1/enrollments`: perangkat pertama diprovisikan, perangkat tambahan menunggu
@@ -191,11 +208,21 @@ public struct EnrollmentStart: Equatable, Sendable, Decodable {
 
     public let enrollmentID: String
     public let status: Status
+    /// Kanal efektif gedung (ADR-0049); nil bila server belum mengirimnya (= semua kanal global).
+    public let channels: Set<ChannelKind>?
 
-    public init(enrollmentID: String, status: Status) {
+    public init(enrollmentID: String, status: Status, channels: Set<ChannelKind>? = nil) {
         self.enrollmentID = enrollmentID
         self.status = status
+        self.channels = channels
     }
 
-    enum CodingKeys: String, CodingKey { case enrollmentID = "enrollment_id", status }
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        enrollmentID = try container.decode(String.self, forKey: .enrollmentID)
+        status = try container.decode(Status.self, forKey: .status)
+        channels = try container.decodeIfPresent([String].self, forKey: .channels).map(ChannelKind.known)
+    }
+
+    enum CodingKeys: String, CodingKey { case enrollmentID = "enrollment_id", status, channels }
 }

@@ -10,7 +10,7 @@ struct EnrollmentMessagesTests {
                                  .enrollmentRejected(.duplicate), .enrollmentRejected(.pendingApproval), .enrollmentRejected(.invitationInvalid), .cardLimitReached,
                                  // Alur Tambah Kartu (ADR-0043, ADR-0044).
                                  .enrollmentRejected(.siteCodeUnknown), .cardUnreadable, .cardReaderUnavailable, .serviceUnavailable, .channelUnavailable(.notEligible),
-                                 .enrollmentRejected(.pendingLimit)]
+                                 .enrollmentRejected(.pendingLimit), .siteChannelUnavailable]
         let texts = errors.compactMap { EnrollmentMessages.text(for: $0) }
         #expect(texts.count == errors.count)
         #expect(Set(texts).count == errors.count)

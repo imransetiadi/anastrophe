@@ -87,6 +87,55 @@ struct CardProvisionerTests {
         #expect(try await cards.all().isEmpty)
     }
 
+    @Test func kanalGedungDiperiksaSebelumEnrolment() async throws {
+        // ADR-0049, Review Focus 3: jalur kartu sudah tahu kanal gedung dari lookup, jadi tidak ada slot
+        // server yang terbuang bila kanal gedung tidak bisa dipakai di iPhone ini.
+        let secrets = InMemorySecretStore()
+        let cards = try SwiftDataCardStore(directory: temporaryDirectory())
+        let transport = SequenceTransport([configBody(["ble", "nfcHCE"])])
+        await #expect(throws: ANError.siteChannelUnavailable) {
+            try await provisioner(transport, secrets: secrets, cards: cards).provision(.card(siteID: "site", identity: labTestCard), deviceID: "dev",
+                                                                                       channel: .automatic([.nfcHCE: .unsupportedDevice, .ble: .available], siteChannels: [.nfcHCE]))
+        }
+        #expect(transport.paths == ["/v1/config"])
+        #expect(secrets.storedKeyCount == 0)
+    }
+
+    @Test func kanalDipilihUlangSesudahEnrolment() async throws {
+        // Jalur undangan baru tahu kanal gedung dari respons enrolment.
+        let cards = try SwiftDataCardStore(directory: temporaryDirectory())
+        let transport = SequenceTransport([configBody(["ble", "nfcHCE"]),
+                                           (201, #"{"enrollment_id":"e1","status":"PROVISIONING","channels":["ble"]}"#, "application/json"),
+                                           (200, provisionedBody(credentialID: Data(repeating: 0x5E, count: 16)), "application/json")])
+        _ = try await provisioner(transport, cards: cards).provision(.invitation(token: String(repeating: "A", count: 42) + "w"), deviceID: "dev",
+                                                                     channel: .automatic([.nfcHCE: .available, .ble: .available]))
+        #expect(try json(transport.bodies[2])["channel"] as? String == "ble")
+    }
+
+    @Test func tanpaKanalGedungSesudahEnrolmentTanpaProvisioning() async throws {
+        let secrets = InMemorySecretStore()
+        let cards = try SwiftDataCardStore(directory: temporaryDirectory())
+        let transport = SequenceTransport([configBody(["ble", "nfcHCE"]),
+                                           (201, #"{"enrollment_id":"e1","status":"PROVISIONING","channels":["nfcHCE"]}"#, "application/json")])
+        await #expect(throws: ANError.siteChannelUnavailable) {
+            try await provisioner(transport, secrets: secrets, cards: cards).provision(.invitation(token: String(repeating: "A", count: 42) + "w"), deviceID: "dev",
+                                                                                       channel: .automatic([.nfcHCE: .unsupportedDevice, .ble: .available]))
+        }
+        #expect(transport.paths == ["/v1/config", "/v1/enrollments"])
+        #expect(secrets.storedKeyCount == 0)
+        #expect(try await cards.all().isEmpty)
+    }
+
+    @Test func serverLamaTanpaKanalGedung() async throws {
+        // Review Focus 4: respons tanpa "channels" = semua kanal global (perilaku sebelum ADR-0049).
+        let cards = try SwiftDataCardStore(directory: temporaryDirectory())
+        let transport = SequenceTransport([configBody(["ble", "nfcHCE"]), enrolled,
+                                           (200, provisionedBody(credentialID: Data(repeating: 0x5E, count: 16), channel: "nfcHCE"), "application/json")])
+        _ = try await provisioner(transport, cards: cards).provision(.card(siteID: "site", identity: labTestCard), deviceID: "dev",
+                                                                     channel: .automatic([.nfcHCE: .available, .ble: .available]))
+        #expect(try json(transport.bodies[2])["channel"] as? String == "nfcHCE")
+    }
+
     @Test func undanganMembawaToken() async throws {
         let cards = try SwiftDataCardStore(directory: temporaryDirectory())
         let token = String(repeating: "A", count: 42) + "w"

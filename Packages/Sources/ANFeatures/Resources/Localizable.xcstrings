@@ -257,6 +257,22 @@
         }
       }
     },
+    "add.error.site_channel_unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The access methods your building allows aren't available on this iPhone yet. Contact your building management."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cara akses yang diizinkan gedung ini belum tersedia di iPhone ini. Hubungi pengelola gedung."
+          }
+        }
+      }
+    },
     "add.error.site_code_unknown": {
       "localizations": {
         "en": {

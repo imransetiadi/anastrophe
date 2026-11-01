@@ -137,7 +137,7 @@ public final class AddCardModel {
             return
         }
         step = .working
-        await enroll(.card(siteID: site.siteID, identity: identity), api: api, siteName: site.name)
+        await enroll(.card(siteID: site.siteID, identity: identity), api: api, siteName: site.name, siteChannels: site.channels)
     }
 
     public func submitInvitation() async {
@@ -157,15 +157,15 @@ public final class AddCardModel {
         defer { isBusy = false }
         fieldError = nil
         step = .working
-        await enroll(.invitation(token: token), api: api, siteName: nil)
+        await enroll(.invitation(token: token), api: api, siteName: nil, siteChannels: nil)
     }
 
-    private func enroll(_ request: EnrollmentRequest, api: APIClient, siteName: String?) async {
+    private func enroll(_ request: EnrollmentRequest, api: APIClient, siteName: String?, siteChannels: Set<ChannelKind>?) async {
         do {
             let deviceID = try services.deviceIdentity.deviceID()
             let availability = await services.availability()
             let outcome = try await CardProvisioner(api: api, keys: services.keys, records: services.records, cards: services.cards, statusTokens: services.statusTokens)
-                .provision(request, deviceID: deviceID, channel: .automatic(availability))
+                .provision(request, deviceID: deviceID, channel: .automatic(availability, siteChannels: siteChannels))
             switch outcome {
             case .added(let card):
                 step = .done(card)

@@ -18,6 +18,15 @@ struct SiteLookupTests {
         #expect(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems == [URLQueryItem(name: "code", value: "7K2Q9XA4")])
     }
 
+    @Test func lookupMembawaKanalGedung() async throws {
+        // ADR-0049: kanal efektif gedung; kanal yang tidak dikenal app diabaikan.
+        let transport = FakeTransport(body: #"{"site_id":"s1","name":"Menara Uji","channels":["nfcHCE","x"]}"#)
+        let site = try await APIClient(baseURL: base, transport: transport).lookupSite(code: "7K2Q9XA4")
+        #expect(site.channels == [.nfcHCE])
+        let legacy = try await APIClient(baseURL: base, transport: FakeTransport(body: #"{"site_id":"s1","name":"Menara Uji"}"#)).lookupSite(code: "7K2Q9XA4")
+        #expect(legacy.channels == nil)
+    }
+
     @Test func lookupTakDikenalMenjadiSiteCodeUnknown() async {
         let transport = FakeTransport(status: 404, body: #"{"type":"SITE-NOT-FOUND","status":404}"#, contentType: "application/problem+json")
         await #expect(throws: ANError.enrollmentRejected(.siteCodeUnknown)) {
