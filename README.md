@@ -82,6 +82,7 @@ ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-audit 
 ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_REGISTRY_KEY=<32 byte hex> go -C backend run ./cmd/anastrophe-registry import --site <uuid> --file ~/registri/kartu.csv --operator <pegangan>   # registri kartu fisik (FR-52); CSV berisi identitas mentah: simpan di luar repo dan hapus setelah impor; approve|reject --card-instance <uuid> untuk perangkat tambahan (ADR-0032)
 ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-registry invite --site <uuid> [--zones Lobi;Parkir | --card-file <berkas>|-] [--ttl 7] [--link-base https://<domain>/i/] --operator <pegangan>   # undangan sekali pakai (FR-12, ADR-0033); mencetak id undangan (untuk audit) dan token sekali; --link-base wajib https dan diakhiri /; berkas kartu berisi <tech>:<hex> (atau - lalu tempel di stdin), bukan argumen, dan butuh ANASTROPHE_DEV_REGISTRY_KEY; undangan berkartu menyetujui enrolment perangkat yang masih menunggu (ADR-0035)
 ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-registry list --site <uuid> [--status ACTIVE]   # card instance gedung: id, status, asal, kanal (FR-50 sebagian); tanpa identitas kartu
+ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-registry site-code --site <uuid> --operator <pegangan>   # kode gedung XXXX-XXXX untuk Tambah Kartu di app (ADR-0044); menjalankan ulang merotasi kode, dan kode lama langsung tidak berlaku
 ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-registry suspend|resume --card-instance <uuid> --operator <pegangan>   # tangguhkan/pulihkan kartu (FR-51, ADR-0036); revoke --card-instance <uuid> [--reason hilang] mencabut dan mengisi denylist
 ```
 
@@ -90,12 +91,23 @@ Lab end-to-end (build DEBUG; kartu diterbitkan backend dev, tanpa `lab_ca.py iss
 ```bash
 export ANASTROPHE_DATABASE_URL=postgres://…
 export ANASTROPHE_DEV_REGISTRY_KEY=$(openssl rand -hex 32)   # kunci registri dev, sama untuk devseed dan API
-go -C backend run ./cmd/anastrophe-devseed -lab-dir ../scripts/anp1/.lab   # mencetak {"site_id","device_id"}
+go -C backend run ./cmd/anastrophe-devseed -lab-dir ../scripts/anp1/.lab   # mencetak {"site_id","device_id","join_code"}
 # devseed juga mendaftarkan kartu lab ke registri (-lab-card, default iso14443a:04a1b2c3d4e5f6)
 ANASTROPHE_DEV_SOFTWARE_CA=1 go -C backend run ./cmd/anastrophe-api
 xcrun simctl launch booted app.anastrophe -ANLabBackend http://127.0.0.1:8080 \
   -ANLabDevice <device_id> -ANLabSite <site_id>   # opsional: -ANLabCard <tech>:<hex> (default sama dengan devseed) atau -ANLabInvite <token>
 ```
+
+Alur Tambah Kartu produksi (ADR-0043) di simulator, lewat jalur yang sama dengan pengguna:
+
+```bash
+xcrun simctl launch booted app.anastrophe -ANAPIBaseURL http://127.0.0.1:8080 \
+  -ANLabCardReader iso14443a:04a1b2c3d4e5f6 -ANLabAddCode <join_code>   # pembaca palsu (simulator tidak bisa membaca kartu)
+xcrun simctl launch booted app.anastrophe -ANAPIBaseURL http://127.0.0.1:8080 \
+  -ANLabOpenURL https://contoh.test/i/<token>   # sama seperti tautan undangan yang dibuka sistem, lalu dikirim otomatis
+```
+
+Build Release mengambil alamat API dari `AN_API_BASE_URL` di `Config/Local.xcconfig`, yang wajib `https` dan ditulis `https:/$()/host` karena `//` memulai komentar xcconfig. Tanpa nilai itu, Tambah Kartu menampilkan "Layanan belum tersedia". Perangkat app dibuat server pada enrolment pertamanya (ADR-0045), jadi tidak perlu devseed `-new-device`.
 
 Catatan alur lab:
 

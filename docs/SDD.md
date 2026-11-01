@@ -33,6 +33,7 @@
 | 2.17 | 2026-11-02 | Siklus hidup kartu oleh operator (suspend/resume/revoke, ADR-0036), denylist dari pencabutan, token baca status dan `GET /cards/{id}/status` (ADR-0037); provisioning hanya memasang hash bila belum ada; `:renew` memeriksa status setelah bukti kepemilikan; celah pembatalan suspend/revoke tercatat di ADR-0038 (§8.1, §8.4.2, §8.4.3, §8.5, §15). |
 | 2.18 | 2026-11-02 | Rahasia enrolment untuk kredensial pertama dan penolakan tambah kanal ke kartu aktif (ADR-0040); celah penerbitan kredensial lewat id instance ditutup (§8.4.1, §8.5, §15). |
 | 2.19 | 2026-11-02 | `credentials.max_not_after` dan masa berlaku denylist dari sertifikat terpanjang, purge per jam (§8.1, §8.4.3). |
+| 2.20 | 2026-11-02 | Alur Tambah Kartu produksi (ADR-0043): kode gedung `sites.join_code` dan `GET /v1/sites/lookup` (ADR-0044), baris perangkat dibuat di transaksi enrolment (ADR-0045), alamat API dari Info.plist, tautan undangan hanya mengisi field (§5.6, §5.8, §8.1, §8.4.1, §8.5, §15). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -301,9 +302,36 @@ func resolveAvailability(_ kind: ChannelKind, config: RemoteConfig) async -> Cha
 
 Undangan memakai Universal Link `https://<domain-produksi>/i/<token>` (domain TBD). Token sekali pakai, TTL 7 hari, di-hash di server. App Clip untuk undangan bersifat P2 (FR-12).
 
+App menangani tautan itu lewat `onOpenURL` (ADR-0043):
+
+- Hanya `https` dengan path `/i/<token>` yang diterima; URL lain diabaikan.
+- Tautan membuka lembar Tambah Kartu dengan field tautan sudah terisi. Enrolment baru berjalan setelah pengguna mengetuk "Tambahkan kartu", sehingga tautan kiriman orang lain tidak mendaftarkan kartu diam-diam.
+- Tidak ada skema URL kustom, karena token sekali pakai bisa disadap app lain yang mendaftarkan skema yang sama.
+- Entitlement Associated Domains dan berkas AASA menunggu domain produksi. Sampai saat itu tautan bisa ditempel ke field.
+
 ### 5.7 Akses cepat (FR-24)
 
 Widget Lock Screen dan kontrol Control Center membuka app langsung ke lembar presentasi kartu terpilih (App Intent `PresentCardIntent`). Presentasi tetap membutuhkan autentikasi; tidak ada presentasi dari ekstensi (Core NFC tidak tersedia di app extension, E07).
+
+### 5.8 Alur Tambah Kartu (FR-05, FR-10–FR-13; ADR-0043)
+
+Tombol "Tambah kartu akses" ada di tab Kunci pada semua build, dan nonaktif saat sudah ada 8 kartu. Lembarnya punya dua jalur:
+
+- **Kartu fisik:** kode gedung → app mencari kode (`GET /v1/sites/lookup`, ADR-0044) → pengguna mengonfirmasi nama gedung → tempel kartu → enrolment dan provisioning.
+- **Tautan undangan:** tempel tautan, atau tautan yang dibuka sistem (§5.6) → enrolment dan provisioning.
+
+Komponen:
+
+- **Kode gedung:** 8 simbol Crockford base32, ditampilkan `XXXX-XXXX`. App dan server menormalisasi dengan aturan yang sama, dan kode yang tidak sah ditolak tanpa permintaan jaringan.
+- **Pembaca kartu:** `NFCTagReaderSession` mem-polling ISO 14443 dan ISO 15693, dan hanya membaca `identifier` (ADR-0001).
+  - MIFARE dan ISO 7816 tipe A dipetakan ke `iso14443a`; ISO 15693 ke `iso15693`.
+  - FeliCa dan identitas berbasis AID belum didukung.
+  - Batas waktu atau jenis yang tidak didukung → "Kartu tidak dapat dibaca iPhone" (`ENR-UNREADABLE`) dengan tawaran undangan. `readingAvailable` false → pesan perangkat tidak bisa membaca kartu, juga dengan tawaran undangan.
+- **Identitas kartu:** hanya hidup di satu pemanggilan sebagai variabel lokal. Tidak ada di state, log, maupun store (aturan 6).
+- **Kanal (§4.2):** irisan `/v1/config` dengan kanal in-app R1 (N-HCE, B), urutan N-HCE lalu B. Untuk B, Bluetooth mati atau belum diizinkan tetap bisa diprovisikan; panduan muncul saat presentasi (FR-82). Tanpa kanal, enrolment tidak dikirim, agar slot server tidak terpakai.
+- **`device_id` (ADR-0045):** UUID v4 di Keychain `afterFirstUnlockThisDeviceOnly`. Dibuat ulang bila penanda instalasi di Application Support (dikecualikan dari backup) hilang, yaitu saat instal ulang (FR-43).
+- **Alamat API:** dari Info.plist `ANAPIBaseURL` (build setting `AN_API_BASE_URL`, wajib `https`). Kosong berarti "Layanan belum tersedia" tanpa menghubungi jaringan. Di DEBUG, `-ANAPIBaseURL` menimpanya untuk lab.
+- **`PENDING_APPROVAL`:** tidak ada kartu lokal. Pengguna diminta menambah lagi setelah pengelola menyetujui, atau memakai tautan undangan dari pengelola (ADR-0035).
 
 ## 6. Presentasi per kanal
 
@@ -557,7 +585,7 @@ FCI/HELLO memuat daftar versi yang didukung. Reader memilih versi tertinggi yang
 
 ```sql
 organizations(id uuid pk, name text, region text, created_at timestamptz)
-sites(id uuid pk, org_id fk, name text, country text, timezone text, policy jsonb, site_ca_key_ref text)  -- key_ref → HSM
+sites(id uuid pk, org_id fk, name text, country text, timezone text, policy jsonb, site_ca_key_ref text, join_code text unique /* kode gedung, ADR-0044 */)  -- key_ref → HSM
 zones(id uuid pk, site_id fk, name text, bit smallint, tra_required bool)
 reader_groups(id bytea pk /*group_id 8B*/, site_id fk, pubkey bytea, next_pubkey bytea, rotated_at timestamptz)
 readers(id uuid pk, site_id fk, group_id fk, kind text /*reference|gateway|vendor_aliro*/, firmware text, last_sync_at timestamptz, rssi_threshold smallint)
@@ -586,6 +614,8 @@ audit_events(id bigserial pk, chain text /* site:<uuid> | platform (ADR-0024) */
 - Siklus hidup oleh operator (ADR-0036): `suspend` ACTIVE → SUSPENDED, `resume` SUSPENDED → ACTIVE, `revoke` {ACTIVE, SUSPENDED, PROVISIONING} → REVOKED; kredensial mengikuti status instance; status lain ditolak tanpa perubahan dan tanpa audit. Audit `card.suspended`, `card.resumed`, `card.revoked {reason, credentials}` dengan alasan berupa kode `[a-z_]{1,32}`. Kunci diambil berurutan: instance, lalu kredensial (sama dengan hapus kartu).
 - Token baca status (ADR-0037): server hanya menyimpan `status_token_hash` (32 byte) yang dikirim app saat provisioning atau perpanjangan bertanda tangan; token mentah tidak pernah disimpan atau di-log.
 - `credentials.not_after ≤ issued_at + policy.cert_validity_days`.
+- Kode gedung (ADR-0044): `sites.join_code` berisi 8 simbol Crockford base32 (`^[0-9A-HJKMNP-TV-Z]{8}$`), unik. Operator membuat atau merotasinya lewat `anastrophe-registry site-code` (audit `site.join_code_rotated` tanpa nilai kode); kode lama langsung tidak berlaku.
+- Perangkat (ADR-0045, provisional): sebelum ada akun dan App Attest, baris `devices` dibuat di transaksi enrolment kartu atau undangan (`INSERT … ON CONFLICT DO NOTHING` sebelum `SELECT … FOR UPDATE`). Enrolment yang ditolak me-rollback baris itu.
 - `denylist_entries.expires_at` = masa berlaku terpanjang yang pernah diterbitkan untuk kredensial itu (`GREATEST(max_not_after, not_after)`), karena perpanjangan bisa memendekkan `not_after` sementara sertifikat lama masih di tangan pemegang. Baris yang sudah lewat dibuang sapuan per jam, sehingga denylist tidak tumbuh tanpa batas.
 - `sites.policy` (JSON) memuat `zones` (nama zona), `zones_bitmap` (bilangan 64-bit) dan `cert_validity_days` (1–30, default 7 sesuai ADR-0010). Tanpa `zones_bitmap`, sertifikat diterbitkan dengan bitmap 0 (*fail-closed*: tidak membuka zona mana pun).
 
@@ -652,7 +682,7 @@ sequenceDiagram
   C-->>A: sertifikat dan kunci publik reader group
 ```
 
-Implementasi saat ini (sebelum akun ada): cabang PRIMARY dan MEMBER_CANDIDATE belum ada. Perangkat pertama untuk sebuah kartu mendapat `PROVISIONING`, perangkat tambahan `PENDING_APPROVAL` yang diputuskan operator lewat `anastrophe-registry` (ADR-0032), dan percobaan ulang perangkat yang sama melanjutkan instance-nya (ADR-0034). `--operator` adalah pegangan buram (mis. kode staf), bukan nama atau email, karena tercatat apa adanya di audit append-only.
+Implementasi saat ini (sebelum akun ada): cabang PRIMARY dan MEMBER_CANDIDATE belum ada. Perangkat pertama untuk sebuah kartu mendapat `PROVISIONING`, perangkat tambahan `PENDING_APPROVAL` yang diputuskan operator lewat `anastrophe-registry` (ADR-0032), dan percobaan ulang perangkat yang sama melanjutkan instance-nya (ADR-0034). Perangkat app yang belum terdaftar dibuat di transaksi enrolment pertamanya (ADR-0045), dan gedung jalur kartu ditentukan lewat kode gedung yang dicari app sebelum kartu ditempel (ADR-0044). `--operator` adalah pegangan buram (mis. kode staf), bukan nama atau email, karena tercatat apa adanya di audit append-only.
 
 Provisioning saat ini (ADR-0040): app membuat rahasia enrolment 32 byte dan mengirim SHA-256-nya sebagai `provisioning_key_hash` di `POST /v1/enrollments`. Server memasang hash itu pada instance `PROVISIONING`/`PENDING_APPROVAL` yang dikembalikan kepada perangkat (baru, dilanjutkan, atau dipromosikan), dalam transaksi enrolment yang sama. `POST /v1/enrollments/{id}/credentials` wajib membawa rahasianya sebagai `Authorization: Bearer` dan hanya berlaku untuk instance `PROVISIONING`; hash dihapus setelah kredensial pertama. Rahasia hilang atau salah dijawab sama dengan id tak dikenal (404 `ENR-NOT-FOUND`) sebelum status apa pun diungkap. Tambah kanal ke kartu aktif ditolak sampai ada alur bertanda tangan. Risiko sisa: tanpa autentikasi perangkat, pihak yang tahu id perangkat dan identitas kartu (atau token undangan) bisa mengganti hash instance yang belum selesai lewat enrolment ulang lalu memprovisikannya (ADR-0041, terbuka).
 
@@ -695,7 +725,8 @@ Semua POST mutasi menerima header `Idempotency-Key`. Error memakai RFC 9457 (`ty
 |---|---|---|
 | `POST /auth/apple` · `POST /auth/otp:send` · `POST /auth/otp:verify` | Login & verifikasi kontak | FR-03 |
 | `GET /config` | Wilayah, kanal aktif, kebijakan, versi minimum | FR-01, FR-04, FR-05 |
-| `POST /enrollments` | Mulai enrolment (kartu fisik/undangan). Body `device_id`, `site_id`, `card` `{tech, id}` (ADR-0031): identitas hanya dipakai untuk HMAC per gedung lalu dibuang; hash idempotency memakai HMAC itu. Respons 201 `{enrollment_id, status}` dengan status `PROVISIONING` atau `PENDING_APPROVAL` (ADR-0032). Alternatif: body `device_id` + `invitation` (token 43 karakter base64url; ADR-0033), tepat satu dari `card`/`invitation`; hash idempotency memakai hash token. Field `provisioning_key_hash` (base64 SHA-256 rahasia enrolment, ADR-0040) dipasang pada instance yang masih menunggu kredensial pertama | FR-11, FR-12, FR-13 |
+| `POST /enrollments` | Mulai enrolment (kartu fisik/undangan). Body `device_id`, `site_id`, `card` `{tech, id}` (ADR-0031): identitas hanya dipakai untuk HMAC per gedung lalu dibuang; hash idempotency memakai HMAC itu. Respons 201 `{enrollment_id, status}` dengan status `PROVISIONING` atau `PENDING_APPROVAL` (ADR-0032). Alternatif: body `device_id` + `invitation` (token 43 karakter base64url; ADR-0033), tepat satu dari `card`/`invitation`; hash idempotency memakai hash token. Field `provisioning_key_hash` (base64 SHA-256 rahasia enrolment, ADR-0040) dipasang pada instance yang masih menunggu kredensial pertama. `device_id` yang belum terdaftar dibuat di transaksi enrolment; enrolment yang ditolak tidak meninggalkan baris perangkat (ADR-0045) | FR-11, FR-12, FR-13 |
+| `GET /sites/lookup?code=<kode>` | Gedung dari kode gedung yang diketik penghuni (ADR-0044): 200 `{site_id, name}`. Kode tak dikenal, tidak berbentuk sah, kosong, atau tidak ada dijawab 404 `SITE-NOT-FOUND` identik; `Cache-Control: no-store`; tanpa audit | FR-11, FR-13 |
 | `POST /enrollments/{id}/security-code` · `/verify-code` | Buat/verifikasi code | FR-14, FR-32 |
 | `POST /enrollments/{id}/credentials` | Kirim pubkey → sertifikat kredensial pertama; wajib `Authorization: Bearer <rahasia enrolment base64url>` dan instance `PROVISIONING` (ADR-0040); field opsional `status_token_hash` (ADR-0037), dipasang hanya bila instance belum punya hash | FR-16, FR-38 |
 | `GET /cards/{id}/status` | Status card instance dengan header `Authorization: Bearer <token baca status base64url>` (ADR-0037); id tak dikenal, token salah, atau tanpa token → 404 `CARD-NOT-FOUND` identik; `Cache-Control: no-store` | FR-38 |
@@ -818,13 +849,14 @@ Tidak ada GPS, tidak ada tracking lintas app (ATT tidak dipakai). Privacy Manife
 | Kode | Kondisi | Pesan untuk pengguna (ID) | Aksi |
 |---|---|---|---|
 | `ENR-NOT-REGISTERED` | Kartu tidak ada di registri | "Kartu ini belum terdaftar di gedung Anda." | Tawarkan undangan |
-| `ENR-UNREADABLE` | Kartu tidak terbaca (mis. 125 kHz) | "Kartu tidak dapat dibaca iPhone." | Tawarkan undangan |
+| `ENR-UNREADABLE` | Kartu tidak terbaca (mis. 125 kHz): batas waktu sesi baca, jenis kartu tidak didukung, atau identitas tidak sah; ditentukan app (§5.8) | "Kartu tidak dapat dibaca iPhone." | Tawarkan undangan |
+| `SITE-NOT-FOUND` | Kode gedung tak dikenal, tidak berbentuk sah, atau kosong; semuanya dijawab identik (404, ADR-0044) | "Kode gedung tidak dikenal. Periksa kode dari pengelola gedung." | Periksa ulang kode |
 | `ENR-SITE-UNSUPPORTED` | Gedung belum memakai Anastrophe | "Gedung ini belum mendukung Anastrophe." | "Usulkan gedung saya" (FR-64) |
 | `ENR-PENDING-APPROVAL` | Kontak tidak cocok registri; sebelum ada akun juga untuk perangkat tambahan (ADR-0032). Provisioning card instance yang menunggu dijawab 409 | "Menunggu persetujuan pengelola gedung." | Notifikasi saat disetujui |
 | `ENR-DUPLICATE` | Kartu fisik yang sama sudah ada di iPhone ini (409) | "Kartu ini sudah ada di iPhone ini." | Buka kartu yang ada |
 | `ENR-INVITATION-INVALID` | Undangan tidak dikenal, kedaluwarsa, atau sudah dipakai; ketiganya dijawab identik (404, TC-ENR-08) | "Undangan tidak berlaku atau sudah dipakai." | Minta undangan baru ke pengelola |
 | `ENR-LIMIT` | Sudah 8 kartu | "Maksimal 8 kartu per iPhone." | Hapus kartu lain |
-| `ENR-NOT-FOUND` | Enrolment/perangkat/gedung tidak dikenal server, atau rahasia enrolment provisioning hilang/salah; keduanya dijawab identik (404, ADR-0040) | "Pendaftaran kartu tidak ditemukan. Mulai lagi." | Ulangi Tambah kartu |
+| `ENR-NOT-FOUND` | Enrolment atau gedung tidak dikenal server (perangkat baru dibuat otomatis, ADR-0045), atau rahasia enrolment provisioning hilang/salah; keduanya dijawab identik (404, ADR-0040) | "Pendaftaran kartu tidak ditemukan. Mulai lagi." | Ulangi Tambah kartu |
 | `ENR-INVALID-KEY` | Kunci publik kanal bukan titik P-256 yang valid (400) | "Kartu tidak dapat disiapkan. Coba lagi." | Buat ulang kunci, ulangi |
 | `ENR-INVALID-CHANNEL` | Kanal tidak didukung untuk provisioning (400) | "Cara akses ini belum didukung." | Pilih kanal lain |
 | `REQ-IDEMPOTENCY-KEY` | POST mutasi tanpa header `Idempotency-Key` (400) | — (bug klien) | Perbaiki klien |

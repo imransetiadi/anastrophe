@@ -1,7 +1,7 @@
 ---
 type: backlog
 project: anastrophe
-updated: 2026-11-01
+updated: 2026-11-02
 ---
 # Backlog minor tertunda (terverifikasi terhadap kode, 2026-11-01)
 
@@ -50,5 +50,14 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
   - Waktu respons berbeda per jalur (tak dikenal ±122 µs, terpakai ±183 µs); tidak bisa dieksploitasi tanpa token 256 bit, perlu dicatat di TC-ENR-08 (M3).
   - Belum ada pencabutan undangan (bersama FR-51) (sisa M7).
   - Test kecil: galat tebusan pertama diabaikan (M12).
+- **Alur Tambah Kartu (sisa, ADR-0043):**
+  - **Persetujuan operator:** instance yang disetujui ditandai `ABANDONED` 15 menit setelah persetujuan bila perangkat belum kembali. Tanpa push (FR-62), penghuni sering melewatkan jendela itu dan permintaannya kembali menunggu. Memperpanjang umurnya melebarkan jendela risiko ADR-0041, jadi diputuskan bersama ADR-0041. Jalur yang andal saat ini: undangan berkartu (ADR-0035).
+  - **Kartu placeholder:** "Menunggu persetujuan" di daftar (tampilan FR-17) belum ada; hasilnya hanya tampil di lembar.
+  - **App Attest (NFR-S03):** belum diterapkan, dan wajib sebelum pilot. Perangkat dibuat di transaksi enrolment (ADR-0045, provisional); attestation kelak ditempel ke enrolment pertama.
+  - **Jenis kartu:** FeliCa (butuh system code per gedung di Info.plist) dan identitas berbasis AID untuk DESFire random UID (TC-ENR-15) belum didukung.
+  - **Urutan byte ISO 15693:** urutan `identifier` dari Core NFC perlu dicocokkan dengan format registri (`e004…`) lewat uji H.
+  - **Universal Link:** entitlement Associated Domains dan berkas AASA menunggu domain produksi. Sampai itu, tautan undangan ditempel ke field.
+  - **Pembatasan laju:** `GET /v1/sites/lookup` belum dibatasi laju (diserahkan ke infrastruktur). Kode 40 bit tidak praktis ditebak.
+  - **Sisa instal ulang:** item Keychain dari instalasi lama (kunci kredensial, token status) tidak dibersihkan.
 - **Test flaky:** `BLETapTests.autentikasiBatalMembatalkanPemindaian` sesekali gagal (pembatalan pemindaian bergantung waktu); lulus 6/6 saat diulang.
 - **Riwayat tap:** judul baris "Ditolak · alasan" dirakit di kode (M8; dikerjakan saat bahasa ketiga ditambahkan); VoiceOver baris Status belum diperiksa dengan Accessibility Inspector.
