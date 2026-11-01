@@ -79,6 +79,11 @@ func run() error {
 			} else if n > 0 {
 				slog.Info("purged idempotency keys", "count", n)
 			}
+			if n, err := db.PurgeRenewalChallenges(ctx, time.Now()); err != nil {
+				slog.Error("purge renewal challenges failed")
+			} else if n > 0 {
+				slog.Info("purged renewal challenges", "count", n)
+			}
 		}
 	}()
 	addr := os.Getenv("ANASTROPHE_ADDR")

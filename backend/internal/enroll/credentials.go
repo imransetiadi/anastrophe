@@ -44,6 +44,7 @@ func (h *Handler) channelEnabled(channel string) bool {
 func (h *Handler) Register(mux *http.ServeMux) {
 	httpapi.Route(mux, http.MethodPost, "/v1/enrollments", h.createEnrollment)
 	httpapi.Route(mux, http.MethodPost, "/v1/enrollments/{id}/credentials", h.issueCredential)
+	httpapi.Route(mux, http.MethodPost, "/v1/credentials/{action}", h.credentialAction)
 }
 
 // validIdempotencyKey: klien mengirim UUID; batasi ke [A-Za-z0-9_-]{1,128} agar byte aneh
@@ -181,6 +182,7 @@ type provisioned struct {
 	CredentialID []byte              `json:"credential_id"`
 	Channel      string              `json:"channel"`
 	Certificate  []byte              `json:"certificate"`
+	NotBefore    string              `json:"not_before"`
 	NotAfter     string              `json:"not_after"`
 	SiteName     string              `json:"site_name"`
 	Zones        []string            `json:"zones"`
@@ -254,12 +256,8 @@ func (h *Handler) issue(ctx context.Context, tx *store.Tx, enrollmentID string, 
 	if _, err := rand.Read(credID); err != nil {
 		return 0, nil, err
 	}
-	validity := h.Validity
-	if enrollment.CertValidityDays > 0 {
-		validity = time.Duration(enrollment.CertValidityDays) * 24 * time.Hour
-	}
 	notBefore := h.Now().UTC().Truncate(time.Second)
-	notAfter := notBefore.Add(validity)
+	notAfter := notBefore.Add(h.validity(enrollment.CertValidityDays))
 	cert, err := certs.Issue(signer, certs.Request{
 		CredentialID: credID, SiteID: enrollment.SiteCode, PublicKey: pub,
 		Zones: enrollment.ZonesBitmap, Channel: req.Channel, NotBefore: notBefore, NotAfter: notAfter,
@@ -274,10 +272,18 @@ func (h *Handler) issue(ctx context.Context, tx *store.Tx, enrollmentID string, 
 	}
 	out, err := json.Marshal(provisioned{
 		CredentialID: credID, Channel: req.Channel, Certificate: cert,
-		NotAfter: notAfter.Format(time.RFC3339), SiteName: enrollment.SiteName,
+		NotBefore: notBefore.Format(time.RFC3339), NotAfter: notAfter.Format(time.RFC3339), SiteName: enrollment.SiteName,
 		Zones: enrollment.Zones, GroupKeys: groupKeys,
 	})
 	return http.StatusOK, out, err
+}
+
+// validity: masa berlaku dari kebijakan gedung (1–30 hari), atau default handler (ADR-0010).
+func (h *Handler) validity(siteDays int) time.Duration {
+	if siteDays > 0 {
+		return time.Duration(siteDays) * 24 * time.Hour
+	}
+	return h.Validity
 }
 
 func problem(code string, status int) httpapi.Problem {

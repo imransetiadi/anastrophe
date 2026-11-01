@@ -262,6 +262,12 @@ func (t *Tx) EnrollmentForUpdate(ctx context.Context, id string) (Enrollment, er
 	if err != nil {
 		return Enrollment{}, err
 	}
+	e.applyPolicy(zones, bitmap, validity)
+	return e, nil
+}
+
+// applyPolicy mengisi zona dan masa berlaku dari sites.policy (fail-closed: tanpa bitmap = 0).
+func (e *Enrollment) applyPolicy(zones []string, bitmap, validity *string) {
 	e.Zones = append([]string{}, zones...)
 	if bitmap != nil {
 		// Dibaca sebagai teks: nilai ≥ 2^63 (bit 63) tidak muat di bigint.
@@ -274,7 +280,118 @@ func (t *Tx) EnrollmentForUpdate(ctx context.Context, id string) (Enrollment, er
 			e.CertValidityDays = days
 		}
 	}
-	return e, nil
+}
+
+// ErrNotRenewable: kredensial atau card instance tidak ACTIVE (SDD §8.4.2).
+var ErrNotRenewable = errors.New("store: kredensial tidak dapat diperpanjang")
+
+// RenewableCredential adalah kredensial beserta kebijakan gedung saat ini untuk perpanjangan.
+type RenewableCredential struct {
+	ID         string
+	Channel    string
+	Status     string
+	CardStatus string
+	CredID     []byte
+	PubKey     []byte
+	// Site memuat gedung dan kebijakannya (Zones, ZonesBitmap, CertValidityDays).
+	Site Enrollment
+}
+
+// Renewable: kredensial dan card instance-nya sama-sama ACTIVE.
+func (c RenewableCredential) Renewable() bool {
+	return c.Status == "ACTIVE" && c.CardStatus == "ACTIVE"
+}
+
+// CreateRenewalChallenge menyimpan nonce untuk kredensial yang masih bisa diperpanjang.
+func (s *Store) CreateRenewalChallenge(ctx context.Context, credID, nonce []byte, expiresAt time.Time) error {
+	var id, status, cardStatus string
+	err := s.pool.QueryRow(ctx, `
+		SELECT c.id, c.status, ci.status
+		FROM credentials c JOIN card_instances ci ON ci.id = c.card_instance_id
+		WHERE c.cred_id = $1`, credID).Scan(&id, &status, &cardStatus)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if !(RenewableCredential{Status: status, CardStatus: cardStatus}).Renewable() {
+		return ErrNotRenewable
+	}
+	_, err = s.pool.Exec(ctx, `INSERT INTO renewal_challenges (nonce, credential_id, expires_at) VALUES ($1, $2, $3)`, nonce, id, expiresAt)
+	return err
+}
+
+// PurgeRenewalChallenges menghapus nonce yang kedaluwarsa sebelum batas waktu.
+func (s *Store) PurgeRenewalChallenges(ctx context.Context, before time.Time) (int64, error) {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM renewal_challenges WHERE expires_at < $1`, before)
+	return tag.RowsAffected(), err
+}
+
+// CredentialCert membaca sertifikat dan masa berlaku yang tersimpan (diagnostik dan test).
+func (s *Store) CredentialCert(ctx context.Context, credID []byte) ([]byte, time.Time, error) {
+	var cert []byte
+	var notAfter time.Time
+	err := s.pool.QueryRow(ctx, `SELECT cert, not_after FROM credentials WHERE cred_id = $1`, credID).Scan(&cert, &notAfter)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, time.Time{}, ErrNotFound
+	}
+	return cert, notAfter, err
+}
+
+// CredentialForRenewal membaca kredensial dan mengunci barisnya sampai transaksi selesai,
+// sehingga dua perpanjangan untuk kredensial yang sama berjalan berurutan.
+func (t *Tx) CredentialForRenewal(ctx context.Context, credID []byte) (RenewableCredential, error) {
+	var c RenewableCredential
+	var zones []string
+	var bitmap, validity *string
+	err := t.tx.QueryRow(ctx, `
+		SELECT c.id, c.channel, c.status, c.cred_id, c.pubkey, ci.id, ci.status, s.id, s.name, s.site_code,
+		       COALESCE(ARRAY(SELECT jsonb_array_elements_text(s.policy -> 'zones')), '{}'),
+		       s.policy ->> 'zones_bitmap',
+		       s.policy ->> 'cert_validity_days'
+		FROM credentials c
+		JOIN card_instances ci ON ci.id = c.card_instance_id
+		JOIN sites s ON s.id = ci.site_id
+		WHERE c.cred_id = $1
+		FOR UPDATE OF c`, credID).Scan(&c.ID, &c.Channel, &c.Status, &c.CredID, &c.PubKey, &c.Site.ID, &c.CardStatus,
+		&c.Site.SiteID, &c.Site.SiteName, &c.Site.SiteCode, &zones, &bitmap, &validity)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return RenewableCredential{}, ErrNotFound
+	}
+	if err != nil {
+		return RenewableCredential{}, err
+	}
+	c.Site.Status = c.CardStatus
+	c.Site.applyPolicy(zones, bitmap, validity)
+	return c, nil
+}
+
+// RenewalChallengeValid mengunci nonce bila milik kredensial ini, belum dipakai, dan belum
+// kedaluwarsa pada waktu now.
+func (t *Tx) RenewalChallengeValid(ctx context.Context, credentialID string, nonce []byte, now time.Time) (bool, error) {
+	var one int
+	err := t.tx.QueryRow(ctx, `
+		SELECT 1 FROM renewal_challenges
+		WHERE nonce = $1 AND credential_id = $2 AND used_at IS NULL AND expires_at > $3
+		FOR UPDATE`, nonce, credentialID, now).Scan(&one)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
+// CompleteRenewal menandai nonce terpakai dan menyimpan sertifikat baru dalam transaksi yang sama.
+func (t *Tx) CompleteRenewal(ctx context.Context, credentialID string, nonce, cert []byte, notAfter, now time.Time) error {
+	tag, err := t.tx.Exec(ctx, `UPDATE renewal_challenges SET used_at = $2 WHERE nonce = $1 AND used_at IS NULL`, nonce, now)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return ErrNotRenewable
+	}
+	_, err = t.tx.Exec(ctx, `UPDATE credentials SET cert = $2, not_after = $3 WHERE id = $1`, credentialID, cert, notAfter)
+	return err
 }
 
 // ReaderGroupKeys: hex group_id → [kunci aktif, kunci berikutnya] untuk satu gedung.

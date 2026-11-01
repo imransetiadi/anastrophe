@@ -187,7 +187,7 @@ func TestProvisioningMengembalikanKontrakApp(t *testing.T) {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	if got := strings.Join(keys, ","); got != "certificate,channel,credential_id,group_keys,not_after,site_name,zones" {
+	if got := strings.Join(keys, ","); got != "certificate,channel,credential_id,group_keys,not_after,not_before,site_name,zones" {
 		t.Fatalf("kunci JSON berbeda dengan kontrak app ProvisionedCredential: %s", got)
 	}
 	var body struct {
