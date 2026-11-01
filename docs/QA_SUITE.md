@@ -259,6 +259,7 @@ Format ID: `TC-<AREA>-<NN>`. **Prio:** P0/P1/P2. **Tipe:** U unit · I integrasi
 | TC-ADM-12 | Alert aksi massal | Revoke > 50 kredensial dalam 5 menit | Konfirmasi tambahan + alert Security Officer | NFR-S10 | P1 | S |
 | TC-ADM-13 | Kebijakan gedung lewat CLI | `policy` membaca kebijakan; mengubah masa berlaku (1–30) dan kanal (`ble`, `nfcHCE`, `semua`) hanya untuk kunci yang diberikan, zona tetap, audit `site.policy_updated`; nilai di luar batas ditolak tanpa perubahan; masa berlaku baru dipakai saat sertifikat diterbitkan | FR-55 | P0 | I |
 | TC-ADM-14 | Kanal gedung ditegakkan | Lookup kode gedung dan respons enrolment membawa kanal efektif gedung; provisioning dengan kanal terlarang → 400 `ENR-INVALID-CHANNEL` hanya sesudah rahasia enrolment valid; app memilih kanal yang diizinkan atau menampilkan pesan tanpa provisioning | FR-55, FR-05 | P0 | I |
+| TC-ADM-15 | Filter dan pencarian daftar kartu | `list` dengan `--channel` (kredensial ACTIVE/SUSPENDED), `--id` (awalan id card instance), dan `--status` digabung AND; awalan dengan karakter pola atau kanal tak dikenal ditolak; tanpa identitas kartu atau kontak | FR-50 | P0 | I |
 
 ### 5.10 Konformansi protokol ANP/1 (PROTO)
 
@@ -667,7 +668,7 @@ Jadwal mengikuti milestone PRD §13; uji pilot mencakup 2 lokasi (ADR-0011).
 | FR-44 | TC-DEV-07, TC-DEV-08 |
 | FR-45 | TC-DEV-09, TC-DEV-10, TC-DEV-11 |
 | FR-46 | TC-DEV-12, TC-PRSW-06 |
-| FR-50 | TC-ADM-01 |
+| FR-50 | TC-ADM-01, TC-ADM-15 |
 | FR-51 | TC-ADM-03, TC-MGT-15, TC-PRSN-13, TC-PRSW-08 |
 | FR-52 | TC-ADM-04 |
 | FR-53 | TC-ADM-05 |
