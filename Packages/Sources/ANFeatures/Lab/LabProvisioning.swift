@@ -36,6 +36,9 @@ enum LabProvisioning {
         records: any CredentialRecordStore,
         cards: any CardStore
     ) async throws -> Card {
+        // Batas 8 kartu juga di app (CLAUDE.md aturan 8): jangan buat enrolment server yang
+        // kartunya pasti ditolak penyimpanan lokal.
+        try CardLimit.ensureCanAdd(currentCount: try await cards.all().count)
         let (localID, publicKey) = try begin(keys: keys)
         var movedTo: Data?
         do {

@@ -43,6 +43,8 @@ public final class AppServices {
     #if DEBUG
     /// Layar yang dibuka otomatis untuk verifikasi visual (`-ANDemoScreen`).
     public var demoScreen: String?
+    /// Provisioning lab yang menunggu layar Kunci (`-ANLabBackend`), lihat `LabBackendTarget`.
+    var pendingLabBackend: LabBackendTarget?
     #endif
 
     init(

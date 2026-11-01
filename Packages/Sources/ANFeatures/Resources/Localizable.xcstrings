@@ -465,6 +465,118 @@
         }
       }
     },
+    "lab.backend": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dev backend"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backend dev"
+          }
+        }
+      }
+    },
+    "lab.backend.device": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device ID (devseed output)"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID perangkat (keluaran devseed)"
+          }
+        }
+      }
+    },
+    "lab.backend.failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Provisioning from the backend failed."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Provisioning dari backend gagal."
+          }
+        }
+      }
+    },
+    "lab.backend.provision": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get card from backend"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ambil kartu dari backend"
+          }
+        }
+      }
+    },
+    "lab.backend.site": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Site ID (devseed output)"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID gedung (keluaran devseed)"
+          }
+        }
+      }
+    },
+    "lab.backend.skipped": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A card already exists, so automatic provisioning was skipped. Add more cards from the Lab screen."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sudah ada kartu, provisioning otomatis dilewati. Tambah kartu lewat layar Lab."
+          }
+        }
+      }
+    },
+    "lab.backend.url": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backend URL"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "URL backend"
+          }
+        }
+      }
+    },
     "lab.channel": {
       "localizations": {
         "en": {

@@ -80,6 +80,18 @@ Backend (Go, ADR-0020; butuh PostgreSQL 16 lokal untuk test integrasi):
 ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_SOFTWARE_CA=1 go -C backend run ./cmd/anastrophe-api   # dev/lab saja
 ```
 
+Lab end-to-end (build DEBUG; kartu diterbitkan backend dev, tanpa `lab_ca.py issue`):
+
+```bash
+export ANASTROPHE_DATABASE_URL=postgres://…
+go -C backend run ./cmd/anastrophe-devseed -lab-dir ../scripts/anp1/.lab   # mencetak {"site_id","device_id"}
+ANASTROPHE_DEV_SOFTWARE_CA=1 go -C backend run ./cmd/anastrophe-api
+xcrun simctl launch booted app.anastrophe -ANLabBackend http://127.0.0.1:8080 \
+  -ANLabDevice <device_id> -ANLabSite <site_id>
+```
+
+`-lab-dir` memakai kunci reader group dari `lab_ca.py init` agar reader uji mengenali kartu; tanpa flag itu devseed membuat group baru yang kunci privatnya dibuang. Argumen `-ANLab*` hanya memprovisikan bila perangkat belum punya kartu; kartu berikutnya lewat layar Lab → "Backend dev". Kode lab tidak ikut build Release. Alur ini baru diverifikasi di simulator; di iPhone fisik URL harus menunjuk alamat Mac di jaringan lokal.
+
 Kanal N (`CardSession`/`CredentialSession`) butuh entitlement Apple yang belum dimiliki (PRD D1/D7). Sampai entitlement itu ada, kanal N selalu tertahan di gating dan app tidak crash. Kanal B dan seluruh logika protokol bisa dikembangkan dan diuji sekarang. Rencana kerja berikutnya: [`docs/superpowers/plans/2026-11-01-r1-tracer-bullet.md`](docs/superpowers/plans/2026-11-01-r1-tracer-bullet.md).
 
 ## Cek dokumen

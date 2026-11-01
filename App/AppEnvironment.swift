@@ -17,7 +17,11 @@ enum AppEnvironment {
         #else
         let nfcEmulationEntitled = false  // build tanpa entitlement HCE/SE (PRD D1)
         #endif
-        return (try? AppServices.live(nfcEmulationEntitled: nfcEmulationEntitled)) ?? AppServices.storageUnavailable()
+        let services = (try? AppServices.live(nfcEmulationEntitled: nfcEmulationEntitled)) ?? AppServices.storageUnavailable()
+        #if DEBUG
+        services.configureLabBackend(arguments: arguments)  // -ANLabBackend <url> -ANLabDevice <id> -ANLabSite <id>
+        #endif
+        return services
     }
 
     static func handle(_ phase: ScenePhase, services: AppServices) {

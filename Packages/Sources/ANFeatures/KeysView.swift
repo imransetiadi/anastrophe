@@ -10,6 +10,9 @@ public struct KeysView: View {
     @State private var path: [Card.ID] = []
     @State private var presentation: PresentationController
     @State private var showsLab = false
+    #if DEBUG
+    @State private var labMessage: String?
+    #endif
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -23,6 +26,9 @@ public struct KeysView: View {
         NavigationStack(path: $path) {
             content
                 .background(ANColor.background)
+                #if DEBUG
+                .safeAreaInset(edge: .bottom) { labBanner }
+                #endif
                 .navigationTitle(localized("keys.title"))
                 .navigationDestination(for: Card.ID.self) { id in
                     if let card = model.cards.first(where: { $0.id == id }) {
@@ -38,6 +44,9 @@ public struct KeysView: View {
                 }
         }
         .task {
+            #if DEBUG
+            if let message = await services.runPendingLabBackendProvisioning() { labMessage = message }
+            #endif
             await model.load()
             openDemoScreen()
         }
@@ -94,6 +103,22 @@ public struct KeysView: View {
             .scrollContentBackground(.hidden)
         }
     }
+
+    #if DEBUG
+    /// Hasil provisioning dari argumen `-ANLabBackend` (DEBUG saja).
+    @ViewBuilder
+    private var labBanner: some View {
+        if let labMessage {
+            Text(labMessage)
+                .font(.footnote)
+                .foregroundStyle(ANColor.mutedForeground)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(.bar)
+        }
+    }
+    #endif
 
     private func use(_ card: Card) {
         guard case .available(let channel) = model.presentability(of: card) else { return }

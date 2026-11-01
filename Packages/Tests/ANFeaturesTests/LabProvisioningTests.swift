@@ -37,10 +37,11 @@ final class SequenceTransport: HTTPTransport, @unchecked Sendable {
     }
 
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        let (status, body, contentType) = lock.withLock {
+        let reply: (Int, String, String)? = lock.withLock {
             paths.append(request.url?.path() ?? "")
-            return replies.removeFirst()
+            return replies.isEmpty ? nil : replies.removeFirst()
         }
+        guard let (status, body, contentType) = reply else { throw URLError(.cannotConnectToHost) }
         return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: ["Content-Type": contentType])!)
     }
 }
@@ -86,6 +87,23 @@ struct LabBackendProvisioningTests {
         }
         #expect(secrets.storedKeyCount == 0)
         #expect(try await cards.all().isEmpty)
+    }
+
+    @Test func provisionViaBackendDitolakLokalSaatDelapanKartu() async throws {
+        // Batas 8 kartu juga di app (CLAUDE.md aturan 8): jangan buat enrolment server yang
+        // kartunya pasti ditolak penyimpanan lokal.
+        let secrets = InMemorySecretStore()
+        let keys = DeviceKeyStore(store: secrets, factory: SoftwareKeyFactory())
+        let cards = try SwiftDataCardStore(directory: temporaryDirectory())
+        for i in 0..<8 {
+            try await cards.add(Card(id: UUID(), name: "Kartu \(i)", siteName: "A", zones: [], status: .active, credentials: [:], notAfter: nil))
+        }
+        let transport = SequenceTransport([])
+        await #expect(throws: ANError.cardLimitReached) {
+            try await LabProvisioning.provisionViaBackend(api: APIClient(baseURL: base, transport: transport), deviceID: "dev", siteID: "site", channel: .ble, keys: keys, records: records, cards: cards)
+        }
+        #expect(transport.paths.isEmpty)
+        #expect(secrets.storedKeyCount == 0)
     }
 }
 
