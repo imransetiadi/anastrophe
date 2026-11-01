@@ -5,11 +5,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/imransetiadi/anastrophe/backend/internal/registry"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -176,6 +178,10 @@ func TestIdentitasKartuTidakBocor(t *testing.T) {
 	if len(stored) == 0 {
 		t.Fatal("tidak ada baris idempotency")
 	}
+	// Review minor 2: tidak ada tabel yang memuat identitas mentah, apa pun cara penyimpanannya.
+	if dump := allTablesText(t, f.dsn); strings.Contains(dump, secret) || strings.Contains(dump, labCardHex(0)) {
+		t.Fatal("identitas kartu mentah tersimpan di database")
+	}
 	for _, raw := range []string{secret, labCardHex(0)} {
 		guess := sha256.Sum256([]byte("/v1/enrollments\n" + f.deviceID + "\n" + f.siteID + "\n" + raw))
 		for _, h := range stored {
@@ -183,5 +189,58 @@ func TestIdentitasKartuTidakBocor(t *testing.T) {
 				t.Fatalf("hash idempotency diturunkan dari identitas mentah %s", raw)
 			}
 		}
+	}
+}
+
+// allTablesText menggabungkan isi semua tabel (row_to_json) untuk memeriksa nilai mentah (aturan 6).
+func allTablesText(t *testing.T, dsn string) string {
+	t.Helper()
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(ctx)
+	rows, err := conn.Query(ctx, `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tables, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var b strings.Builder
+	for _, table := range tables {
+		var text string
+		query := fmt.Sprintf(`SELECT coalesce(string_agg(row_to_json(t)::text, ' '), '') FROM %s t`, pgx.Identifier{table}.Sanitize())
+		if err := conn.QueryRow(ctx, query).Scan(&text); err != nil {
+			t.Fatal(err)
+		}
+		b.WriteString(strings.ToLower(text))
+	}
+	return b.String()
+}
+
+// recordingMAC mencatat ID gedung yang diterima sumber MAC.
+type recordingMAC struct {
+	inner registry.MAC
+	sites *[]string
+}
+
+func (m recordingMAC) MAC(ctx context.Context, siteID string, msg []byte) ([]byte, error) {
+	*m.sites = append(*m.sites, siteID)
+	return m.inner.MAC(ctx, siteID, msg)
+}
+
+func TestSiteIDDinormalisasiSebelumMAC(t *testing.T) {
+	// Review minor 9: adapter KMS kelak tidak boleh bergantung pada DevMAC yang mengecilkan huruf.
+	f := newFixture(t)
+	var seen []string
+	f.h.Registry = recordingMAC{inner: f.mac, sites: &seen}
+	body := f.cardBody()
+	body["site_id"] = " " + strings.ToUpper(f.siteID) + " "
+	rec := f.do(t, http.MethodPost, "/v1/enrollments", "", body)
+	if rec.Code != http.StatusCreated || len(seen) != 1 || seen[0] != f.siteID {
+		t.Fatalf("status %d, ID gedung ke MAC %q", rec.Code, seen)
 	}
 }

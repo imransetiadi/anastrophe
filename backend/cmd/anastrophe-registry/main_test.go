@@ -14,6 +14,7 @@ import (
 	"github.com/imransetiadi/anastrophe/backend/internal/registry"
 	"github.com/imransetiadi/anastrophe/backend/internal/store"
 	"github.com/imransetiadi/anastrophe/backend/internal/testpg"
+	"github.com/jackc/pgx/v5"
 )
 
 var adminDSN, skipReason string
@@ -164,7 +165,7 @@ func TestImportTanpaNilaiMentah(t *testing.T) {
 	if err != nil || len(events) != 1 {
 		t.Fatalf("audit: %d %v", len(events), err)
 	}
-	text := strings.ToLower(out.String() + errOut.String() + fmt.Sprint(events))
+	text := strings.ToLower(out.String() + errOut.String() + fmt.Sprint(events) + allTablesText(t, dsn))
 	for _, raw := range []string{"04a1b2c3d4e5f6", "0123456789abcdef", "04a1b2c3d4", "e004010203040506", "04b1b2c3d4e5f6", "6281234567890", "812-3456", "bukan-kontak"} {
 		if strings.Contains(text, raw) {
 			t.Fatalf("nilai mentah %q bocor: %s", raw, text)
@@ -229,5 +230,61 @@ func TestArgumenSalah(t *testing.T) {
 	errOut.Reset()
 	if code := run(ctx, []string{"import", "--site", "x", "--file", "y", "--operator", "budi"}, &out, &errOut, withDB); code != 2 || !strings.Contains(errOut.String(), "ANASTROPHE_DEV_REGISTRY_KEY") {
 		t.Fatalf("tanpa kunci registri: %d %s", code, errOut.String())
+	}
+}
+
+// allTablesText menggabungkan isi semua tabel (row_to_json) untuk memeriksa nilai mentah (aturan 6).
+func allTablesText(t *testing.T, dsn string) string {
+	t.Helper()
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(ctx)
+	rows, err := conn.Query(ctx, `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tables, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var b strings.Builder
+	for _, table := range tables {
+		var text string
+		query := fmt.Sprintf(`SELECT coalesce(string_agg(row_to_json(t)::text, ' '), '') FROM %s t`, pgx.Identifier{table}.Sanitize())
+		if err := conn.QueryRow(ctx, query).Scan(&text); err != nil {
+			t.Fatal(err)
+		}
+		b.WriteString(strings.ToLower(text))
+	}
+	return b.String()
+}
+
+func TestImportCSVDenganBOMDanCRLF(t *testing.T) {
+	// Review I3: ekspor "CSV UTF-8" Excel diawali BOM dan memakai CRLF; header boleh beda huruf/spasi.
+	db, dsn := freshStore(t)
+	site := siteWithZones(t, db)
+	content := "\ufeffTech, card_id ,Holder_Contact,zones\r\niso14443a,04a1b2c3d4e5f6,,Lobi\r\n"
+	var out, errOut bytes.Buffer
+	if code := run(context.Background(), []string{"import", "--site", site, "--file", writeCSV(t, content), "--operator", "budi"}, &out, &errOut, env(dsn)); code != 0 || !strings.Contains(out.String(), "ditambah: 1, diperbarui: 0, ditolak: 0") {
+		t.Fatalf("kode %d: %s %s", code, out.String(), errOut.String())
+	}
+}
+
+func TestImportKutipRusakDibatalkan(t *testing.T) {
+	// Review I3: tanda kutip yang tidak ditutup menelan baris sesudahnya; seluruh impor dibatalkan.
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	content := "tech,card_id,holder_contact,zones\niso14443a,04a1b2c3d4e5f6,,Lobi\niso14443a,04b1b2c3d4e5f6,\"budi,Lobi\niso14443a,04c1b2c3d4e5f6,,Lobi\niso14443a,04d1b2c3d4e5f6,,Lobi\n"
+	var out, errOut bytes.Buffer
+	code := run(ctx, []string{"import", "--site", site, "--file", writeCSV(t, content), "--operator", "budi"}, &out, &errOut, env(dsn))
+	if code != 2 || !strings.Contains(errOut.String(), "baris 3") {
+		t.Fatalf("kode %d (ingin 2): %s %s", code, out.String(), errOut.String())
+	}
+	if events, _ := db.AuditEvents(ctx, store.AuditChain(site)); len(events) != 0 {
+		t.Fatalf("impor seharusnya batal seluruhnya, audit: %d", len(events))
 	}
 }

@@ -79,7 +79,7 @@ Backend (Go, ADR-0020; butuh PostgreSQL 16 lokal untuk test integrasi):
 (cd backend && go test ./... && go vet ./...)
 ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_SOFTWARE_CA=1 ANASTROPHE_DEV_REGISTRY_KEY=<32 byte hex> go -C backend run ./cmd/anastrophe-api   # dev/lab saja; kunci registri dev (ADR-0031), bukan untuk produksi
 ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-audit   # verifikasi rantai audit (FR-54); keluar 1 bila ada yang rusak
-ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_REGISTRY_KEY=<32 byte hex> go -C backend run ./cmd/anastrophe-registry import --site <uuid> --file kartu.csv --operator <nama>   # registri kartu fisik (FR-52); approve|reject --card-instance <uuid> untuk perangkat tambahan (ADR-0032)
+ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_REGISTRY_KEY=<32 byte hex> go -C backend run ./cmd/anastrophe-registry import --site <uuid> --file ~/registri/kartu.csv --operator <pegangan>   # registri kartu fisik (FR-52); CSV berisi identitas mentah: simpan di luar repo dan hapus setelah impor; approve|reject --card-instance <uuid> untuk perangkat tambahan (ADR-0032)
 ```
 
 Lab end-to-end (build DEBUG; kartu diterbitkan backend dev, tanpa `lab_ca.py issue`):
@@ -97,8 +97,9 @@ xcrun simctl launch booted app.anastrophe -ANLabBackend http://127.0.0.1:8080 \
 Catatan alur lab:
 
 - **Reader uji.** `-lab-dir` memakai kunci reader group dari `lab_ca.py init`, sehingga ponsel menerima tanda tangan reader uji. Reader juga memverifikasi sertifikat terhadap Site CA (SDD §7.5). CA dev `anastrophe-api` dibuat ulang setiap start (kunci publiknya dicetak di log), dan `site_id` di sertifikat = `-site-code` devseed, jadi reader uji harus memakai keduanya. Tanpa `-lab-dir`, devseed membuat group baru yang kunci privatnya dibuang.
-- **Batas 8 kartu.** Setiap enrolment memakai satu dari 8 slot kartu perangkat di server, termasuk percobaan yang gagal setelah enrolment. Bila app menampilkan "Batas 8 kartu" padahal tidak ada kartu, buat perangkat baru untuk gedung yang sama dengan `go -C backend run ./cmd/anastrophe-devseed -site-code <hex> -new-device`.
-- **Provisioning otomatis.** Argumen `-ANLab*` hanya memprovisikan bila perangkat belum punya kartu dan penyimpanan berfungsi; kartu berikutnya lewat layar Lab → "Backend dev". Kode lab tidak ikut build Release.
+- **Batas 8 kartu.** Setiap enrolment memakai satu dari 8 slot kartu perangkat di server. Enrolment yang gagal sebelum kredensial dilanjutkan bila dicoba lagi, dan slotnya bebas otomatis setelah 15 menit (ADR-0034). Perangkat baru untuk gedung yang sama: `go -C backend run ./cmd/anastrophe-devseed -site-code <hex> -new-device` (tidak butuh kunci registri).
+- **Perangkat tambahan.** Perangkat kedua untuk kartu lab yang sama mendapat `PENDING_APPROVAL` dan app menampilkan "Menunggu persetujuan". Setujui dengan `anastrophe-registry approve --card-instance <id> --operator <pegangan>`, lalu jalankan app lagi: enrolment dilanjutkan dan kredensial diterbitkan (ADR-0032/0034).
+- **Provisioning otomatis.** Argumen `-ANLab*` hanya memprovisikan bila perangkat belum punya kartu dan penyimpanan berfungsi. Layar Lab → "Backend dev" memakai kartu lab bawaan; untuk kartu lain, daftarkan dulu lewat `anastrophe-registry import` lalu jalankan app dengan `-ANLabCard <tech>:<hex>`. Kode lab tidak ikut build Release.
 - **Perpanjangan.** `-ANLabRenew` (atau tombol "Perpanjang (lab)" di detail kartu) memperpanjang sertifikat kartu dari backend tanpa tap. Di luar lab, perpanjangan hanya terjadi setelah tap (ADR-0023).
 - **Hapus kartu.** `-ANLabDelete` menghapus kartu pertama tanpa ketukan (verifikasi simulator). Di app biasa: Detail → Pengaturan → Hapus kartu, dengan konfirmasi dan autentikasi (FR-31, ADR-0026).
 - **iPhone fisik.** Alur ini baru diverifikasi di simulator (`http://127.0.0.1`). Mulai iOS 17, ATS tidak lagi mengizinkan HTTP ke alamat IP secara default (O-B07), jadi di iPhone fisik pakai nama `.local` Mac, mis. `http://nama-mac.local:8080`. API dev tanpa autentikasi, jadi jalankan hanya di jaringan tepercaya. Belum diverifikasi di perangkat.

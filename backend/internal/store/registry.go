@@ -1,9 +1,11 @@
 package store
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"regexp"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -47,6 +49,10 @@ func (s *Store) UpsertPhysicalCards(ctx context.Context, siteID, operator string
 			return 0, 0, errInvalidHMAC
 		}
 	}
+	// Urutan kunci baris tetap (menurut HMAC) agar impor bersamaan dengan kartu bertumpuk tidak
+	// saling deadlock (review registri minor 10).
+	sorted := slices.Clone(cards)
+	slices.SortFunc(sorted, func(a, b PhysicalCard) int { return bytes.Compare(a.CardHMAC, b.CardHMAC) })
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		added, updated = 0, 0
 		var site string
@@ -56,7 +62,7 @@ func (s *Store) UpsertPhysicalCards(ctx context.Context, siteID, operator string
 			}
 			return err
 		}
-		for _, c := range cards {
+		for _, c := range sorted {
 			var inserted bool
 			err := tx.QueryRow(ctx, `
 				INSERT INTO physical_cards (id, site_id, card_id_hmac, holder_contact_hmac, zones_bitmap)

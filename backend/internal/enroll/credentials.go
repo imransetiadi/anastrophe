@@ -12,6 +12,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/imransetiadi/anastrophe/backend/internal/anp1"
@@ -110,8 +111,11 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteProblem(w, problem("REQ-INVALID", http.StatusBadRequest))
 		return
 	}
+	// ID gedung dinormalisasi sekali sebelum MAC, agar impor dan enrolment selalu cocok apa pun sumber
+	// MAC-nya (review registri minor 9).
+	siteID := strings.ToLower(strings.TrimSpace(req.SiteID))
 	// Dihitung di luar transaksi database: produksi memanggil KMS.
-	cardHMAC, err := h.Registry.MAC(r.Context(), req.SiteID, identity.MACInput())
+	cardHMAC, err := h.Registry.MAC(r.Context(), siteID, identity.MACInput())
 	if err != nil {
 		h.writeResult(w, 0, nil, err, "registry mac failed")
 		return
@@ -150,15 +154,15 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 		}
 		// Hash memakai HMAC kartu per gedung, bukan identitas mentah: SHA-256 dari UID pendek bisa
 		// ditebak, sedangkan baris idempotency tersimpan di database (aturan 6).
-		hash := sha256.Sum256([]byte(r.URL.Path + "\n" + req.DeviceID + "\n" + req.SiteID + "\n" + hex.EncodeToString(cardHMAC)))
+		hash := sha256.Sum256([]byte(r.URL.Path + "\n" + req.DeviceID + "\n" + siteID + "\n" + hex.EncodeToString(cardHMAC)))
 		status, resp, err = h.Store.Idempotent(r.Context(), key, hash[:], func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
 			return enroll(func() (store.CardEnrollment, error) {
-				return tx.EnrollCard(ctx, req.DeviceID, req.SiteID, cardHMAC, h.Now())
+				return tx.EnrollCard(ctx, req.DeviceID, siteID, cardHMAC, h.Now())
 			})
 		})
 	} else {
 		status, resp, err = enroll(func() (store.CardEnrollment, error) {
-			return h.Store.EnrollCard(r.Context(), req.DeviceID, req.SiteID, cardHMAC, h.Now())
+			return h.Store.EnrollCard(r.Context(), req.DeviceID, siteID, cardHMAC, h.Now())
 		})
 	}
 	h.writeResult(w, status, resp, err, "create enrollment failed")

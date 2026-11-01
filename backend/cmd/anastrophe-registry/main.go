@@ -2,16 +2,18 @@
 // dan persetujuan perangkat tambahan sebelum ada akun (ADR-0032).
 //
 //	ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_REGISTRY_KEY=<32 byte hex> \
-//	  go -C backend run ./cmd/anastrophe-registry import --site <uuid> --file kartu.csv --operator <nama>
-//	go -C backend run ./cmd/anastrophe-registry approve|reject --card-instance <uuid> --operator <nama>
+//	  go -C backend run ./cmd/anastrophe-registry import --site <uuid> --file kartu.csv --operator <pegangan>
+//	go -C backend run ./cmd/anastrophe-registry approve|reject --card-instance <uuid> --operator <pegangan>
 //
 // CSV: tech,card_id,holder_contact,zones (zones = nama zona dipisah ";", dipetakan lewat kebijakan
 // gedung). Identitas kartu dan kontak langsung di-HMAC per gedung dan tidak pernah dicetak, dicatat,
-// atau disimpan (CLAUDE.md aturan 6). Kode keluar: 0 berhasil, 1 ada baris ditolak (baris lain tetap
-// diimpor), 2 galat.
+// atau disimpan (CLAUDE.md aturan 6). --operator adalah pegangan buram (mis. kode staf), bukan nama
+// atau email, karena tercatat apa adanya di audit append-only. Kode keluar: 0 berhasil, 1 ada baris
+// ditolak (baris lain tetap diimpor), 2 galat.
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/csv"
 	"encoding/hex"
@@ -27,7 +29,7 @@ import (
 	"github.com/imransetiadi/anastrophe/backend/internal/store"
 )
 
-const usage = "pemakaian: anastrophe-registry import --site <uuid> --file <csv> --operator <nama> | approve|reject --card-instance <uuid> --operator <nama>"
+const usage = "pemakaian: anastrophe-registry import --site <uuid> --file <csv> --operator <pegangan> | approve|reject --card-instance <uuid> --operator <pegangan>"
 
 func main() {
 	os.Exit(run(context.Background(), os.Args[1:], os.Stdout, os.Stderr, os.Getenv))
@@ -47,7 +49,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 		fs.SetOutput(stderr)
 		site := fs.String("site", "", "UUID gedung")
 		file := fs.String("file", "", "berkas CSV registri")
-		operator := fs.String("operator", "", "nama operator untuk audit")
+		operator := fs.String("operator", "", "pegangan operator untuk audit (kode staf, bukan nama atau email)")
 		if err := fs.Parse(args[1:]); err != nil {
 			return 2
 		}
@@ -69,7 +71,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 			return fail(err)
 		}
 		defer db.Close()
-		rejected, err := importCards(ctx, db, mac, *site, *operator, in, stdout, time.Now())
+		// ID gedung dinormalisasi sekali sebelum MAC (review registri minor 9).
+		siteID := strings.ToLower(strings.TrimSpace(*site))
+		rejected, err := importCards(ctx, db, mac, siteID, *operator, in, stdout, time.Now())
 		if err != nil {
 			return fail(err)
 		}
@@ -81,7 +85,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 		fs := flag.NewFlagSet(args[0], flag.ContinueOnError)
 		fs.SetOutput(stderr)
 		id := fs.String("card-instance", "", "UUID card instance PENDING_APPROVAL")
-		operator := fs.String("operator", "", "nama operator untuk audit")
+		operator := fs.String("operator", "", "pegangan operator untuk audit (kode staf, bukan nama atau email)")
 		if err := fs.Parse(args[1:]); err != nil {
 			return 2
 		}
@@ -132,9 +136,17 @@ func importCards(ctx context.Context, db *store.Store, mac registry.MAC, siteID,
 			bits[name] = uint(i)
 		}
 	}
-	reader := csv.NewReader(in)
+	// Ekspor "CSV UTF-8" (mis. Excel) diawali BOM; header dibandingkan tanpa beda huruf dan spasi.
+	buffered := bufio.NewReader(in)
+	if bom, err := buffered.Peek(3); err == nil && string(bom) == "\ufeff" {
+		_, _ = buffered.Discard(3)
+	}
+	reader := csv.NewReader(buffered)
 	reader.FieldsPerRecord = 4
 	header, err := reader.Read()
+	for i := range header {
+		header[i] = strings.ToLower(strings.TrimSpace(header[i]))
+	}
 	if err != nil || strings.Join(header, ",") != "tech,card_id,holder_contact,zones" {
 		return 0, errors.New("header CSV harus: tech,card_id,holder_contact,zones")
 	}
@@ -150,7 +162,12 @@ func importCards(ctx context.Context, db *store.Store, mac registry.MAC, siteID,
 		if err != nil {
 			var parseErr *csv.ParseError
 			if errors.As(err, &parseErr) {
-				line = parseErr.Line
+				// Tanda kutip yang tidak ditutup menelan baris sesudahnya: batalkan seluruh impor
+				// alih-alih membuang baris valid tanpa laporan (review registri I3).
+				if errors.Is(parseErr.Err, csv.ErrQuote) || errors.Is(parseErr.Err, csv.ErrBareQuote) {
+					return 0, fmt.Errorf("CSV rusak mulai baris %d (tanda kutip tidak lengkap); tidak ada yang diimpor", parseErr.StartLine)
+				}
+				line = parseErr.StartLine
 			}
 			problems = append(problems, fmt.Sprintf("baris %d: format CSV tidak valid", line))
 			continue

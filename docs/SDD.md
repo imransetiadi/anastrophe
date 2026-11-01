@@ -26,6 +26,7 @@
 | 2.10 | 2026-11-01 | `POST /enrollments` mewajibkan identitas kartu dan menjawab `{enrollment_id, status}`; galat `ENR-NOT-REGISTERED`, `ENR-SITE-UNSUPPORTED`, `ENR-DUPLICATE`, `ENR-PENDING-APPROVAL` (§8.5, §15). |
 | 2.11 | 2026-11-01 | Perpanjangan memakai zona kartu terdaftar seperti penerbitan pertama (review registri C1, §8.4.2). |
 | 2.12 | 2026-11-01 | Enrolment yang belum selesai dilanjutkan dan `PROVISIONING` terbengkalai menjadi `ABANDONED` (ADR-0034); batas 8 kartu diperiksa sebelum membedakan kartu terdaftar (§8.1). |
+| 2.13 | 2026-11-01 | Catatan implementasi enrolment sebelum akun (§8.4.1), `ENR-NOT-REGISTERED` di diagram, struktur modul `CardIdentity`. |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -204,7 +205,7 @@ Anastrophe/
 │   ├── ANDesignSystem/      # Token warna/tipografi/spasi dari design-system/pages/ios-app.md
 │   ├── ANCrypto/            # Secure Enclave key mgmt, ECDH ephemeral, HKDF, AES-GCM
 │   ├── ANProtocol/          # Codec ANP/1 (TLV/CBOR), state machine sisi ponsel, framing BLE
-│   ├── ANNFCEnroll/         # NFCTagReaderSession → CardFingerprint
+│   ├── ANNFCEnroll/         # NFCTagReaderSession → CardIdentity (lewat TLS, HMAC di server)
 │   ├── ANChannelNFC/        # HCEAdapter (CardSession) + SEAdapter (CredentialSession)
 │   ├── ANChannelBLE/        # Central Core Bluetooth, pemilihan RSSI, framing
 │   ├── ANWallet/            # PassKit: provisioning pass SE, status pass (R2)
@@ -624,7 +625,7 @@ sequenceDiagram
   Note over API: identitas hanya lewat TLS, server menghitung HMAC lalu membuang nilai mentah
   API->>E: cocokkan HMAC dengan registri
   alt kartu tidak terdaftar
-    E-->>A: 404 CARD_NOT_REGISTERED
+    E-->>A: 404 ENR-NOT-REGISTERED
   else belum ada pemegang utama dan kontak cocok dengan registri
     E-->>A: role PRIMARY
     U->>A: buat security code
@@ -641,6 +642,8 @@ sequenceDiagram
   API->>C: terbitkan CredentialCert per kanal
   C-->>A: sertifikat dan kunci publik reader group
 ```
+
+Implementasi saat ini (sebelum akun ada): cabang PRIMARY dan MEMBER_CANDIDATE belum ada. Perangkat pertama untuk sebuah kartu mendapat `PROVISIONING`, perangkat tambahan `PENDING_APPROVAL` yang diputuskan operator lewat `anastrophe-registry` (ADR-0032), dan percobaan ulang perangkat yang sama melanjutkan instance-nya (ADR-0034). `--operator` adalah pegangan buram (mis. kode staf), bukan nama atau email, karena tercatat apa adanya di audit append-only.
 
 #### 8.4.2 Perpanjangan sertifikat (FR-45)
 

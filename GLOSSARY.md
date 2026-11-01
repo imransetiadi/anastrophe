@@ -15,6 +15,9 @@ Bahasa domain bersama (*ubiquitous language*) untuk PRD, SDD, QA Suite, kode, da
 | **ACS (panel)** | Access Control System milik operator: memutuskan buka/tolak berdasarkan identitas yang diteruskan reader. | Backend Anastrophe | `AccessControlSystem` |
 | **Kartu fisik** | Kartu/fob plastik yang sudah ada; dipakai **hanya** sebagai bukti kepemilikan saat enrolment. | Kredensial | `PhysicalCard` |
 | **Registri kartu** | Daftar kartu fisik milik gedung (identitas & kontak pemegang dalam bentuk HMAC, zona). | Database kredensial | `CardRegistry` |
+| **Identitas kartu** | Nilai yang dibaca dari kartu fisik saat enrolment (UID ISO 14443A/15693/FeliCa, atau ID aplikasi ISO 7816). Hanya dikirim lewat TLS lalu di-HMAC per gedung; tidak pernah disimpan, dicatat, atau dipakai sebagai faktor autentikasi. | Kredensial | `CardIdentity` |
+| **Perangkat tambahan** | Perangkat yang mendaftarkan kartu fisik yang sudah dipegang perangkat lain. Sebelum ada akun, card instance-nya menunggu persetujuan operator (ADR-0032). | Anggota (setelah akun ada) | — |
+| **Enrolment terbengkalai** | Card instance `PROVISIONING` tanpa kredensial yang melewati 15 menit; menjadi `ABANDONED` dan tidak lagi memakai slot (ADR-0034). | Ditolak operator (`REJECTED`) | `ABANDONED` |
 | **Kartu (digital)** | Hak akses seorang pengguna atas satu kartu fisik/undangan di satu iPhone, seperti yang terlihat di daftar Kunci. Maksimal 8 per perangkat. | Kredensial (satu kartu bisa punya kredensial per kanal) | `CardInstance` |
 | **Kredensial** | Pasangan kunci + sertifikat untuk **satu kanal** dari sebuah kartu digital. Kunci privatnya tidak pernah keluar dari Secure Enclave/SE. | Kartu fisik; pass Wallet | `Credential` |
 | **Sertifikat kredensial** | Pernyataan yang ditandatangani Site CA: `cred_id`, kunci publik, zona, dan masa berlaku (default 7 hari). | Sertifikat TLS | `CredentialCert` |

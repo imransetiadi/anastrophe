@@ -60,14 +60,6 @@ func run() error {
 	if err != nil || len(code) != 8 {
 		return errors.New("-site-code harus 8 byte hex")
 	}
-	labIdentity, err := parseLabCard(*labCard)
-	if err != nil {
-		return err
-	}
-	mac, err := registry.NewDevMAC(os.Getenv("ANASTROPHE_DEV_REGISTRY_KEY"))
-	if err != nil {
-		return errors.New("ANASTROPHE_DEV_REGISTRY_KEY wajib diisi (32 byte hex, sama dengan API)")
-	}
 	ctx := context.Background()
 	db, err := store.Open(ctx, dsn)
 	if err != nil {
@@ -86,6 +78,15 @@ func run() error {
 			return err
 		}
 		return json.NewEncoder(os.Stdout).Encode(out)
+	}
+	// Kartu lab dan kunci registri hanya dibutuhkan seed lengkap, bukan -new-device (review registri minor 4).
+	labIdentity, err := parseLabCard(*labCard)
+	if err != nil {
+		return err
+	}
+	mac, err := registry.NewDevMAC(os.Getenv("ANASTROPHE_DEV_REGISTRY_KEY"))
+	if err != nil {
+		return errors.New("ANASTROPHE_DEV_REGISTRY_KEY wajib diisi (32 byte hex, sama dengan API)")
 	}
 	groupID, groupKey, err := readerGroup(*labDir)
 	if err != nil {

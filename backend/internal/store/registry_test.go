@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // cardHMAC membuat HMAC uji 32 B yang deterministik; nilai mentah tidak pernah sampai ke store.
@@ -287,19 +289,22 @@ func TestEnrolmentBersamaanSatuProvisioning(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	groups := 0
-	for rows.Next() {
-		var provisioning, pending int
-		if err := rows.Scan(&provisioning, &pending); err != nil {
-			t.Fatal(err)
-		}
-		groups++
-		if provisioning != 1 || pending != 1 {
-			t.Errorf("satu kartu: PROVISIONING=%d PENDING_APPROVAL=%d", provisioning, pending)
+	type counts struct{ provisioning, pending int }
+	groups, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (counts, error) {
+		var c counts
+		err := row.Scan(&c.provisioning, &c.pending)
+		return c, err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range groups {
+		if c.provisioning != 1 || c.pending != 1 {
+			t.Errorf("satu kartu: PROVISIONING=%d PENDING_APPROVAL=%d", c.provisioning, c.pending)
 		}
 	}
-	if groups != len(cards) {
-		t.Fatalf("kartu dengan card instance = %d, ingin %d", groups, len(cards))
+	if len(groups) != len(cards) {
+		t.Fatalf("kartu dengan card instance = %d, ingin %d", len(groups), len(cards))
 	}
 }
 
@@ -382,9 +387,11 @@ func TestRegistriTanpaNilaiMentah(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for rows.Next() {
-		var line string
-		_ = rows.Scan(&line)
+	lines, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range lines {
 		for _, secret := range [][]byte{cardHMAC("A"), cardHMAC("kontak")} {
 			if strings.Contains(line, hex.EncodeToString(secret)) || strings.Contains(line, base64.StdEncoding.EncodeToString(secret)) {
 				t.Fatalf("audit memuat HMAC: %s", line)
@@ -444,5 +451,40 @@ func TestNamaZonaGedung(t *testing.T) {
 	}
 	if _, err := s.SiteZoneNames(ctx, "00000000-0000-0000-0000-000000000000"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("gedung tak dikenal: %v", err)
+	}
+}
+
+func TestImporBersamaanTanpaDeadlock(t *testing.T) {
+	// Review minor 10: dua impor dengan kartu yang sama dalam urutan terbalik tidak saling mengunci.
+	s := freshStore(t)
+	ctx := context.Background()
+	siteID, _ := seed(t, s)
+	var cards []PhysicalCard
+	for i := range 30 {
+		cards = append(cards, PhysicalCard{CardHMAC: cardHMAC(fmt.Sprintf("impor-%d", i))})
+	}
+	reversed := make([]PhysicalCard, len(cards))
+	for i, c := range cards {
+		reversed[len(cards)-1-i] = c
+	}
+	for round := range 10 {
+		var wg sync.WaitGroup
+		errs := make([]error, 2)
+		start := make(chan struct{})
+		for i, batch := range [][]PhysicalCard{cards, reversed} {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				_, _, errs[i] = s.UpsertPhysicalCards(ctx, siteID, "uji", batch, 0, time.Now())
+			}()
+		}
+		close(start)
+		wg.Wait()
+		for _, err := range errs {
+			if err != nil {
+				t.Fatalf("putaran %d: %v", round, err)
+			}
+		}
 	}
 }

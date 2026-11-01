@@ -37,3 +37,7 @@ docs/agentmemory/.trash/
 # Bila root repo dibuka sebagai vault
 /.obsidian/
 /.trash/
+
+# CSV registri berisi identitas kartu mentah (CLAUDE.md aturan 6); simpan di luar repo
+/*.csv
+/backend/*.csv

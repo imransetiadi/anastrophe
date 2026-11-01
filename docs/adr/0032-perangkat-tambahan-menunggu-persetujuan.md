@@ -24,6 +24,7 @@ Aturan ini sementara. Saat akun dan keanggotaan ada, `PENDING_APPROVAL` untuk pe
 - Akses dengan kartu pinjaman tidak lagi otomatis untuk perangkat kedua; tetap ada pemeriksaan manusia.
 - Enrolment pertama dan uji lab end-to-end tetap berjalan tanpa akun atau portal admin.
 - Pemegang pertama tetap dipercaya tanpa pencocokan kontak sampai akun ada. Risiko ini sama dengan tracer saat ini dan ditinjau ulang bersama fondasi akun.
+- Pemegang pertama yang menghapus lalu menambah ulang kartunya saat perangkat lain masih `PENDING_APPROVAL` ikut mendapat `PENDING_APPROVAL`. Ini gagal ke arah tinjauan manusia dan ikut ditinjau bersama fondasi akun (temuan review registri minor 8).
 
 ## Catatan keputusan JEV
 
