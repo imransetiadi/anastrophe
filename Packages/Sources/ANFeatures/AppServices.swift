@@ -3,6 +3,7 @@ import ANChannelNFC
 import ANCore
 import ANCrypto
 import ANNetworking
+import ANNFCEnroll
 import ANProtocol
 import ANStorage
 import ANWallet
@@ -59,6 +60,10 @@ public final class AppServices {
     /// Token baca status kartu (ADR-0037), di Keychain yang sama dengan record kredensial.
     let statusTokens: any StatusTokenStore
     private let statusRefresher: CardStatusRefresher
+    /// Alamat API enrolment dari Info.plist `ANAPIBaseURL` (nil = layanan belum tersedia).
+    let apiBaseURL: URL?
+    /// `device_id` untuk enrolment (ADR-0045).
+    let deviceIdentity: any DeviceIdentityStore
     /// Store kartu tidak bisa dibuka; UI memberi tahu alih-alih menampilkan daftar kosong.
     public let storageFailed: Bool
     #if DEBUG
@@ -70,6 +75,13 @@ public final class AppServices {
     var pendingLabRenewal = false
     /// Hapus kartu lab saat peluncuran (`-ANLabDelete`) untuk verifikasi di simulator.
     var pendingLabDelete = false
+    /// Identitas kartu untuk pembaca palsu di simulator (`-ANLabCardReader`), karena simulator tidak bisa
+    /// membaca kartu fisik.
+    var labCardIdentity: CardIdentity?
+    /// Tautan yang dibuka seperti `onOpenURL` saat peluncuran (`-ANLabOpenURL`).
+    var pendingLabOpenURL: URL?
+    /// Kode gedung untuk menjalankan alur Tambah Kartu otomatis saat peluncuran (`-ANLabAddCode`).
+    var pendingLabAddCode: String?
     #endif
 
     init(
@@ -84,7 +96,10 @@ public final class AppServices {
         authenticator: any UserAuthenticator,
         tapHistory: any TapHistoryStore,
         statusTokens: any StatusTokenStore = KeychainStatusTokenStore(store: InMemorySecretStore()),
-        storageFailed: Bool = false
+        storageFailed: Bool = false,
+        apiBaseURL: URL? = nil,
+        deviceIdentity: any DeviceIdentityStore = KeychainDeviceIdentityStore(
+            store: InMemorySecretStore(), installMarker: FileManager.default.temporaryDirectory.appending(path: "anastrophe-\(UUID().uuidString)/installed"))
     ) {
         self.cards = cards
         self.keys = keys
@@ -99,6 +114,21 @@ public final class AppServices {
         self.statusTokens = statusTokens
         self.statusRefresher = CardStatusRefresher(cards: cards, records: records, tokens: statusTokens)
         self.storageFailed = storageFailed
+        self.apiBaseURL = apiBaseURL
+        self.deviceIdentity = deviceIdentity
+    }
+
+    /// Pembaca kartu fisik untuk alur Tambah Kartu (FR-11). Teks lembar sistem terlokalisasi tanpa istilah
+    /// teknis.
+    func makeCardReader() -> any CardOwnershipReader {
+        #if DEBUG && targetEnvironment(simulator)
+        if let labCardIdentity { return FixedCardOwnershipReader(.identity(labCardIdentity)) }
+        #endif
+        #if os(iOS) && canImport(CoreNFC)
+        return NFCTagCardOwnershipReader(prompt: localized("add.read.prompt"), multipleCardsMessage: localized("add.read.multiple"))
+        #else
+        return FixedCardOwnershipReader(.failure(.cardReaderUnavailable))
+        #endif
     }
 
     /// Dipakai bila `live()` gagal membuka penyimpanan: tidak ada presentasi, UI memberi tahu.
@@ -142,7 +172,7 @@ public final class AppServices {
         RemoteConfig(enabledChannels: nfcEmulationEntitled ? [.ble, .nfcHCE] : [.ble])
     }
 
-    public static func live(nfcEmulationEntitled: Bool) throws -> AppServices {
+    public static func live(nfcEmulationEntitled: Bool, apiBaseURL: URL? = nil) throws -> AppServices {
         let secrets = deviceSecretStore()
         let keys = DeviceKeyStore(store: secrets, factory: keyFactory())
         let records = KeychainCredentialRecordStore(store: secrets)
@@ -165,7 +195,10 @@ public final class AppServices {
             connectivity: LiveConnectivity(onChange: { Task { @MainActor in revision.bump() } }),
             authenticator: LAUserAuthenticator(),
             tapHistory: tapHistory,
-            statusTokens: statusTokens
+            statusTokens: statusTokens,
+            apiBaseURL: apiBaseURL,
+            // ADR-0045: penanda instalasi di kontainer app; hilang saat instal ulang sehingga id dibuat ulang.
+            deviceIdentity: KeychainDeviceIdentityStore(store: secrets, installMarker: URL.applicationSupportDirectory.appending(path: "Anastrophe/installed"))
         )
     }
 
@@ -175,7 +208,7 @@ public final class AppServices {
     }
 
     static func inMemory(events: [PresentmentEvent], connectivity: any ConnectivityStatus = FixedConnectivity(isOnline: true),
-                         authenticator: any UserAuthenticator = ImmediateAuthenticator()) -> AppServices {
+                         authenticator: any UserAuthenticator = ImmediateAuthenticator(), apiBaseURL: URL? = nil) -> AppServices {
         let secrets = InMemorySecretStore()
         let keys = DeviceKeyStore(store: secrets, factory: SoftwareKeyFactory())
         let directory = FileManager.default.temporaryDirectory.appending(path: "anastrophe-\(UUID().uuidString)")
@@ -190,7 +223,8 @@ public final class AppServices {
             connectivity: connectivity,
             authenticator: authenticator,
             tapHistory: tapHistory,
-            statusTokens: KeychainStatusTokenStore(store: secrets)
+            statusTokens: KeychainStatusTokenStore(store: secrets),
+            apiBaseURL: apiBaseURL
         )
     }
 

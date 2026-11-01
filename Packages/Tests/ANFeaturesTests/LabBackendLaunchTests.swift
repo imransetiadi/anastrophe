@@ -8,6 +8,21 @@ import Testing
 
 @Suite("Target backend lab (argumen peluncuran DEBUG)")
 struct LabBackendTargetTests {
+    @MainActor
+    @Test func argumenLabAlurTambahKartu() {
+        // E2e alur Tambah Kartu di simulator (ADR-0043): pembaca palsu, tautan undangan, kode gedung.
+        let token = String(repeating: "A", count: 42) + "w"
+        let services = AppServices.inMemory()
+        services.configureLabBackend(arguments: ["Anastrophe", "-ANLabCardReader", "iso14443a:04a1b2c3d4e5f6",
+                                                 "-ANLabOpenURL", "https://contoh.test/i/\(token)", "-ANLabAddCode", "7K2Q-9XA4"])
+        #expect(services.labCardIdentity == CardIdentity("iso14443a:04a1b2c3d4e5f6"))
+        #expect(services.pendingLabOpenURL == URL(string: "https://contoh.test/i/\(token)"))
+        #expect(services.pendingLabAddCode == "7K2Q-9XA4")
+        let empty = AppServices.inMemory()
+        empty.configureLabBackend(arguments: ["Anastrophe", "-ANLabCardReader", "iso14443a:zz"])
+        #expect(empty.labCardIdentity == nil && empty.pendingLabOpenURL == nil && empty.pendingLabAddCode == nil)
+    }
+
     @Test func argumenLengkapMenghasilkanTarget() {
         let target = LabBackendTarget(arguments: ["Anastrophe", "-ANLabBackend", "http://127.0.0.1:8080", "-ANLabDevice", "d1", "-ANLabSite", "s1"])
         #expect(target?.baseURL == URL(string: "http://127.0.0.1:8080"))

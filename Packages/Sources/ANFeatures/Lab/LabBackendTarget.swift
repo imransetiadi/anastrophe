@@ -77,6 +77,14 @@ extension AppServices {
         pendingLabBackend = LabBackendTarget(arguments: arguments)
         pendingLabRenewal = arguments.contains("-ANLabRenew")
         pendingLabDelete = arguments.contains("-ANLabDelete")
+        // Alur Tambah Kartu (ADR-0043): pembaca palsu di simulator, tautan undangan, dan kode gedung.
+        func value(_ flag: String) -> String? {
+            guard let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1) else { return nil }
+            return arguments[index + 1]
+        }
+        labCardIdentity = value("-ANLabCardReader").flatMap(CardIdentity.init)
+        pendingLabOpenURL = value("-ANLabOpenURL").flatMap { URL(string: $0) }
+        pendingLabAddCode = value("-ANLabAddCode")
     }
 
     /// Hapus kartu pertama dari `-ANLabDelete`, sekali per peluncuran; nil bila tidak diminta.

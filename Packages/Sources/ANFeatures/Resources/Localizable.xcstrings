@@ -1,6 +1,182 @@
 {
   "sourceLanguage": "id",
   "strings": {
+    "add.back": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kembali"
+          }
+        }
+      }
+    },
+    "add.close": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutup"
+          }
+        }
+      }
+    },
+    "add.code.help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "8 letters and numbers from your building management, for example on a lobby poster."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "8 huruf dan angka dari pengelola gedung, misalnya di poster lobi."
+          }
+        }
+      }
+    },
+    "add.code.invalid": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The building code has 8 letters and numbers."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kode gedung terdiri dari 8 huruf dan angka."
+          }
+        }
+      }
+    },
+    "add.code.label": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Building code"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kode gedung"
+          }
+        }
+      }
+    },
+    "add.confirm.caption": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your building"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gedung Anda"
+          }
+        }
+      }
+    },
+    "add.confirm.message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make sure this is your building, then hold your access card near the top of your iPhone."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pastikan ini gedung Anda, lalu tempelkan kartu akses ke bagian atas iPhone."
+          }
+        }
+      }
+    },
+    "add.confirm.read": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap card"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempel kartu"
+          }
+        }
+      }
+    },
+    "add.confirm.wrong_site": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not my building"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bukan gedung saya"
+          }
+        }
+      }
+    },
+    "add.continue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lanjutkan"
+          }
+        }
+      }
+    },
+    "add.done.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your card is ready"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu siap dipakai"
+          }
+        }
+      }
+    },
     "add.error.channel_unavailable": {
       "localizations": {
         "en": {
@@ -13,6 +189,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Fitur ini belum tersedia di perangkat atau wilayah Anda."
+          }
+        }
+      }
+    },
+    "add.error.generic": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Something went wrong. Try again."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terjadi kesalahan. Coba lagi."
+          }
+        }
+      }
+    },
+    "add.error.offline": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This step needs an internet connection."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Butuh koneksi internet untuk langkah ini."
           }
         }
       }
@@ -77,6 +285,294 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kartu tidak dapat dibaca iPhone."
+          }
+        }
+      }
+    },
+    "add.failed.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The card couldn't be added"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu belum bisa ditambahkan"
+          }
+        }
+      }
+    },
+    "add.finish": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selesai"
+          }
+        }
+      }
+    },
+    "add.intro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose how to add your building access card."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pilih cara menambahkan kartu akses gedung Anda."
+          }
+        }
+      }
+    },
+    "add.link.help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste the link from your building management."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempel tautan dari pengelola gedung."
+          }
+        }
+      }
+    },
+    "add.link.invalid": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We don't recognize this invitation link. Check the link again."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tautan undangan tidak dikenali. Periksa lagi tautannya."
+          }
+        }
+      }
+    },
+    "add.link.label": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invitation link"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tautan undangan"
+          }
+        }
+      }
+    },
+    "add.link.submit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add card"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambahkan kartu"
+          }
+        }
+      }
+    },
+    "add.method.card": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap your physical card"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempel kartu fisik"
+          }
+        }
+      }
+    },
+    "add.method.card.detail": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You'll need the building code from your building management."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Butuh kode gedung dari pengelola gedung."
+          }
+        }
+      }
+    },
+    "add.method.invitation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use an invitation link"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pakai tautan undangan"
+          }
+        }
+      }
+    },
+    "add.method.invitation.detail": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From a message or email sent by your building management."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dari pesan atau email pengelola gedung."
+          }
+        }
+      }
+    },
+    "add.pending.message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your building management needs to approve this iPhone. After approval, add the card again by tapping the same card, or ask your building management for an invitation link."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pengelola gedung perlu menyetujui iPhone ini. Setelah disetujui, tambahkan kartu lagi dengan menempelkan kartu yang sama, atau minta tautan undangan dari pengelola."
+          }
+        }
+      }
+    },
+    "add.pending.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for approval"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menunggu persetujuan"
+          }
+        }
+      }
+    },
+    "add.read.multiple": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More than one card detected. Hold just one card."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terdeteksi lebih dari satu kartu. Tempelkan satu kartu saja."
+          }
+        }
+      }
+    },
+    "add.read.prompt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold your access card near the top of your iPhone."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempelkan kartu akses ke bagian atas iPhone."
+          }
+        }
+      }
+    },
+    "add.retry": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coba lagi"
+          }
+        }
+      }
+    },
+    "add.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Access Card"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambah Kartu Akses"
+          }
+        }
+      }
+    },
+    "add.working": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Setting up your card…"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menyiapkan kartu…"
           }
         }
       }
@@ -870,13 +1366,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Add card"
+            "value": "Add access card"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tambah kartu"
+            "value": "Tambah kartu akses"
           }
         }
       }

@@ -13,8 +13,13 @@ public struct KeysView: View {
     @State private var showsLab = false
     @State private var deleteMessage: String?
     @State private var deleting: Card.ID?
+    /// Alur Tambah Kartu (FR-10): dari tombol atau dari tautan undangan yang dibuka sistem.
+    @State private var addCard: AddCardEntry?
     #if DEBUG
     @State private var labMessage: String?
+    /// E2e alur Tambah Kartu di simulator (`-ANLabAddCode`, `-ANLabOpenURL`).
+    @State private var labAddCode: String?
+    @State private var labAutoSubmit = false
     #endif
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -51,8 +56,14 @@ public struct KeysView: View {
                     }
                 }
                 .toolbar {
-                    #if DEBUG
                     ToolbarItem(placement: .primaryAction) {
+                        Button { addCard = .start } label: {
+                            Label(localized("keys.add"), systemImage: "plus")
+                        }
+                        .disabled(!model.canAddCard || services.storageFailed)
+                    }
+                    #if DEBUG
+                    ToolbarItem(placement: Self.labPlacement) {
                         Button(localized("keys.lab")) { showsLab = true }
                     }
                     #endif
@@ -76,8 +87,25 @@ public struct KeysView: View {
                 labMessage = message
                 await model.load()
             }
+            if let url = services.pendingLabOpenURL {
+                services.pendingLabOpenURL = nil
+                labAutoSubmit = true
+                addCard = AddCardEntry.entry(for: url)
+            } else if let code = services.pendingLabAddCode {
+                services.pendingLabAddCode = nil
+                labAddCode = code
+                addCard = .start
+            }
             #endif
             openDemoScreen()
+        }
+        .onOpenURL { url in
+            // Tautan undangan https://<host>/i/<token> (FR-12). Tidak menyela presentasi yang sedang berjalan.
+            guard let entry = AddCardEntry.entry(for: url), presentation.request == nil else { return }
+            addCard = entry
+        }
+        .sheet(item: $addCard) { entry in
+            addCardSheet(entry)
         }
         .alert(deleteMessage ?? "", isPresented: Binding(get: { deleteMessage != nil }, set: { if !$0 { deleteMessage = nil } })) {
             Button(localized("present.done"), role: .cancel) {}
@@ -127,12 +155,10 @@ public struct KeysView: View {
             } description: {
                 Text(localized("keys.empty.message"))
             } actions: {
-                #if DEBUG
-                Button(localized("keys.add")) { showsLab = true }
+                Button(localized("keys.add")) { addCard = .start }
                     .buttonStyle(ANPrimaryButtonStyle())
                     .disabled(!model.canAddCard)
                     .padding(.horizontal)
-                #endif
             }
         } else {
             List(model.cards) { card in
@@ -144,7 +170,27 @@ public struct KeysView: View {
         }
     }
 
+    private func addCardSheet(_ entry: AddCardEntry) -> some View {
+        #if DEBUG
+        AddCardView(services: services, entry: entry, reader: services.makeCardReader(), labAutoCode: labAddCode, labAutoSubmit: labAutoSubmit) {
+            Task { await model.load() }
+        }
+        #else
+        AddCardView(services: services, entry: entry, reader: services.makeCardReader()) {
+            Task { await model.load() }
+        }
+        #endif
+    }
+
     #if DEBUG
+    private static var labPlacement: ToolbarItemPlacement {
+        #if os(iOS)
+        .topBarLeading
+        #else
+        .automatic
+        #endif
+    }
+
     /// Hasil provisioning dari argumen `-ANLabBackend` (DEBUG saja).
     @ViewBuilder
     private var labBanner: some View {
