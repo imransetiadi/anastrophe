@@ -239,3 +239,69 @@ func provisioningHashOf(t *testing.T, f fixture, id string) []byte {
 	}
 	return stored
 }
+
+func TestProvisioningIdempotencyMemuatRahasia(t *testing.T) {
+	// Review akhir provisioning M2: pengulangan Idempotency-Key tanpa rahasia atau dengan rahasia lain
+	// tidak boleh memakai respons lama (sertifikat).
+	f := newFixture(t)
+	_, bearer, hashB64 := newProvisioningSecret(t)
+	id, _ := f.enrollWith(t, f.deviceID, 0, hashB64)
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	body := map[string]string{"channel": "ble", "public_key": base64.StdEncoding.EncodeToString(mustPub(t, key))}
+	path := "/v1/enrollments/" + id + "/credentials"
+	if rec := f.request(t, http.MethodPost, path, "prov-sama", body, map[string]string{"Authorization": bearer}); rec.Code != http.StatusOK {
+		t.Fatalf("pertama: %d %s", rec.Code, rec.Body)
+	}
+	_, otherBearer, _ := newProvisioningSecret(t)
+	for name, headers := range map[string]map[string]string{"tanpa rahasia": nil, "rahasia lain": {"Authorization": otherBearer}} {
+		if rec := f.request(t, http.MethodPost, path, "prov-sama", body, headers); rec.Code != http.StatusUnprocessableEntity {
+			t.Errorf("%s: %d %s", name, rec.Code, rec.Body)
+		}
+	}
+}
+
+func TestEnrolmentIdempotencyMemuatHashRahasia(t *testing.T) {
+	// Review akhir provisioning M2: key sama dengan hash lain → 422, dan hash tersimpan tidak berubah.
+	f := newFixture(t)
+	first, _, h1 := newProvisioningSecret(t)
+	_, _, h2 := newProvisioningSecret(t)
+	body := func(hash string) map[string]any {
+		return map[string]any{"device_id": f.deviceID, "site_id": f.siteID, "card": map[string]string{"tech": "iso14443a", "id": labCardHex(0)}, "provisioning_key_hash": hash}
+	}
+	rec := f.request(t, http.MethodPost, "/v1/enrollments", "enrol-sama", body(h1), nil)
+	id, _ := enrolResult(t, rec.Body)
+	if rec := f.request(t, http.MethodPost, "/v1/enrollments", "enrol-sama", body(h2), nil); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("key sama, hash lain: %d %s", rec.Code, rec.Body)
+	}
+	if sum := sha256.Sum256(first); !bytes.Equal(provisioningHashOf(t, f, id), sum[:]) {
+		t.Fatal("hash tersimpan berubah")
+	}
+}
+
+func TestAlurPersetujuanOperatorLewatHTTP(t *testing.T) {
+	// Review akhir provisioning M2 (README): menunggu persetujuan → operator approve → enrolment ulang
+	// dengan rahasia baru → provisioning hanya dengan rahasia terbaru.
+	f := newFixture(t)
+	if _, _, h := newProvisioningSecret(t); true {
+		f.enrollWith(t, f.deviceID, 0, h) // pemegang pertama
+	}
+	other, _ := f.store.CreateDevice(context.Background())
+	_, pendingBearer, pendingHash := newProvisioningSecret(t)
+	pending, status := f.enrollWith(t, other, 0, pendingHash)
+	if status != "PENDING_APPROVAL" {
+		t.Fatalf("perangkat kedua: %s", status)
+	}
+	if err := f.store.DecideEnrollment(context.Background(), pending, true, "staf-01", f.h.Now()); err != nil {
+		t.Fatal(err)
+	}
+	_, newBearer, newHash := newProvisioningSecret(t)
+	if again, status := f.enrollWith(t, other, 0, newHash); again != pending || status != "PROVISIONING" {
+		t.Fatalf("setelah disetujui: %s %s", again, status)
+	}
+	if r := f.provisionWith(t, pending, pendingBearer, "ble"); r.code != http.StatusNotFound {
+		t.Fatalf("rahasia saat menunggu masih berlaku: %d", r.code)
+	}
+	if r := f.provisionWith(t, pending, newBearer, "ble"); r.code != http.StatusOK {
+		t.Fatalf("rahasia terbaru: %d %s", r.code, r.body)
+	}
+}

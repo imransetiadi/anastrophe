@@ -151,3 +151,16 @@ func hexLower(b []byte) string {
 	}
 	return string(out)
 }
+
+func TestUndanganIdempotencyMemuatToken(t *testing.T) {
+	// Review akhir undangan M9: key sama dengan token lain tidak boleh memakai respons enrolment lama.
+	f := newFixture(t)
+	first := f.invitation(t, store.Invitation{ZonesBitmap: 1}, f.h.Now())
+	second := f.invitation(t, store.Invitation{ZonesBitmap: 1}, f.h.Now())
+	if rec := f.request(t, http.MethodPost, "/v1/enrollments", "undangan-sama", map[string]string{"device_id": f.deviceID, "invitation": first}, nil); rec.Code != http.StatusCreated {
+		t.Fatalf("pertama: %d %s", rec.Code, rec.Body)
+	}
+	if rec := f.request(t, http.MethodPost, "/v1/enrollments", "undangan-sama", map[string]string{"device_id": f.deviceID, "invitation": second}, nil); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("token lain: %d %s", rec.Code, rec.Body)
+	}
+}

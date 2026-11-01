@@ -63,6 +63,8 @@ type fixture struct {
 	// secrets: rahasia enrolment per id instance (ADR-0040). Fixture berperan sebagai klien yang
 	// benar: do() mengirim hash saat enrolment dan rahasia saat provisioning.
 	secrets map[string][]byte
+	// secretsMu menjaga secrets dari enrolment bersamaan lewat do() (review akhir provisioning M6).
+	secretsMu *sync.Mutex
 }
 
 func newFixture(t *testing.T) fixture {
@@ -119,17 +121,18 @@ func newFixtureWithPool(t *testing.T, poolParams string) fixture {
 		Registry:        mac,
 	}
 	f := fixture{
-		mac:      mac,
-		nextCard: new(int),
-		secrets:  map[string][]byte{},
-		dsn:      dsn,
-		h:        h,
-		handler:  httpapi.New(httpapi.Config{}, httpapi.Deps{Routes: h.Register}),
-		store:    s,
-		signer:   signer,
-		siteID:   siteID,
-		deviceID: deviceID,
-		groupID:  groupID,
+		mac:       mac,
+		nextCard:  new(int),
+		secrets:   map[string][]byte{},
+		secretsMu: &sync.Mutex{},
+		dsn:       dsn,
+		h:         h,
+		handler:   httpapi.New(httpapi.Config{}, httpapi.Deps{Routes: h.Register}),
+		store:     s,
+		signer:    signer,
+		siteID:    siteID,
+		deviceID:  deviceID,
+		groupID:   groupID,
 	}
 	var cards []store.PhysicalCard
 	for i := range labCards {
@@ -194,7 +197,9 @@ func (f fixture) do(t *testing.T, method, path, idempotencyKey string, body any)
 			EnrollmentID string `json:"enrollment_id"`
 		}
 		if json.Unmarshal(rec.Body.Bytes(), &out) == nil && out.EnrollmentID != "" {
+			f.secretsMu.Lock()
 			f.secrets[out.EnrollmentID] = secret
+			f.secretsMu.Unlock()
 		}
 	}
 	return rec
@@ -204,8 +209,11 @@ func (f fixture) do(t *testing.T, method, path, idempotencyKey string, body any)
 func (f fixture) provisioningHeaders(method, path string) map[string]string {
 	headers := map[string]string{}
 	if id, ok := strings.CutPrefix(path, "/v1/enrollments/"); ok && method == http.MethodPost {
-		if id, ok = strings.CutSuffix(id, "/credentials"); ok && f.secrets[id] != nil {
-			headers["Authorization"] = "Bearer " + base64.RawURLEncoding.EncodeToString(f.secrets[id])
+		f.secretsMu.Lock()
+		secret := f.secrets[strings.TrimSuffix(id, "/credentials")]
+		f.secretsMu.Unlock()
+		if strings.HasSuffix(id, "/credentials") && secret != nil {
+			headers["Authorization"] = "Bearer " + base64.RawURLEncoding.EncodeToString(secret)
 		}
 	}
 	return headers
@@ -222,7 +230,9 @@ func (f fixture) armProvisioning(t *testing.T, id string) {
 	if err := f.store.InTx(context.Background(), func(tx *store.Tx) error { return tx.SetProvisioningKeyHash(context.Background(), id, sum[:]) }); err != nil {
 		t.Fatal(err)
 	}
+	f.secretsMu.Lock()
 	f.secrets[id] = secret
+	f.secretsMu.Unlock()
 }
 
 // request mengirim permintaan apa adanya, tanpa perilaku klien otomatis do().
