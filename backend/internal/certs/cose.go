@@ -103,6 +103,9 @@ func Issue(s Signer, r Request) ([]byte, error) {
 
 // Verify memeriksa tanda tangan Site CA lalu mengembalikan isi sertifikat.
 func Verify(cert []byte, ca *ecdsa.PublicKey) (Request, error) {
+	if len(cert) > MaxSize {
+		return Request{}, ErrInvalid
+	}
 	v, err := decode(cert)
 	if err != nil {
 		return Request{}, ErrInvalid
@@ -118,7 +121,10 @@ func Verify(cert []byte, ca *ecdsa.PublicKey) (Request, error) {
 	protected, ok1 := parts[0].([]byte)
 	payload, ok2 := parts[2].([]byte)
 	sig, ok3 := parts[3].([]byte)
-	if !ok1 || !ok2 || !ok3 {
+	// Header tak terlindung wajib map kosong: semua parameter ada di header terlindung,
+	// dan label tidak boleh muncul di keduanya (RFC 9052 §3).
+	unprotected, ok4 := parts[1].(map[int64]any)
+	if !ok1 || !ok2 || !ok3 || !ok4 || len(unprotected) != 0 {
 		return Request{}, ErrInvalid
 	}
 	if header, err := decode(protected); err != nil || !isES256(header) {
@@ -146,8 +152,8 @@ func isES256(header any) bool {
 
 func parsePayload(body any) (Request, error) {
 	m, ok := body.(map[int64]any)
-	if !ok {
-		return Request{}, ErrInvalid
+	if !ok || len(m) != 7 {
+		return Request{}, ErrInvalid // skema tetap SDD §7.3: tepat kunci 1–7
 	}
 	credID, ok1 := m[1].([]byte)
 	siteID, ok2 := m[2].([]byte)
@@ -156,7 +162,10 @@ func parsePayload(body any) (Request, error) {
 	code, ok5 := m[5].(uint64)
 	nbf, ok6 := m[6].(uint64)
 	naf, ok7 := m[7].(uint64)
-	if !(ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7) {
+	if !(ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7) || len(credID) != 16 || len(siteID) != 8 {
+		return Request{}, ErrInvalid
+	}
+	if _, err := anp1.ParsePublicKey(pub); err != nil {
 		return Request{}, ErrInvalid
 	}
 	channel := ""

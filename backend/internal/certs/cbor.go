@@ -3,7 +3,9 @@ package certs
 import (
 	"encoding/binary"
 	"errors"
+	"math"
 	"sort"
+	"unicode/utf8"
 )
 
 // CBOR minimal (RFC 8949) untuk CredentialCert: uint, nint, bstr, tstr, array, map
@@ -112,6 +114,11 @@ func decodeItem(data []byte, depth int) (any, []byte, error) {
 			n = n<<8 | uint64(b)
 		}
 		data = data[size:]
+		// Hanya encoding terpendek (deterministik, RFC 8949 §4.2.1): byte sertifikat tidak
+		// boleh punya lebih dari satu bentuk yang lolos verifikasi.
+		if minimum := [...]uint64{24, 0x100, 0x1_0000, 0x1_0000_0000}[info-24]; n < minimum {
+			return nil, nil, errCBOR
+		}
 	default:
 		return nil, nil, errCBOR
 	}
@@ -119,6 +126,9 @@ func decodeItem(data []byte, depth int) (any, []byte, error) {
 	case 0:
 		return n, data, nil
 	case 1:
+		if n > math.MaxInt64 {
+			return nil, nil, errCBOR // -1-n tidak muat di int64
+		}
 		return -1 - int64(n), data, nil
 	case 2, 3:
 		if uint64(len(data)) < n {
@@ -126,6 +136,9 @@ func decodeItem(data []byte, depth int) (any, []byte, error) {
 		}
 		if major == 2 {
 			return append([]byte(nil), data[:n]...), data[n:], nil
+		}
+		if !utf8.Valid(data[:n]) {
+			return nil, nil, errCBOR
 		}
 		return string(data[:n]), data[n:], nil
 	case 4:
@@ -148,10 +161,16 @@ func decodeItem(data []byte, depth int) (any, []byte, error) {
 			var key int64
 			switch kk := k.(type) {
 			case uint64:
+				if kk > math.MaxInt64 {
+					return nil, nil, errCBOR // tidak boleh beralias dengan kunci negatif
+				}
 				key = int64(kk)
 			case int64:
 				key = kk
 			default:
+				return nil, nil, errCBOR
+			}
+			if _, duplicate := m[key]; duplicate {
 				return nil, nil, errCBOR
 			}
 			v, rest, err := decodeItem(rest, depth+1)
