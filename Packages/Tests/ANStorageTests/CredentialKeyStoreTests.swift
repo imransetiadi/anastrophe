@@ -62,6 +62,17 @@ struct CredentialKeyStoreTests {
         }
     }
 
+    @Test func kunciDipindahKeCredIDServer() throws {
+        // cred_id ditetapkan server setelah kunci dibuat; kunci tetap bisa menandatangani.
+        let keys = DeviceKeyStore(store: InMemorySecretStore(), factory: SoftwareKeyFactory())
+        let local = Data(repeating: 0x0A, count: 16), server = Data(repeating: 0x0B, count: 16)
+        let publicKey = try P256.Signing.PublicKey(x963Representation: keys.createKey(for: local))
+        try keys.moveKey(from: local, to: server)
+        #expect(try !keys.hasKey(for: local))
+        let signature = try P256.Signing.ECDSASignature(rawRepresentation: keys.signer(for: server, context: AuthorizedContext(laContext: LAContext())).sign(Data("m".utf8)))
+        #expect(publicKey.isValidSignature(signature, for: Data("m".utf8)))
+    }
+
     @Test func recordMenjadiMaterial() throws {
         let groupID = Data(repeating: 0xA1, count: 8)
         let record = CredentialRecord(

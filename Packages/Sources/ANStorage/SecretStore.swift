@@ -53,6 +53,9 @@ public final class InMemorySecretStore: SecretStore, @unchecked Sendable {
     public func get(_ key: String) throws -> Data? { lock.withLock { items[key]?.data } }
     public func delete(_ key: String) throws { _ = lock.withLock { items.removeValue(forKey: key) } }
 
+    /// Jumlah item tersimpan, untuk memeriksa kunci yatim di test.
+    public var storedKeyCount: Int { lock.withLock { items.count } }
+
     /// Kelas proteksi item, untuk pemeriksaan di test.
     public func accessibility(for key: String) -> SecretAccessibility? { lock.withLock { items[key]?.accessibility } }
 }

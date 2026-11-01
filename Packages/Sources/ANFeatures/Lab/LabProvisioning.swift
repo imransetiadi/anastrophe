@@ -20,8 +20,39 @@ enum LabProvisioning {
     }
 
     static func complete(json: Data, keys: any CredentialKeyStore, records: any CredentialRecordStore, cards: any CardStore) async throws -> Card {
-        guard let provisioned = try? ProvisionedCredential.decode(json),
-              [.ble, .nfcHCE].contains(provisioned.channel),
+        guard let provisioned = try? ProvisionedCredential.decode(json) else { throw ANError.invalidData }
+        return try await store(provisioned, keys: keys, records: records, cards: cards)
+    }
+
+    /// Alur lab lewat backend dev (cmd/anastrophe-devseed + anastrophe-api): enrolment tracer,
+    /// provisioning kredensial, lalu kunci dipindah ke `cred_id` dari server. Gagal di mana pun
+    /// tidak menyisakan kunci, record, atau kartu (FR-19).
+    static func provisionViaBackend(
+        api: APIClient,
+        deviceID: String,
+        siteID: String,
+        channel: ChannelKind,
+        keys: any CredentialKeyStore,
+        records: any CredentialRecordStore,
+        cards: any CardStore
+    ) async throws -> Card {
+        let (localID, publicKey) = try begin(keys: keys)
+        var movedTo: Data?
+        do {
+            let enrollmentID = try await api.createEnrollment(deviceID: deviceID, siteID: siteID, idempotencyKey: UUID())
+            let provisioned = try await api.submitCredentialKey(enrollmentID: enrollmentID, channel: channel, publicKey: publicKey, idempotencyKey: UUID())
+            try keys.moveKey(from: localID, to: provisioned.credentialID)
+            movedTo = provisioned.credentialID
+            return try await store(provisioned, keys: keys, records: records, cards: cards)
+        } catch {
+            try? keys.deleteKey(for: localID)
+            if let movedTo { try? keys.deleteKey(for: movedTo) }
+            throw error
+        }
+    }
+
+    private static func store(_ provisioned: ProvisionedCredential, keys: any CredentialKeyStore, records: any CredentialRecordStore, cards: any CardStore) async throws -> Card {
+        guard [.ble, .nfcHCE].contains(provisioned.channel),
               (try? keys.hasKey(for: provisioned.credentialID)) == true
         else { throw ANError.invalidData }
         let record = CredentialRecord(

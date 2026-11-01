@@ -11,6 +11,9 @@ public protocol CredentialKeyStore: Sendable {
     /// `false` bila kunci tidak ada; melempar error bila Keychain tidak bisa dibaca.
     func hasKey(for credentialID: Data) throws -> Bool
     func deleteKey(for credentialID: Data) throws
+    /// Memindahkan kunci ke `cred_id` yang ditetapkan server (blob terikat perangkat, kunci
+    /// privat tidak pernah diekspor).
+    func moveKey(from: Data, to: Data) throws
 }
 
 /// Pembuat kunci tanda tangan. Live: Secure Enclave; test/preview: perangkat lunak.
@@ -96,5 +99,11 @@ public struct DeviceKeyStore: CredentialKeyStore {
 
     public func deleteKey(for credentialID: Data) throws {
         try store.delete(Self.storageKey(for: credentialID))
+    }
+
+    public func moveKey(from: Data, to: Data) throws {
+        guard let blob = try store.get(Self.storageKey(for: from)) else { throw ANError.keyUnavailable }
+        try store.set(blob, for: Self.storageKey(for: to), accessibility: .whenPasscodeSetThisDeviceOnly)
+        try store.delete(Self.storageKey(for: from))
     }
 }
