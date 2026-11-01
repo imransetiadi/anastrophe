@@ -1,0 +1,51 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "label": "riwayat-tap-minor-completion",
+  "date": "2026-11-01",
+  "request": "Plan 2026-11-01-riwayat-tap-minor (Task 1-4: e6b0544..97e8216) + final-review fixes (Minor 1 re-graded Important; Minor 2-5)",
+  "runs": [
+    {
+      "note": "run tunggal; kutipan log uji sebagai butir evidence (pelajaran gate riwayat tap). Batas waktu hanya dimutasi pada entriTersimpanSebelumHasilDiteruskan, belum pada daftarTampilSebelumRiwayatSelesai.",
+      "action": "escalate",
+      "review": {
+        "safe_to_apply": 0.46,
+        "composite": 0.73,
+        "limiting": "test_gap"
+      },
+      "claims": [
+        [
+          "baris tak terbaca dilewati",
+          "verified",
+          0.5
+        ],
+        [
+          "sapu yatim dengan baca ulang; galat baca tidak menghapus; kartu baru tetap punya riwayat",
+          "verified",
+          0.68
+        ],
+        [
+          "isLoading turun sebelum riwayat diambil",
+          "verified",
+          0.19
+        ],
+        [
+          "cancel lewat wrapper; simpan sebelum teruskan",
+          "verified",
+          0.46
+        ],
+        [
+          "dua test bergerbang gagal setelah batas waktu",
+          "verified",
+          0.2
+        ],
+        [
+          "baris Test run host dan simulator",
+          "verified",
+          0.34
+        ]
+      ]
+    }
+  ],
+  "status": "Eskalasi ke pengguna; tidak diulang (ADR-0018). Semua klaim verified, 0 contradicted, 0 unsupported, tetapi confidence di bawah ambang auto-accept."
+}

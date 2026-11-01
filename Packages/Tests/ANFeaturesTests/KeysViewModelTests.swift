@@ -101,7 +101,8 @@ struct KeysViewModelTests {
         #expect(model.history(for: card).count == 25)
     }
 
-    @Test func daftarTampilSebelumRiwayatSelesai() async throws {
+    @Test(.timeLimit(.minutes(1)))
+    func daftarTampilSebelumRiwayatSelesai() async throws {
         // M2: daftar kartu tidak menunggu riwayat (NFR-P03); riwayat menyusul.
         let base = AppServices.inMemory()
         let card = Card(id: UUID(), name: "Lobi", siteName: "Menara A", zones: [], status: .active, credentials: [:], notAfter: nil)
@@ -130,6 +131,27 @@ struct KeysViewModelTests {
         await model.load()
         #expect(try await services.tapHistory.entries(for: orphan, since: .distantPast).isEmpty)
         #expect(try await services.tapHistory.entries(for: card.id, since: .distantPast).count == 1)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func kartuBaruSaatMuatTidakKehilanganRiwayat() async throws {
+        // Review minor 1: sapu yatim memakai daftar kartu terbaru, bukan cuplikan di awal load().
+        let base = AppServices.inMemory()
+        try await base.cards.add(Card(id: UUID(), name: "Lobi", siteName: "Menara A", zones: [], status: .active, credentials: [:], notAfter: nil))
+        let gate = AvailabilityGate()
+        let history = InMemoryTapHistoryStore()
+        let services = AppServices(cards: base.cards, keys: base.keys, records: base.records, availability: { await gate.pass() }, launcher: SpyLauncher(), foreground: ForegroundState(), authenticator: ImmediateAuthenticator(), tapHistory: history)
+        let model = KeysViewModel(services: services)
+        let loading = Task { await model.load() }
+        var reached = gate.reached.makeAsyncIterator()
+        _ = await reached.next()
+        // Kartu ditambahkan dan langsung dipakai selagi load() pertama tertahan.
+        let added = Card(id: UUID(), name: "Parkir", siteName: "Menara A", zones: [], status: .active, credentials: [:], notAfter: nil)
+        try await base.cards.add(added)
+        try await history.append(TapEntry(cardID: added.id, date: .now, channel: .ble, granted: true, denyReason: nil))
+        await gate.open()
+        await loading.value
+        #expect(try await history.entries(for: added.id, since: .distantPast).count == 1)
     }
 
     @Test func gagalMuatKartuTidakMenghapusRiwayat() async throws {
@@ -183,4 +205,30 @@ struct FailingCardStore: CardStore {
     func add(_ card: Card) async throws { throw ANError.internalError }
     func update(_ card: Card) async throws { throw ANError.internalError }
     func remove(id: UUID) async throws { throw ANError.internalError }
+}
+
+/// Menahan ketersediaan kanal sampai dibuka, untuk menguji jendela di tengah `load()`.
+actor AvailabilityGate {
+    let reached: AsyncStream<Void>
+    private let signal: AsyncStream<Void>.Continuation
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var isOpen = false
+
+    init() {
+        let (stream, continuation) = AsyncStream.makeStream(of: Void.self)
+        reached = stream
+        signal = continuation
+    }
+
+    func open() {
+        isOpen = true
+        waiters.forEach { $0.resume() }
+        waiters.removeAll()
+    }
+
+    func pass() async -> [ChannelKind: ChannelAvailability] {
+        signal.yield()
+        if !isOpen { await withCheckedContinuation { waiters.append($0) } }
+        return [:]
+    }
 }

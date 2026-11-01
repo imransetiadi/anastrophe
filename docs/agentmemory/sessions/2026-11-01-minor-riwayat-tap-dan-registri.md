@@ -2,7 +2,7 @@
 type: session
 project: anastrophe
 date: 2026-11-01
-status: berjalan
+status: selesai
 tags: [ios, riwayat-tap, registri, jev, github]
 ---
 # 2026-11-01 — Minor riwayat tap, fokus registri, push ke GitHub
@@ -19,7 +19,8 @@ Rencana: `docs/superpowers/plans/2026-11-01-riwayat-tap-minor.md`.
 - Badge status di AX5 ditumpuk di bawah label (`AnyLayout`). `LabeledContent` dicoba lebih dulu, tetapi merusak baris pada ukuran standar.
 - M8 tidak dikerjakan: ID dan EN berurutan sama.
 - Bukti: host 242 test, simulator 240 (masing-masing 1 dilewati); uji mutasi tertangkap untuk penjaga gagal-muat, urutan simpan, dan `cancel()`.
-- Review akhir masih berjalan.
+- Review akhir: siap merge, lima minor, semuanya dikerjakan. Minor 1 (pembersihan memakai cuplikan kartu basi) dinaikkan ke Important dan diperbaiki dengan membaca ulang daftar kartu tepat sebelum menghapus. Kontrak `CardStore.all()` ditulis. Test bergerbang diberi batas waktu (mutasi: gagal setelah 64 detik). Baris Status digabung untuk VoiceOver. Test hapus memakai kartu kedua yang nyata.
+- Suite akhir: host 244, simulator 242 (masing-masing 1 dilewati). `jev_gate` tereskalasi (composite 0,73) dengan semua klaim terverifikasi.
 
 ## Keputusan
 

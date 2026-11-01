@@ -12,10 +12,10 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 ## Status terkini
 
 - Branch kerja: `feat/r1-scaffold`, di-push ke GitHub private `imransetiadi/anastrophe` (origin) atas permintaan pengguna; belum di-merge.
-- Suite terakhir: Swift host 242 test (1 dilewati, tanpa gagal) dan simulator 240 test (1 dilewati). Backend Go 7 paket lulus pada iterasi hapus kartu; belum ada perubahan backend sejak itu.
+- Suite terakhir: Swift host 244 test (1 dilewati, tanpa gagal) dan simulator 242 test (1 dilewati). Backend Go 7 paket lulus pada iterasi hapus kartu; belum ada perubahan backend sejak itu.
 - Menunggu keputusan pengguna:
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
-  - Tinjauan 5 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap (`docs/adr/jev-log/*-gate.json`).
+  - Tinjauan 6 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap (`docs/adr/jev-log/*-gate.json`).
   - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
 
@@ -30,6 +30,21 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Audit | Rantai hash per gedung, append-only, pseudonim sejak ditulis, perintah `anastrophe-audit` | ADR-0024, ADR-0025 |
 | Hapus kartu | Bukti kepemilikan, kartu ditangguhkan, kartu tanpa kunci | ADR-0026, ADR-0027, ADR-0028, FR-31 |
 | Riwayat tap | Log lokal 30 hari: lima terbaru di detail, "Lihat semua" ke riwayat penuh, store pulih sendiri bila rusak | FR-30, ADR-0029, ADR-0030 |
+
+## IOS-2026-11-01-1902 - Minor riwayat tap selesai: review akhir dan perbaikannya (Selesai, commit lokal; gate tereskalasi)
+
+Review akhir oleh subagent baru atas `947ae3f..97e8216`: siap merge, tanpa Critical/Important, lima minor. Kelimanya dikerjakan:
+- **Minor 1, dinaikkan ke Important:** pembersihan entri yatim memakai cuplikan kartu yang basi, sehingga riwayat kartu yang baru ditambahkan selama `load()` bisa terhapus. Kini daftar kartu dibaca ulang tepat sebelum menghapus. Test `kartuBaruSaatMuatTidakKehilanganRiwayat`: RED lalu GREEN.
+- **Minor 2:** kontrak `CardStore.all()` (semua kartu atau gagal) dan `removeAll(except:)` ditulis di doc comment, dengan test penjaga `barisKartuTakTerbacaMembuatAllGagal`.
+- **Minor 3:** dua test bergerbang diberi batas waktu satu menit. Mutasi membuktikan test gagal setelah 64 detik, bukan menggantung.
+- **Minor 4:** baris Status digabung untuk VoiceOver. Baru diverifikasi lewat kode.
+- **Minor 5:** test hapus kartu memakai kartu kedua yang benar-benar ada di store.
+
+Suite: host 244 test (1 dilewati), simulator 242 (`TEST SUCCEEDED`). Dokumen: SDD 2.8 (§5.3 pembersihan riwayat) dan QA TC-MGT-01 beserta jumlah test.
+
+`jev_gate`: semua klaim terverifikasi (0 *contradicted*, 0 *unsupported*), tetapi tereskalasi (composite 0,73, safe_to_apply 0,46); masuk daftar tinjauan README sebagai gate keenam.
+
+Commit unit ini: `e6b0544`, `f899544`, `33e1103`, `97e8216`, dan commit ini. Obsidian: `sessions/2026-11-01-minor-riwayat-tap-dan-registri.md` dan MOC. Berikutnya: rencana implementasi registri kartu fisik (ADR-0031/0032).
 
 ## DOC-2026-11-01-1856 - ADR-0001 dikembalikan ke keputusan asli (Selesai)
 

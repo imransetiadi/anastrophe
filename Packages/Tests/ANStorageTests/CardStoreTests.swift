@@ -1,5 +1,6 @@
 import ANCore
 import Foundation
+import SwiftData
 import Testing
 @testable import ANStorage
 
@@ -20,6 +21,25 @@ func temporaryDirectory() -> URL {
 
 @Suite("Metadata kartu (SDD §5.3, FR-15, FR-38)")
 struct CardStoreTests {
+    @Test func barisKartuTakTerbacaMembuatAllGagal() async throws {
+        // Kontrak yang diandalkan sapu riwayat: all() gagal, bukan mengembalikan daftar sebagian.
+        let directory = temporaryDirectory()
+        let card = makeCard("Lobi")
+        do {
+            let store = try SwiftDataCardStore(directory: directory)
+            try await store.add(card)
+            try await store.add(makeCard("Parkir"))
+        }
+        do {
+            let configuration = ModelConfiguration(schema: Schema([CardEntity.self]), url: directory.appending(path: "cards.store"), cloudKitDatabase: .none)
+            let context = ModelContext(try ModelContainer(for: CardEntity.self, configurations: configuration))
+            try context.fetch(FetchDescriptor<CardEntity>()).first { $0.name == card.name }?.statusRaw = "status-masa-depan"
+            try context.save()
+        }
+        let reopened = try SwiftDataCardStore(directory: directory)
+        await #expect(throws: ANError.invalidData) { try await reopened.all() }
+    }
+
     @Test func kartuKesembilanDitolak() async throws {
         let store = try SwiftDataCardStore(directory: temporaryDirectory())
         for i in 1...8 { try await store.add(makeCard("Kartu \(i)")) }

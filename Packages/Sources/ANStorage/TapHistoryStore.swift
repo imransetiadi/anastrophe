@@ -10,7 +10,8 @@ public protocol TapHistoryStore: Sendable {
     func entries(for cardID: UUID, since: Date) async throws -> [TapEntry]
     func purge(before: Date) async throws
     func removeAll(for cardID: UUID) async throws
-    /// Menghapus entri kartu yang sudah tidak ada di perangkat (M1).
+    /// Menghapus entri kartu yang sudah tidak ada di perangkat (M1). Pemanggil wajib memberi daftar
+    /// kartu yang lengkap dan terbaru; himpunan kosong menghapus semua entri.
     func removeAll(except cardIDs: Set<UUID>) async throws
 }
 

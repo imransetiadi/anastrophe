@@ -42,7 +42,8 @@ struct RecordingLauncherTests {
         #expect(RecordingLauncher.entry(for: event, cardID: card.id, channel: .ble, at: moment) == nil)
     }
 
-    @Test func entriTersimpanSebelumHasilDiteruskan() async throws {
+    @Test(.timeLimit(.minutes(1)))
+    func entriTersimpanSebelumHasilDiteruskan() async throws {
         // M7: sheet memuat ulang riwayat saat ditutup, jadi entri harus sudah ada ketika hasil tiba.
         let history = GatedAppendHistory()
         let moment = moment, card = card

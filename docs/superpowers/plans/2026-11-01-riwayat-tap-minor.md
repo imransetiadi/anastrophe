@@ -56,4 +56,5 @@
 **Files:** Modify `Packages/Sources/ANFeatures/Keys/CardViews.swift`.
 
 - [ ] Ganti `HStack` + `alignmentGuide` dengan `LabeledContent { StatusBadge } label: { Text }`, yang menumpuk label dan nilai pada ukuran aksesibilitas seperti baris lain.
+  - *Catatan eksekusi:* `LabeledContent` merusak baris pada ukuran standar (baris tinggi, separator mengikuti badge), jadi diganti `AnyLayout` seperti `CardRow` (ruling Task 4 di ledger).
 - [ ] Verifikasi dengan screenshot demo AX5 (sebelumnya "Ac-tive") dan ukuran teks standar. Tidak ada infrastruktur snapshot, jadi tanpa unit test.
