@@ -13,6 +13,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -173,7 +174,11 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 		case err != nil:
 			return 0, nil, err
 		}
-		out, err := json.Marshal(map[string]string{"enrollment_id": result.ID, "status": result.Status})
+		out, err := json.Marshal(struct {
+			EnrollmentID string   `json:"enrollment_id"`
+			Status       string   `json:"status"`
+			Channels     []string `json:"channels"` // ADR-0049: kanal efektif gedung
+		}{result.ID, result.Status, h.effectiveChannels(result.Channels)})
 		if result.Resumed {
 			return http.StatusOK, out, err // ADR-0034: instance yang belum selesai dilanjutkan
 		}
@@ -185,6 +190,10 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 		result, err := inTx(ctx, tx)
 		if err == nil && provisioningHash != nil && (result.Status == "PROVISIONING" || result.Status == "PENDING_APPROVAL") {
 			err = tx.SetProvisioningKeyHash(ctx, result.ID, provisioningHash)
+		}
+		if err == nil {
+			// ADR-0049: dibaca di transaksi yang sama agar instance yang baru dibuat ikut terlihat.
+			result.Channels, err = tx.SiteChannelsOfInstance(ctx, result.ID)
 		}
 		return result, err
 	}
@@ -357,6 +366,11 @@ func (h *Handler) issue(ctx context.Context, tx *store.Tx, enrollmentID string, 
 	// bertanda tangan (ADR-0040).
 	if enrollment.Status != "PROVISIONING" {
 		return problemBody("ENR-NOT-PROVISIONABLE", http.StatusConflict)
+	}
+	// ADR-0049: kanal di luar kebijakan gedung ditolak seperti kanal yang dimatikan global, dan hanya
+	// sesudah rahasia diperiksa sehingga kebijakan tidak bocor sebelum autentikasi.
+	if !slices.Contains(h.effectiveChannels(enrollment.Channels), req.Channel) {
+		return problemBody("ENR-INVALID-CHANNEL", http.StatusBadRequest)
 	}
 	exists, err := tx.HasActiveCredential(ctx, enrollment.ID, req.Channel)
 	if err != nil {

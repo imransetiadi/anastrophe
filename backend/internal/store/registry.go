@@ -109,6 +109,8 @@ type CardEnrollment struct {
 	ID      string
 	Status  string
 	Resumed bool
+	// Channels: kanal kebijakan gedung (ADR-0049), diisi handler di transaksi enrolment; nil = semua.
+	Channels []string
 }
 
 // StartCardEnrollment memulai atau melanjutkan enrolment untuk kartu fisik yang cocok dengan

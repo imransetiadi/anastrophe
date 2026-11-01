@@ -44,7 +44,8 @@ func TestLookupKodeGedung(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatal(err)
 	}
-	if len(out) != 2 || out["site_id"] != f.siteID || out["name"] != "Menara Uji" {
+	// ADR-0049: lookup juga membawa kanal efektif gedung.
+	if len(out) != 3 || out["site_id"] != f.siteID || out["name"] != "Menara Uji" || out["channels"] == nil {
 		t.Fatalf("body = %v", out)
 	}
 }
