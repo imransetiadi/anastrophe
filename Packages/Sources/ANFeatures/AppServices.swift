@@ -21,6 +21,16 @@ public final class ForegroundState: @unchecked Sendable {
     }
 }
 
+/// Naik setiap kali data kartu berubah di luar layar Kunci (mis. perpanjangan sesudah tap),
+/// agar daftar dimuat ulang.
+@MainActor
+@Observable
+public final class CardsRevision {
+    public private(set) var value = 0
+    public init() {}
+    func bump() { value += 1 }
+}
+
 /// Memulai dan membatalkan presentasi untuk kartu yang dipilih pengguna.
 @MainActor
 protocol PresentationLaunching: AnyObject {
@@ -38,6 +48,7 @@ public final class AppServices {
     let availability: @MainActor () async -> [ChannelKind: ChannelAvailability]
     let launcher: any PresentationLaunching
     public let foreground: ForegroundState
+    public let cardsRevision: CardsRevision
     /// Store kartu tidak bisa dibuka; UI memberi tahu alih-alih menampilkan daftar kosong.
     public let storageFailed: Bool
     #if DEBUG
@@ -56,6 +67,7 @@ public final class AppServices {
         availability: @escaping @MainActor () async -> [ChannelKind: ChannelAvailability],
         launcher: any PresentationLaunching,
         foreground: ForegroundState,
+        cardsRevision: CardsRevision = CardsRevision(),
         storageFailed: Bool = false
     ) {
         self.cards = cards
@@ -64,6 +76,7 @@ public final class AppServices {
         self.availability = availability
         self.launcher = launcher
         self.foreground = foreground
+        self.cardsRevision = cardsRevision
         self.storageFailed = storageFailed
     }
 
@@ -106,14 +119,16 @@ public final class AppServices {
         let foreground = ForegroundState()
         let config = localConfig(nfcEmulationEntitled: nfcEmulationEntitled)
         let cards = try SwiftDataCardStore(directory: URL.applicationSupportDirectory.appending(path: "Anastrophe/Cards"))
-        let launcher = LivePresentationLauncher(keys: keys, records: records, cards: cards, counters: KeychainCounterStore(store: secrets), foreground: foreground, config: config, nfcEmulationEntitled: nfcEmulationEntitled)
+        let revision = CardsRevision()
+        let launcher = LivePresentationLauncher(keys: keys, records: records, cards: cards, counters: KeychainCounterStore(store: secrets), foreground: foreground, config: config, nfcEmulationEntitled: nfcEmulationEntitled, onCardsChanged: { revision.bump() })
         return AppServices(
             cards: cards,
             keys: keys,
             records: records,
             availability: { await liveAvailability(config: config, nfcEmulationEntitled: nfcEmulationEntitled, bluetoothPoweredOn: launcher.bluetoothPoweredOn) },
             launcher: launcher,
-            foreground: foreground
+            foreground: foreground,
+            cardsRevision: revision
         )
     }
 
@@ -219,8 +234,9 @@ private final class LivePresentationLauncher: PresentationLaunching {
     private var hce: HCEPresentmentCoordinator?
     #endif
 
-    init(keys: any CredentialKeyStore, records: any CredentialRecordStore, cards: any CardStore, counters: any CounterStore, foreground: ForegroundState, config: RemoteConfig, nfcEmulationEntitled: Bool) {
-        let scheduler = RenewalScheduler(renewer: CredentialRenewer(keys: keys, records: records, cards: cards), clock: ContinuousClock())
+    init(keys: any CredentialKeyStore, records: any CredentialRecordStore, cards: any CardStore, counters: any CounterStore, foreground: ForegroundState, config: RemoteConfig, nfcEmulationEntitled: Bool, onCardsChanged: @escaping @MainActor () -> Void) {
+        let scheduler = RenewalScheduler(renewer: CredentialRenewer(keys: keys, records: records, cards: cards), clock: ContinuousClock(),
+                                         isForeground: { foreground.isActive }, onRenewed: onCardsChanged)
         self.scheduler = scheduler
         self.foreground = foreground
         self.config = config
@@ -260,6 +276,7 @@ private final class LivePresentationLauncher: PresentationLaunching {
     }
 
     func cancel() async {
+        scheduler.cancelPending()
         await ble?.cancel()
         #if os(iOS)
         await hce?.cancel()

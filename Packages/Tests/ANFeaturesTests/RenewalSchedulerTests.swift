@@ -43,9 +43,11 @@ struct RenewalSchedulerTests {
         return (card, cards, record)
     }
 
-    func scheduler(cards: SwiftDataCardStore, transport: any HTTPTransport, clock: ManualClock = ManualClock(), daysAfterIssue: Double) -> RenewalScheduler<ManualClock> {
+    func scheduler(cards: SwiftDataCardStore, transport: any HTTPTransport, clock: ManualClock = ManualClock(), daysAfterIssue: Double,
+                   foreground: LockedBox<Bool> = LockedBox(true), onRenewed: @escaping @MainActor () -> Void = {}) -> RenewalScheduler<ManualClock> {
         let now = issued.addingTimeInterval(daysAfterIssue * 86_400)
-        return RenewalScheduler(renewer: CredentialRenewer(keys: keys, records: records, cards: cards, transport: transport), clock: clock, now: { now })
+        return RenewalScheduler(renewer: CredentialRenewer(keys: keys, records: records, cards: cards, transport: transport), clock: clock, now: { now },
+                                isForeground: { foreground.value }, onRenewed: onRenewed)
     }
 
     @Test func kedaluwarsaDiperpanjangSebelumPresentasi() async throws {
@@ -93,5 +95,67 @@ struct RenewalSchedulerTests {
         await scheduler.beforePresentation(card: card, channel: .ble, context: context)
         await scheduler.afterPresentation()
         #expect(transport.paths.isEmpty)
+    }
+
+    @Test func hampirHabisTidakDiperpanjangDiBackground() async throws {
+        // Review I2: aliran tap berakhir karena app ke background → tidak ada tanda tangan.
+        let (card, cards, record) = try await setUp()
+        let foreground = LockedBox(true)
+        let transport = SequenceTransport(renewReplies)
+        let scheduler = scheduler(cards: cards, transport: transport, daysAfterIssue: 4, foreground: foreground)
+        await scheduler.beforePresentation(card: card, channel: .ble, context: context)
+        foreground.withLock { $0 = false }
+        await scheduler.afterPresentation()
+        #expect(transport.paths.isEmpty)
+        #expect(try records.record(for: credentialID) == record)
+    }
+
+    @Test func tidakMenandatanganiBilaKeBackgroundSetelahChallenge() async throws {
+        // Review I2/M2: cek foreground tepat sebelum tanda tangan, bukan hanya di awal.
+        let (card, cards, _) = try await setUp()
+        let foreground = LockedBox(true)
+        let transport = FlippingTransport(replies: renewReplies, flip: foreground)
+        let scheduler = scheduler(cards: cards, transport: transport, daysAfterIssue: 4, foreground: foreground)
+        await scheduler.beforePresentation(card: card, channel: .ble, context: context)
+        await scheduler.afterPresentation()
+        #expect(transport.paths.value == ["/v1/credentials/\(credentialID.hexString):challenge"])
+    }
+
+    @Test func cancelPendingMembuangPekerjaan() async throws {
+        let (card, cards, _) = try await setUp()
+        let transport = SequenceTransport(renewReplies)
+        let scheduler = scheduler(cards: cards, transport: transport, daysAfterIssue: 4)
+        await scheduler.beforePresentation(card: card, channel: .ble, context: context)
+        scheduler.cancelPending()
+        await scheduler.afterPresentation()
+        #expect(transport.paths.isEmpty)
+    }
+
+    @Test func perpanjanganBerhasilMemberiSinyal() async throws {
+        // Review I1: UI memuat ulang daftar kartu setelah perpanjangan sukses.
+        let (card, cards, _) = try await setUp()
+        let signals = LockedBox(0)
+        let scheduler = scheduler(cards: cards, transport: SequenceTransport(renewReplies), daysAfterIssue: 8, onRenewed: { signals.withLock { $0 += 1 } })
+        await scheduler.beforePresentation(card: card, channel: .ble, context: context)
+        #expect(signals.value == 1)
+    }
+}
+
+/// Menjawab berurutan, dan mematikan status foreground saat challenge dilayani.
+final class FlippingTransport: HTTPTransport, @unchecked Sendable {
+    private let replies: LockedBox<[(status: Int, body: String, contentType: String)]>
+    let paths = LockedBox<[String]>([])
+    private let flip: LockedBox<Bool>
+
+    init(replies: [(status: Int, body: String, contentType: String)], flip: LockedBox<Bool>) {
+        self.replies = LockedBox(replies)
+        self.flip = flip
+    }
+
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        paths.withLock { $0.append(request.url?.path(percentEncoded: false) ?? "") }
+        flip.withLock { $0 = false }
+        guard let reply = replies.withLock({ $0.isEmpty ? nil : $0.removeFirst() }) else { throw URLError(.cannotConnectToHost) }
+        return (Data(reply.body.utf8), HTTPURLResponse(url: request.url!, statusCode: reply.status, httpVersion: nil, headerFields: ["Content-Type": reply.contentType])!)
     }
 }

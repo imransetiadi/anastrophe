@@ -288,3 +288,18 @@ func TestNonceKedaluwarsaDibersihkan(t *testing.T) {
 		t.Fatalf("purge = %d, %v; harus 1", n, err)
 	}
 }
+
+func TestKanalDimatikanTidakDiperpanjang(t *testing.T) {
+	// Review perpanjangan I3: kill switch kanal (FR-04) juga menghentikan perpanjangan.
+	f := provisionedForRenewal(t)
+	nonce := f.challenge(t, f.credID)
+	f.handlerConfig(t, []string{"nfcHCE"})
+	rec := f.renew(t, f.credID, nonce, renewalSignature(t, f.key, f.credID, nonce), "renew-killed")
+	if rec.Code != http.StatusConflict || problemType(t, rec) != "CRED-NOT-RENEWABLE" {
+		t.Fatalf("renew kanal mati: %d %s", rec.Code, rec.Body)
+	}
+	rec = f.do(t, http.MethodPost, "/v1/credentials/"+hex.EncodeToString(f.credID)+":challenge", "", map[string]string{})
+	if rec.Code != http.StatusConflict || problemType(t, rec) != "CRED-NOT-RENEWABLE" {
+		t.Fatalf("challenge kanal mati: %d %s", rec.Code, rec.Body)
+	}
+}

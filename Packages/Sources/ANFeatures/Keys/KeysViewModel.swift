@@ -22,7 +22,7 @@ public final class KeysViewModel {
 
     public func load() async {
         let stored = (try? await services.cards.all()) ?? []
-        let reconciled = RestoreCheck.reconcile(stored, keys: services.keys)
+        let reconciled = RestoreCheck.reconcile(stored, keys: services.keys).map(expiryFromRecord)
         for (old, new) in zip(stored, reconciled) where old != new {
             try? await services.cards.update(new)
         }
@@ -32,6 +32,17 @@ public final class KeysViewModel {
         }.map(\.id))
         availability = await services.availability()
         isLoading = false
+    }
+
+    /// Record kredensial adalah sumber kebenaran masa berlaku (perpanjangan memperbarui record
+    /// lebih dulu); kartu di daftar disesuaikan bila berbeda.
+    private func expiryFromRecord(_ card: Card) -> Card {
+        guard let record = card.credentials.values.lazy.compactMap({ try? self.services.records.record(for: $0) }).first,
+              record.notAfter != card.notAfter
+        else { return card }
+        var updated = card
+        updated.notAfter = record.notAfter
+        return updated
     }
 
     /// Memuat ulang ketersediaan kanal (mis. setelah Bluetooth dinyalakan atau izin diberikan).

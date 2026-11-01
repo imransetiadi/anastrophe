@@ -60,7 +60,7 @@ func (h *Handler) renewalChallenge(w http.ResponseWriter, r *http.Request, credI
 		return
 	}
 	expiresAt := h.Now().UTC().Add(RenewalChallengeTTL).Truncate(time.Second)
-	switch err := h.Store.CreateRenewalChallenge(r.Context(), credID, nonce, expiresAt); {
+	switch err := h.Store.CreateRenewalChallenge(r.Context(), credID, nonce, expiresAt, h.channelEnabled); {
 	case errors.Is(err, store.ErrNotFound):
 		httpapi.WriteProblem(w, problem("CRED-NOT-FOUND", http.StatusNotFound))
 	case errors.Is(err, store.ErrNotRenewable):
@@ -122,7 +122,8 @@ func (h *Handler) renew(ctx context.Context, tx *store.Tx, credID, nonce, sig []
 	if err != nil {
 		return 0, nil, err
 	}
-	if !cred.Renewable() {
+	// Kill switch kanal (FR-04) juga menghentikan perpanjangan, bukan hanya penerbitan baru.
+	if !cred.Renewable() || !h.channelEnabled(cred.Channel) {
 		return problemBody("CRED-NOT-RENEWABLE", http.StatusConflict)
 	}
 	now := h.Now().UTC().Truncate(time.Second)

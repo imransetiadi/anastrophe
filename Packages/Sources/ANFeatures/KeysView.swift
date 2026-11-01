@@ -70,13 +70,16 @@ public struct KeysView: View {
             #endif
             openDemoScreen()
         }
+        .onChange(of: services.cardsRevision.value) { _, _ in
+            Task { await model.load() }
+        }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await model.refreshAvailability() } }
+            if phase == .active { Task { await model.load() } }
         }
         .sheet(item: $presentation.request, onDismiss: {
             Task {
                 await presentation.sheetDismissed()
-                await model.refreshAvailability()  // mis. Bluetooth baru dinyalakan
+                await model.load()  // mis. Bluetooth baru dinyalakan, atau sertifikat baru diperpanjang
             }
         }) { request in
             PresentationSheet(request: request, onCancel: cancel, onRetry: { use(request.card) })

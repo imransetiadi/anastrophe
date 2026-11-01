@@ -13,12 +13,23 @@ final class RenewalScheduler<C: Clock> where C.Duration == Duration {
     private let renewer: CredentialRenewer
     private let clock: C
     private let now: @Sendable () -> Date
+    private let isForeground: @Sendable () -> Bool
+    private let onRenewed: @MainActor () -> Void
     private var pending: (card: Card, channel: ChannelKind, context: AuthorizedContext)?
 
-    init(renewer: CredentialRenewer, clock: C, now: @escaping @Sendable () -> Date = { .now }) {
+    init(renewer: CredentialRenewer, clock: C, now: @escaping @Sendable () -> Date = { .now },
+         isForeground: @escaping @Sendable () -> Bool = { true }, onRenewed: @escaping @MainActor () -> Void = {}) {
         self.renewer = renewer
         self.clock = clock
         self.now = now
+        self.isForeground = isForeground
+        self.onRenewed = onRenewed
+    }
+
+    /// Dipanggil saat presentasi dibatalkan (mis. app ke background): pekerjaan tertunda dibuang.
+    func cancelPending() {
+        pending?.context.laContext.invalidate()
+        pending = nil
     }
 
     /// Dipanggil coordinator setelah autentikasi tap, sebelum sesi presentasi dibuat.
@@ -42,16 +53,21 @@ final class RenewalScheduler<C: Clock> where C.Duration == Duration {
     func afterPresentation() async {
         guard let job = pending else { return }
         pending = nil
-        _ = try? await renewer.renew(card: job.card, channel: job.channel, context: job.context)
+        defer { job.context.laContext.invalidate() }
+        // Aliran tap juga berakhir saat app ke background; jangan menandatangani di sana.
+        guard isForeground() else { return }
+        await renewBounded(card: job.card, channel: job.channel, context: job.context)
     }
 
     /// Bila gagal atau lewat batas waktu, tap tetap dilanjutkan dan gagal tertutup
     /// (`.denied(.expired)`).
     private func renewBounded(card: Card, channel: ChannelKind, context: AuthorizedContext) async {
         let (signal, continuation) = AsyncStream.makeStream(of: Void.self)
-        let renewer = renewer, clock = clock
+        let renewer = renewer, clock = clock, isForeground = isForeground, onRenewed = onRenewed
         let renewal = Task {
-            _ = try? await renewer.renew(card: card, channel: channel, context: context)
+            if (try? await renewer.renew(card: card, channel: channel, context: context, shouldSign: { isForeground() && !Task.isCancelled })) != nil {
+                await onRenewed()
+            }
             continuation.yield()
         }
         let timer = Task {

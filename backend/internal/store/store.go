@@ -333,20 +333,21 @@ func (c RenewableCredential) Renewable() bool {
 	return c.Status == "ACTIVE" && c.CardStatus == "ACTIVE"
 }
 
-// CreateRenewalChallenge menyimpan nonce untuk kredensial yang masih bisa diperpanjang.
-func (s *Store) CreateRenewalChallenge(ctx context.Context, credID, nonce []byte, expiresAt time.Time) error {
-	var id, status, cardStatus string
+// CreateRenewalChallenge menyimpan nonce untuk kredensial yang masih bisa diperpanjang dan
+// kanalnya masih diizinkan kill switch (FR-04).
+func (s *Store) CreateRenewalChallenge(ctx context.Context, credID, nonce []byte, expiresAt time.Time, channelAllowed func(string) bool) error {
+	var id, channel, status, cardStatus string
 	err := s.pool.QueryRow(ctx, `
-		SELECT c.id, c.status, ci.status
+		SELECT c.id, c.channel, c.status, ci.status
 		FROM credentials c JOIN card_instances ci ON ci.id = c.card_instance_id
-		WHERE c.cred_id = $1`, credID).Scan(&id, &status, &cardStatus)
+		WHERE c.cred_id = $1`, credID).Scan(&id, &channel, &status, &cardStatus)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNotFound
 	}
 	if err != nil {
 		return err
 	}
-	if !(RenewableCredential{Status: status, CardStatus: cardStatus}).Renewable() {
+	if !(RenewableCredential{Status: status, CardStatus: cardStatus}).Renewable() || !channelAllowed(channel) {
 		return ErrNotRenewable
 	}
 	_, err = s.pool.Exec(ctx, `INSERT INTO renewal_challenges (nonce, credential_id, expires_at) VALUES ($1, $2, $3)`, nonce, id, expiresAt)

@@ -35,4 +35,19 @@ struct KeysViewModelTests {
         await model.load()
         #expect(model.presentability(of: card) == .unavailable(.expired))
     }
+
+    @Test func masaBerlakuKartuMengikutiRecord() async throws {
+        // Review I1: record adalah sumber kebenaran masa berlaku; kartu di daftar disesuaikan.
+        let services = AppServices.inMemory()
+        let renewedUntil = Date(timeIntervalSince1970: 1_794_787_200)
+        _ = try services.keys.createKey(for: credentialID)
+        try services.records.save(CredentialRecord(credentialID: credentialID, certificate: Data(repeating: 0xAA, count: 188), notAfter: renewedUntil, groupKeys: [:], renewalURL: URL(string: "http://127.0.0.1:8080")))
+        let card = Card(id: UUID(), name: "Gedung Lab", siteName: "Gedung Lab", zones: [], status: .active, credentials: [.ble: credentialID], notAfter: expiredAt)
+        try await services.cards.add(card)
+        let model = KeysViewModel(services: services)
+        await model.load()
+        #expect(model.cards.first?.notAfter == renewedUntil)
+        #expect(try await services.cards.all().first?.notAfter == renewedUntil)
+    }
 }
+

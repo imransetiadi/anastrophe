@@ -38,13 +38,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This card's certificate has expired. Open the app while online to renew it."
+            "value": "This card's certificate has expired and can't renew automatically. Add the card again."
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sertifikat kartu ini sudah kedaluwarsa. Buka app saat online agar diperbarui."
+            "value": "Sertifikat kartu ini kedaluwarsa dan tidak bisa diperbarui otomatis. Tambahkan ulang kartu."
           }
         }
       }
@@ -966,13 +966,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Your card has expired. Open the app while online to renew it."
+            "value": "Your card has expired and couldn't be renewed. Connect your iPhone to the internet, then use the card again."
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kartu sudah kedaluwarsa. Buka app saat online agar diperbarui."
+            "value": "Kartu kedaluwarsa dan belum bisa diperbarui. Sambungkan iPhone ke internet, lalu gunakan kartu lagi."
           }
         }
       }

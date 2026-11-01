@@ -632,7 +632,7 @@ sequenceDiagram
 
 1. App meminta nonce lewat `POST /v1/credentials/{cred}:challenge`. Nonce 32 B, berlaku 120 dtk, sekali pakai, dan terikat ke satu kredensial.
 2. App mengirim `POST /v1/credentials/{cred}:renew` (`Idempotency-Key` wajib) berisi nonce, tanda tangan kunci kredensial (ECDSA P-256, raw r‖s) atas `"ANP1-RENEW"` ‖ `cred_id` ‖ `nonce` sebagai bukti kepemilikan, dan App Attest assertion. Prefix memisahkan domain pesan dari transcript ANP/1.
-3. Dalam satu transaksi, server memeriksa berurutan: kredensial ada (404 `CRED-NOT-FOUND`); kredensial dan card instance ACTIVE (409 `CRED-NOT-RENEWABLE`, termasuk SUSPENDED/REVOKED); nonce valid (400 `CRED-CHALLENGE-INVALID`); tanda tangan valid (400 `CRED-PROOF-INVALID`).
+3. Dalam satu transaksi, server memeriksa berurutan: kredensial ada (404 `CRED-NOT-FOUND`); kredensial dan card instance ACTIVE serta kanalnya masih diizinkan kill switch FR-04 (409 `CRED-NOT-RENEWABLE`, termasuk SUSPENDED/REVOKED; berlaku juga untuk `:challenge`); nonce valid (400 `CRED-CHALLENGE-INVALID`); tanda tangan valid (400 `CRED-PROOF-INVALID`).
 4. Server menerbitkan sertifikat baru untuk kunci, `cred_id`, dan kanal yang sama, dengan zona dan masa berlaku dari kebijakan gedung saat ini. Nonce ditandai terpakai hanya bila perpanjangan sukses. Respons memakai kontrak provisioning (termasuk `not_before`).
 
 Kapan app memicu alur ini diatur ADR-0023 (§5.5). App Attest belum diimplementasikan karena butuh tim pengembang Apple dan perangkat fisik.
@@ -799,7 +799,7 @@ Tidak ada GPS, tidak ada tracking lintas app (ATT tidak dipakai). Privacy Manife
 | `PRS-TIMEOUT` | 60 dtk tanpa reader | "Waktu habis. Coba lagi." | Retry |
 | `PRS-DENIED-ZONE` | Zona tidak diizinkan | "Kartu ini tidak berlaku di pintu ini." | — |
 | `PRS-SUSPENDED` | Kredensial ditangguhkan | "Kartu sedang ditangguhkan." | Hubungi pengelola |
-| `CRED-EXPIRED` | Sertifikat kedaluwarsa | "Sambungkan ke internet untuk memperbarui kartu." | Perpanjang otomatis saat online |
+| `CRED-EXPIRED` | Sertifikat kedaluwarsa | "Sambungkan iPhone ke internet, lalu gunakan kartu lagi." | Diperpanjang saat kartu dipakai berikutnya dengan koneksi internet (ADR-0023) |
 | `CRED-NOT-FOUND` | `cred_id` tidak dikenal saat perpanjangan | "Kartu tidak ditemukan. Tambahkan ulang kartu." | Enrolment ulang |
 | `CRED-NOT-RENEWABLE` | Kredensial atau kartu ditangguhkan/dicabut | "Kartu sedang ditangguhkan. Hubungi pengelola gedung." | Hubungi admin |
 | `CRED-CHALLENGE-INVALID` | Nonce tidak dikenal, terpakai, kedaluwarsa, atau milik kredensial lain | — (diulang otomatis pada tap berikutnya) | Minta nonce baru |
