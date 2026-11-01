@@ -21,4 +21,7 @@ public enum EnrollmentRejection: String, Equatable, Sendable {
     case notRegistered, siteUnsupported, duplicate, pendingApproval, invitationInvalid
     /// Kode gedung tak dikenal atau tidak berbentuk sah (`SITE-NOT-FOUND`, ADR-0044).
     case siteCodeUnknown
+    /// Kartu sudah punya batas permintaan perangkat tambahan yang menunggu operator (`ENR-PENDING-LIMIT`,
+    /// ADR-0047).
+    case pendingLimit
 }

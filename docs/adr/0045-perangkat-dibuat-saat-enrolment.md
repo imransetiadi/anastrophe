@@ -30,7 +30,9 @@ Enrolment berjalan dalam satu transaksi, dan `Store.Idempotent` tidak meng-commi
 
 ## Konsekuensi
 
-- Tidak ada endpoint baru. Jumlah baris perangkat dibatasi jumlah kartu terdaftar dan undangan yang sah.
+- Tidak ada endpoint baru. Enrolment yang ditolak tidak meninggalkan baris perangkat.
+- **Koreksi (review akhir, 2026-11-02):** jumlah baris perangkat **tidak** dibatasi jumlah kartu terdaftar. Satu identitas kartu dengan `device_id` acak bisa terus membuat permintaan `PENDING_APPROVAL`; mitigasinya ada di ADR-0047 (batas 4 per kartu).
+- **Celah tebakan identitas kartu:** bersama kode gedung (ADR-0044), enrolment menjadi oracle tebakan identitas kartu tanpa autentikasi. Celah ini dicatat sebagai gerbang pra-pilot di ADR-0046.
 - App Attest (NFR-S03) nanti ditempel ke enrolment pertama yang membuat perangkat; keputusan ini tidak menutup jalan itu.
 - ADR-0041 tidak berubah: `device_id` tetap acak dan tidak pernah ditampilkan atau di-log.
 - **Status Provisional:** ditinjau di M2 bersama App Attest. Bila attestation per perangkat menuntut registrasi terpisah, `endpoint_registrasi` dipertimbangkan ulang dengan bukti baru.

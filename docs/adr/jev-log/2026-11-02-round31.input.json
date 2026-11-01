@@ -1,0 +1,21 @@
+{
+  "tool": "jev_decide",
+  "decision": "Mitigasi apa yang diterapkan sekarang untuk temuan review akhir #1: POST /v1/enrollments menjadi oracle tebak identitas kartu tanpa autentikasi setelah ADR-0044 dan ADR-0045?",
+  "candidates": [
+    "catat_gerbang_pra_pilot",
+    "deteksi_per_gedung",
+    "batas_per_ip",
+    "batas_per_gedung"
+  ],
+  "requirements": [
+    "Tidak memungkinkan penyerang memblokir enrolment sah penghuni (tanpa DoS lintas penghuni).",
+    "Ancaman tercatat dan menjadi gerbang eksplisit sebelum pilot.",
+    "Bisa diverifikasi dengan test otomatis sekarang tanpa konfigurasi infrastruktur yang belum ada."
+  ],
+  "escalate_on_contradiction": true,
+  "evidence_summary": [
+    "NUID 4 byte → ruang 2^32; ±2^32/R tebakan per kartu terdaftar; tebakan benar pada kartu yang belum didaftarkan → PROVISIONING.",
+    "ENR-NOT-REGISTERED vs 201/200 membedakan; percobaan ditolak tanpa jejak; belum ada pembatas laju.",
+    "App Attest belum ada; backend belum di-deploy; pilot belum mulai; proxy dan IP klien belum dikonfigurasi."
+  ]
+}

@@ -43,9 +43,11 @@ public final class NFCTagCardOwnershipReader: NSObject, CardOwnershipReader, @un
         }
     }
 
-    /// Menyelesaikan pembacaan sekali; panggilan berikutnya (mis. invalidasi setelah sukses) diabaikan.
-    private func finish(_ result: Result<CardIdentity, any Error>) {
-        let continuation = lock.withLock {
+    /// Menyelesaikan pembacaan milik `session` sekali. Panggilan berikutnya (mis. invalidasi setelah sukses)
+    /// dan callback dari sesi lama diabaikan, sehingga tidak menyelesaikan pembacaan yang lebih baru.
+    private func finish(_ result: Result<CardIdentity, any Error>, session: NFCTagReaderSession) {
+        let continuation = lock.withLock { () -> CheckedContinuation<CardIdentity, any Error>? in
+            guard self.session === session else { return nil }
             defer {
                 self.continuation = nil
                 self.session = nil
@@ -71,9 +73,9 @@ extension NFCTagCardOwnershipReader: NFCTagReaderSessionDelegate {
 
     public func tagReaderSession(_ session: NFCTagReaderSession, didInvalidateWithError error: any Error) {
         if (error as? NFCReaderError)?.code == .readerSessionInvalidationErrorUserCanceled {
-            finish(.failure(CancellationError()))
+            finish(.failure(CancellationError()), session: session)
         } else {
-            finish(.failure(ANError.cardUnreadable))  // batas waktu sistem dan galat sesi lain
+            finish(.failure(ANError.cardUnreadable), session: session)  // batas waktu sistem dan galat sesi lain
         }
     }
 
@@ -84,15 +86,16 @@ extension NFCTagCardOwnershipReader: NFCTagReaderSessionDelegate {
             return
         }
         nonisolated(unsafe) let session = session
-        let detected = Self.detected(tag)  // Sendable; NFCTag tidak
-        session.connect(to: tag) { [weak self] error in
+        nonisolated(unsafe) let connected = tag
+        session.connect(to: connected) { [weak self] error in
             guard let self else { return }
-            guard error == nil, let identity = CardIdentityMapper.identity(for: detected) else {
-                finish(.failure(ANError.cardUnreadable))
+            // Identifier dibaca setelah connect berhasil; sebelum connect nilainya bisa kosong (review akhir #3).
+            guard error == nil, let identity = CardIdentityMapper.identity(for: Self.detected(connected)) else {
+                finish(.failure(ANError.cardUnreadable), session: session)
                 session.invalidate()
                 return
             }
-            finish(.success(identity))
+            finish(.success(identity), session: session)
             session.invalidate()
         }
     }

@@ -150,6 +150,7 @@ Format ID: `TC-<AREA>-<NN>`. **Prio:** P0/P1/P2. **Tipe:** U unit · I integrasi
 | TC-ENR-21 | Perangkat baru dibuat saat enrolment | `device_id` baru: enrolment kartu terdaftar atau undangan sah; lalu enrolment ditolak (kartu tak terdaftar, gedung tak dikenal, undangan tidak sah), dengan dan tanpa Idempotency-Key | Enrolment sah membuat tepat satu baris perangkat; enrolment ditolak tidak meninggalkan baris (ADR-0045) | FR-10, FR-11, FR-12 | P0 | I | N, B |
 | TC-ENR-22 | Alur Tambah Kartu di build Release | Tambah Kartu Akses → kode gedung → tempel kartu; jalur tautan undangan; kartu tak terdaftar/tak terbaca; perangkat tanpa pembaca kartu; ketuk ganda | Kartu aktif dengan kanal terbaik (N-HCE > B) dari `/v1/config`; pesan alasan spesifik + tawaran undangan; satu enrolment per ketukan ganda; identitas kartu tidak tertinggal di app | FR-05, FR-10, FR-11, FR-12, FR-13 | P0 | U | N, B |
 | TC-ENR-23 | Instal ulang membuat id perangkat baru | Hapus penanda instalasi (instal ulang), lalu luncurkan app dua kali | Peluncuran pertama membuat `device_id` baru; peluncuran berikutnya memakai id yang sama; id tidak ikut backup | FR-40, FR-43 | P0 | U | N, B |
+| TC-ENR-24 | Batas permintaan menunggu per kartu | Kartu terdaftar dengan pemegang pertama; 5 perangkat baru meminta kartu yang sama; perangkat yang menunggu mengulang | 4 permintaan `PENDING_APPROVAL`; permintaan ke-5 → 409 `ENR-PENDING-LIMIT` tanpa baris perangkat; perangkat yang menunggu tetap bisa melanjutkan (ADR-0047) | FR-17, FR-36 | P0 | I | N, B |
 
 ### 5.4 Presentasi NFC in-app (PRSN)
 
@@ -308,6 +309,7 @@ Format ID: `TC-<AREA>-<NN>`. **Prio:** P0/P1/P2. **Tipe:** U unit · I integrasi
 | TC-SEC-12 | Pentest eksternal | Tidak ada temuan high/critical terbuka saat pilot/GA | NFR-S09 | P0 | S |
 | TC-SEC-13 | Rotasi Site CA | CA baru → perpanjangan menerbitkan sertifikat dari CA baru; transisi tanpa lockout | NFR-S08 | P1 | S |
 | TC-SEC-14 | Pembaruan sertifikat layanan | Alert ≥ 30 hari sebelum kedaluwarsa; perpanjangan otomatis | NFR-S08 | P1 | I |
+| TC-SEC-15 | Enumerasi identitas kartu lewat enrolment | Kirim enrolment beruntun dengan identitas kartu acak untuk satu `site_id`, dengan dan tanpa attestation | Ditolak/terdeteksi sesuai gerbang ADR-0046 (App Attest + pembatas/deteksi kegagalan); tidak ada identitas di log. **Pending:** kontrol belum diputuskan pengguna | NFR-S03, NFR-S09 | P0 | S | N, B |
 
 ### 5.13 Privasi (PRIV)
 
@@ -554,6 +556,7 @@ Lingkungan: branch `feat/r1-scaffold`, Xcode 27.2 (27B52), host macOS dan iOS Si
 | TC-ENR-21 | Lulus di backend; lab simulator lulus (ADR-0045): enrolment kartu dan undangan dari `device_id` baru membuat satu baris perangkat; kartu tak terdaftar, gedung tak dikenal, dan undangan tidak sah, dengan dan tanpa Idempotency-Key, tidak meninggalkan baris; lab: perangkat 1→2 (kartu), tetap 2 (kartu tak terdaftar), 3 (undangan setelah instal ulang) | `TestEnrolmentKartuMembuatPerangkatBaru`, `TestEnrolmentUndanganMembuatPerangkatBaru`, `TestEnrolmentDitolakTanpaBarisPerangkat`, `TestEnrolmentPerangkatBaruBersamaan` |
 | TC-ENR-22 | Lulus di app (U) dan lab simulator dengan pembaca palsu: kartu aktif lewat kode gedung dan lewat tautan undangan; kanal N-HCE > B dari `/v1/config`; kartu tak terdaftar/tak terbaca dan perangkat tanpa pembaca → pesan + tawaran undangan; ketuk ganda → satu enrolment (mutasi tanpa guard tertangkap); identitas kartu tidak tertinggal; pembacaan kartu live butuh iPhone + kartu (uji H, belum dijalankan) | `AddCardModelTests` (17), `CardProvisionerTests` (7), `CardIdentityMapperTests` (7); screenshot lab A/C/D |
 | TC-ENR-23 | Lulus di app: id perangkat stabil antar peluncuran, dibuat ulang saat penanda instalasi hilang, penanda dikecualikan dari backup, Keychain `afterFirstUnlockThisDeviceOnly`; lab: instal ulang memakai id baru (perangkat ke-3 di server) | `idPerangkatDibuatSekaliDanStabil`, `instalasiBaruMembuatIDBaru` |
+| TC-ENR-24 | Lulus di backend (ADR-0047): 4 perangkat tambahan menunggu, permintaan ke-5 → 409 `ENR-PENDING-LIMIT` tanpa baris perangkat, perangkat yang menunggu melanjutkan (200); mutasi `>` alih-alih `>=` tertangkap; app memetakan ke teks yang mengarahkan ke pengelola | `TestPermintaanMenungguPerKartuDibatasi`, `batasPermintaanMenungguDipetakan`, `batasPermintaanMenungguMengarahkanKePengelola` |
 | TC-ENR-07 | Logika lulus di app dan backend, lab simulator lulus (ADR-0033): `InvitationLink.token(from:)` hanya menerima `https://<host>/i/<token>` dengan token base64url 43 karakter; body enrolment hanya `{device_id, invitation}`; undangan selalu `PROVISIONING`. Lab end-to-end dengan `-ANLabInvite`: card instance `ACTIVE` tanpa kartu fisik dengan 1 kredensial aktif, undangan tercatat terpakai, audit `invitation.created` → `enrollment.started` → `credential.provisioned`. Undangan berkartu menyetujui instance perangkat itu yang masih `PENDING_APPROVAL`/`PROVISIONING` untuk kartu yang sama, tanpa instance baru, dengan audit `enrollment.approved` yang memuat id undangan (ADR-0035). Universal Link produksi tertunda (domain dan Associated Domains belum ada, SDD §5.6) | `tautanValidMemberiToken`, `tautanTidakValidDitolak`, `createEnrollmentMengirimUndangan`, `provisionViaBackendDenganUndangan`, `provisioningPeluncuranDenganUndangan`, `TestEnrolmentDenganUndangan`, `TestUndanganDipakaiSekali`, `TestZonaUndangan`, `TestUndanganMenyetujuiInstanceMenunggu`, `TestUndanganMelanjutkanInstanceKartuSendiri`, `TestUndanganLainTidakMenimpaInstance`, `TestAuditEnrolmentUndanganMenautkanUndangan` |
 | TC-ENR-08 | Lulus di backend, app, dan lab simulator: undangan tak dikenal, kedaluwarsa, terpakai, dan yang kartunya dikeluarkan dari registri dijawab identik 404 `ENR-INVITATION-INVALID` tanpa info kartu; app menampilkan "Undangan tidak berlaku atau sudah dipakai." (EN: "This invitation is invalid or has already been used."). Lab: perangkat kedua dengan token terpakai melihat teks itu tanpa card instance baru; respons token terpakai dan token acak identik; token mentah tidak ada di log API maupun dump database | `TestUndanganTidakBerlakuIdentik`, `TestUndanganKedaluwarsaDitolak`, `TestTokenUndanganTidakBocor`, `TestUndanganKartuDihapusDitolak`, `galatRegistriMenjadiErrorDomain`, `setiapAlasanPunyaTeksSendiri` |
 | TC-ENR-13 | **Tertunda** (iPhone fisik, `AN_DEVICE_TESTS=1`) | test tersedia, dilewati di simulator |
@@ -626,7 +629,7 @@ Jadwal mengikuti milestone PRD §13; uji pilot mencakup 2 lokasi (ADR-0011).
 | FR-14 | TC-ENR-01, TC-ENR-09, TC-ENR-10 |
 | FR-15 | TC-ENR-11, TC-ENR-12 |
 | FR-16 | TC-ENR-01, TC-ENR-13, TC-ENR-18, TC-ENR-19 |
-| FR-17 | TC-ENR-02 |
+| FR-17 | TC-ENR-02, TC-ENR-24 |
 | FR-18 | TC-ENR-01, TC-ENR-02, TC-ENR-03, TC-SEC-09 |
 | FR-19 | TC-ENR-16 |
 | FR-20 | TC-PRSN-01, TC-PRSN-02, TC-PRSN-03, TC-PRSN-16, TC-PROTO-03 |
@@ -645,7 +648,7 @@ Jadwal mengikuti milestone PRD §13; uji pilot mencakup 2 lokasi (ADR-0011).
 | FR-33 | TC-MGT-06, TC-MGT-08 |
 | FR-34 | TC-MGT-07 |
 | FR-35 | TC-MGT-09, TC-PRSW-10 |
-| FR-36 | TC-MGT-10 |
+| FR-36 | TC-MGT-10, TC-ENR-24 |
 | FR-37 | TC-MGT-13 |
 | FR-38 | TC-MGT-11, TC-MGT-15, TC-DEV-10 |
 | FR-39 | TC-MGT-14 |
@@ -690,13 +693,13 @@ Jadwal mengikuti milestone PRD §13; uji pilot mencakup 2 lokasi (ADR-0011).
 | NFR-R04 | TC-DEV-03, TC-DEV-04, TC-DEV-11, TC-RDR-02, TC-RDR-04, TC-PERF-08, TC-DR-03 |
 | NFR-S01 | TC-ENR-13 |
 | NFR-S02 | TC-PROTO-01, TC-PROTO-02, TC-PROTO-04, TC-PROTO-05, TC-PROTO-06, TC-PROTO-07, TC-PROTO-11, TC-SEC-08 |
-| NFR-S03 | TC-ENR-17, TC-SEC-05 |
+| NFR-S03 | TC-ENR-17, TC-SEC-05, TC-SEC-15 |
 | NFR-S04 | TC-SEC-04 |
 | NFR-S05 | TC-MGT-04, TC-MGT-05, TC-SEC-10 |
 | NFR-S06 | TC-SEC-02, TC-SEC-03 |
 | NFR-S07 | TC-SEC-01 |
 | NFR-S08 | TC-RDR-03, TC-RDR-05, TC-SEC-13, TC-SEC-14 |
-| NFR-S09 | TC-SEC-06, TC-SEC-07, TC-SEC-11, TC-SEC-12, TC-PROTO-12, TC-PROTO-13, TC-RDR-08 |
+| NFR-S09 | TC-SEC-06, TC-SEC-07, TC-SEC-11, TC-SEC-12, TC-PROTO-12, TC-PROTO-13, TC-RDR-08, TC-SEC-15 |
 | NFR-S10 | TC-ADM-02, TC-ADM-12 |
 | NFR-PR01 | TC-ADM-07, TC-PRIV-04 |
 | NFR-PR02 | TC-ENR-01, TC-ADM-04, TC-PRIV-01 |

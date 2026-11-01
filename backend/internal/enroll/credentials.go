@@ -159,6 +159,8 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 			return problemBody("ENR-LIMIT", http.StatusConflict)
 		case errors.Is(err, store.ErrDuplicateEnrollment):
 			return problemBody("ENR-DUPLICATE", http.StatusConflict)
+		case errors.Is(err, store.ErrPendingLimit):
+			return problemBody("ENR-PENDING-LIMIT", http.StatusConflict)
 		case errors.Is(err, store.ErrSiteUnsupported):
 			return problemBody("ENR-SITE-UNSUPPORTED", http.StatusNotFound)
 		case errors.Is(err, store.ErrNotRegistered):

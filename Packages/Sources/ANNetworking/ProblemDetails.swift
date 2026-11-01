@@ -23,6 +23,7 @@ public struct ProblemDetails: Decodable, Error, Equatable, Sendable {
         case "ENR-PENDING-APPROVAL": ANError.enrollmentRejected(.pendingApproval)
         case "ENR-INVITATION-INVALID": ANError.enrollmentRejected(.invitationInvalid)
         case "SITE-NOT-FOUND": ANError.enrollmentRejected(.siteCodeUnknown)
+        case "ENR-PENDING-LIMIT": ANError.enrollmentRejected(.pendingLimit)
         default: nil
         }
     }

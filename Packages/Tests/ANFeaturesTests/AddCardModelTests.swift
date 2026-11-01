@@ -84,6 +84,23 @@ struct AddCardModelTests {
         #expect(model.step == .failed(.init(message: localized("enroll.error.not_registered"), offersInvitation: true)))
     }
 
+    @Test func gedungTanpaRegistriMenawarkanUndangan() async {
+        // Review akhir #7: ENR-SITE-UNSUPPORTED berarti gedung belum memakai registri kartu (hanya undangan),
+        // jadi FR-13 menawarkan jalur undangan dengan teks yang tidak bertentangan dengan gedung terkonfirmasi.
+        let (model, _, _) = make([site, configBody(["ble"]), problem("ENR-SITE-UNSUPPORTED")])
+        await confirmed(model)
+        await model.confirmAndRead()
+        #expect(model.step == .failed(.init(message: localized("enroll.error.site_unsupported"), offersInvitation: true)))
+        #expect(!localized("enroll.error.site_unsupported").contains("Anastrophe"))
+    }
+
+    @Test func batasPermintaanMenungguMengarahkanKePengelola() async {
+        let (model, _, _) = make([site, configBody(["ble"]), problem("ENR-PENDING-LIMIT", 409)])
+        await confirmed(model)
+        await model.confirmAndRead()
+        #expect(model.step == .failed(.init(message: localized("enroll.error.pending_limit"), offersInvitation: false)))
+    }
+
     @Test func kartuTakTerbacaMenawarkanUndangan() async {
         let (model, transport, _) = make([site], reader: .failure(.cardUnreadable))
         await confirmed(model)

@@ -33,6 +33,7 @@
 | 2.17 | 2026-11-02 | Siklus hidup kartu oleh operator (suspend/resume/revoke, ADR-0036), denylist dari pencabutan, token baca status dan `GET /cards/{id}/status` (ADR-0037); provisioning hanya memasang hash bila belum ada; `:renew` memeriksa status setelah bukti kepemilikan; celah pembatalan suspend/revoke tercatat di ADR-0038 (§8.1, §8.4.2, §8.4.3, §8.5, §15). |
 | 2.18 | 2026-11-02 | Rahasia enrolment untuk kredensial pertama dan penolakan tambah kanal ke kartu aktif (ADR-0040); celah penerbitan kredensial lewat id instance ditutup (§8.4.1, §8.5, §15). |
 | 2.19 | 2026-11-02 | `credentials.max_not_after` dan masa berlaku denylist dari sertifikat terpanjang, purge per jam (§8.1, §8.4.3). |
+| 2.21 | 2026-11-02 | Review akhir alur Tambah Kartu: oracle tebakan identitas kartu menjadi gerbang pra-pilot (ADR-0046), batas 4 permintaan menunggu per kartu `ENR-PENDING-LIMIT` (ADR-0047), `ENR-SITE-UNSUPPORTED` menawarkan undangan, dan klaim pembaca kartu disertai bukti (§5.8, §8.1, §10.1, §15). |
 | 2.20 | 2026-11-02 | Alur Tambah Kartu produksi (ADR-0043): kode gedung `sites.join_code` dan `GET /v1/sites/lookup` (ADR-0044), baris perangkat dibuat di transaksi enrolment (ADR-0045), alamat API dari Info.plist, tautan undangan hanya mengisi field (§5.6, §5.8, §8.1, §8.4.1, §8.5, §15). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
@@ -323,8 +324,9 @@ Tombol "Tambah kartu akses" ada di tab Kunci pada semua build, dan nonaktif saat
 Komponen:
 
 - **Kode gedung:** 8 simbol Crockford base32, ditampilkan `XXXX-XXXX`. App dan server menormalisasi dengan aturan yang sama, dan kode yang tidak sah ditolak tanpa permintaan jaringan.
-- **Pembaca kartu:** `NFCTagReaderSession` mem-polling ISO 14443 dan ISO 15693, dan hanya membaca `identifier` (ADR-0001).
-  - MIFARE dan ISO 7816 tipe A dipetakan ke `iso14443a`; ISO 15693 ke `iso15693`.
+- **Pembaca kartu:** `NFCTagReaderSession` mem-polling ISO 14443 dan ISO 15693, dan hanya membaca `identifier` setelah `connect` berhasil (ADR-0001). Core NFC bisa membaca tag ISO 7816, ISO 15693, FeliCa, dan MIFARE (O-A14).
+  - MIFARE dipetakan ke `iso14443a`, dan ISO 15693 ke `iso15693`.
+  - **Unknown:** Info.plist belum memuat daftar `select-identifiers`, jadi belum diketahui apakah tag ISO 7816 dilaporkan sebagai `NFCISO7816Tag`. Pemetaan ISO 7816 tipe A ke `iso14443a` sudah ada, tetapi bisa jadi tidak pernah terjangkau. Perilaku MIFARE Classic juga belum diketahui (U05). Keduanya diverifikasi lewat uji H (TC-ENR-14, TC-ENR-15).
   - FeliCa dan identitas berbasis AID belum didukung.
   - Batas waktu atau jenis yang tidak didukung → "Kartu tidak dapat dibaca iPhone" (`ENR-UNREADABLE`) dengan tawaran undangan. `readingAvailable` false → pesan perangkat tidak bisa membaca kartu, juga dengan tawaran undangan.
 - **Identitas kartu:** hanya hidup di satu pemanggilan sebagai variabel lokal. Tidak ada di state, log, maupun store (aturan 6).
@@ -616,6 +618,7 @@ audit_events(id bigserial pk, chain text /* site:<uuid> | platform (ADR-0024) */
 - `credentials.not_after ≤ issued_at + policy.cert_validity_days`.
 - Kode gedung (ADR-0044): `sites.join_code` berisi 8 simbol Crockford base32 (`^[0-9A-HJKMNP-TV-Z]{8}$`), unik. Operator membuat atau merotasinya lewat `anastrophe-registry site-code` (audit `site.join_code_rotated` tanpa nilai kode); kode lama langsung tidak berlaku.
 - Perangkat (ADR-0045, provisional): sebelum ada akun dan App Attest, baris `devices` dibuat di transaksi enrolment kartu atau undangan (`INSERT … ON CONFLICT DO NOTHING` sebelum `SELECT … FOR UPDATE`). Enrolment yang ditolak me-rollback baris itu.
+- Permintaan menunggu (ADR-0047): paling banyak 4 instance `PENDING_APPROVAL` per kartu fisik (`MaxPendingPerCard`), dihitung di transaksi yang mengunci baris kartu. Permintaan berikutnya ditolak `ENR-PENDING-LIMIT`; perangkat yang sudah menunggu tetap bisa melanjutkan.
 - `denylist_entries.expires_at` = masa berlaku terpanjang yang pernah diterbitkan untuk kredensial itu (`GREATEST(max_not_after, not_after)`), karena perpanjangan bisa memendekkan `not_after` sementara sertifikat lama masih di tangan pemegang. Baris yang sudah lewat dibuang sapuan per jam, sehingga denylist tidak tumbuh tanpa batas.
 - `sites.policy` (JSON) memuat `zones` (nama zona), `zones_bitmap` (bilangan 64-bit) dan `cert_validity_days` (1–30, default 7 sesuai ADR-0010). Tanpa `zones_bitmap`, sertifikat diterbitkan dengan bitmap 0 (*fail-closed*: tidak membuka zona mana pun).
 
@@ -786,6 +789,8 @@ Update firmware bertanda tangan (A/B partition), alarm tamper, heartbeat 60 dtk,
 | Kompromi reader | Kunci reader group dicuri | Kunci di SE/TPM; rotasi darurat ≤ 24 jam. Dampaknya privasi, bukan pemalsuan kredensial |
 | Brute-force security code | Anggota palsu | Server-side + rate-limit (ADR-0005) |
 | Enrolment hijack | Meminjam kartu fisik korban | Kecocokan pemegang + sengketa (ADR-0004) |
+| Tebakan identitas kartu (enumerasi) | `POST /v1/enrollments` tanpa autentikasi dengan `site_id` dari kode gedung dan `device_id` acak; ruang NUID 4 byte 2^32; tebakan benar pada kartu yang belum didaftarkan menjadi `PROVISIONING` | **Terbuka, gerbang pra-pilot** (ADR-0046): App Attest (NFR-S03) + pembatas/deteksi kegagalan enrolment; backend tidak dibuka untuk pilot sebelum gerbang ditutup |
+| Banjir permintaan persetujuan | Satu identitas kartu dengan `device_id` acak membuat permintaan `PENDING_APPROVAL` berulang | Batas 4 permintaan menunggu per kartu (ADR-0047); kedaluwarsa menunggu keputusan |
 | App termodifikasi/jailbreak | Bypass UI | App Attest; deteksi jailbreak → provisioning ditolak |
 | Pengambilalihan akun | Pencurian sesi | SIWA + OTP, refresh token terikat perangkat, re-auth untuk aksi sensitif |
 | Penyalahgunaan admin | Admin mencabut/menyetujui sembarangan | RBAC, MFA, audit hash-chained (head per rantai dicatat per jam ke log terpusat; pemotongan ekor tidak terdeteksi tanpa anchoring), peran DB runtime dipisah dari pemilik tabel (rencana), alert aksi massal |
@@ -851,8 +856,9 @@ Tidak ada GPS, tidak ada tracking lintas app (ATT tidak dipakai). Privacy Manife
 | `ENR-NOT-REGISTERED` | Kartu tidak ada di registri | "Kartu ini belum terdaftar di gedung Anda." | Tawarkan undangan |
 | `ENR-UNREADABLE` | Kartu tidak terbaca (mis. 125 kHz): batas waktu sesi baca, jenis kartu tidak didukung, atau identitas tidak sah; ditentukan app (§5.8) | "Kartu tidak dapat dibaca iPhone." | Tawarkan undangan |
 | `SITE-NOT-FOUND` | Kode gedung tak dikenal, tidak berbentuk sah, atau kosong; semuanya dijawab identik (404, ADR-0044) | "Kode gedung tidak dikenal. Periksa kode dari pengelola gedung." | Periksa ulang kode |
-| `ENR-SITE-UNSUPPORTED` | Gedung belum memakai Anastrophe | "Gedung ini belum mendukung Anastrophe." | "Usulkan gedung saya" (FR-64) |
+| `ENR-SITE-UNSUPPORTED` | Gedung belum punya registri kartu aktif, jadi hanya bisa lewat undangan (gedung yang belum memakai Anastrophe tidak lolos pencarian kode gedung) | "Gedung ini belum memakai pendaftaran dengan kartu fisik. Minta tautan undangan dari pengelola gedung." | Tawarkan undangan |
 | `ENR-PENDING-APPROVAL` | Kontak tidak cocok registri; sebelum ada akun juga untuk perangkat tambahan (ADR-0032). Provisioning card instance yang menunggu dijawab 409 | "Menunggu persetujuan pengelola gedung." | Notifikasi saat disetujui |
+| `ENR-PENDING-LIMIT` | Kartu sudah punya 4 permintaan perangkat tambahan yang menunggu operator (409, ADR-0047) | "Kartu ini sudah punya beberapa permintaan yang menunggu pengelola gedung. Hubungi pengelola gedung." | Hubungi pengelola |
 | `ENR-DUPLICATE` | Kartu fisik yang sama sudah ada di iPhone ini (409) | "Kartu ini sudah ada di iPhone ini." | Buka kartu yang ada |
 | `ENR-INVITATION-INVALID` | Undangan tidak dikenal, kedaluwarsa, atau sudah dipakai; ketiganya dijawab identik (404, TC-ENR-08) | "Undangan tidak berlaku atau sudah dipakai." | Minta undangan baru ke pengelola |
 | `ENR-LIMIT` | Sudah 8 kartu | "Maksimal 8 kartu per iPhone." | Hapus kartu lain |

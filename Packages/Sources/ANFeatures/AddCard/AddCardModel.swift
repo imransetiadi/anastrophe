@@ -188,8 +188,10 @@ public final class AddCardModel {
     }
 
     static func failure(for error: any Error) -> Failure {
+        // FR-13: kartu tak terdaftar, tak terbaca, perangkat tanpa pembaca, atau gedung yang belum memakai
+        // registri kartu (hanya undangan, review akhir #7) → tawarkan jalur undangan.
         let offersInvitation = switch error as? ANError {
-        case .enrollmentRejected(.notRegistered)?, .cardUnreadable?, .cardReaderUnavailable?: true
+        case .enrollmentRejected(.notRegistered)?, .enrollmentRejected(.siteUnsupported)?, .cardUnreadable?, .cardReaderUnavailable?: true
         default: false
         }
         if let text = EnrollmentMessages.text(for: error) { return Failure(message: text, offersInvitation: offersInvitation) }

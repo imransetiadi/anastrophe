@@ -49,6 +49,15 @@ struct APIClientTests {
         }
     }
 
+    @Test func batasPermintaanMenungguDipetakan() async {
+        // Review akhir #2 (ADR-0047): kartu dengan terlalu banyak permintaan perangkat tambahan.
+        let transport = FakeTransport(status: 409, body: #"{"type":"ENR-PENDING-LIMIT","status":409}"#, contentType: "application/problem+json")
+        await #expect(throws: ANError.enrollmentRejected(.pendingLimit)) {
+            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "d", siteID: "s", card: CardIdentity("iso14443a:04a1b2c3d4e5f6")!,
+                                                                                   provisioningKeyHash: Data(repeating: 1, count: 32), idempotencyKey: UUID())
+        }
+    }
+
     @Test func problemLainDiteruskan() async {
         let transport = FakeTransport(status: 403, body: #"{"type":"ENR-ATTEST-FAILED","status":403}"#, contentType: "application/problem+json; charset=utf-8")
         let client = APIClient(baseURL: base, transport: transport)

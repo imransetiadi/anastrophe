@@ -1249,18 +1249,34 @@
         }
       }
     },
-    "enroll.error.site_unsupported": {
+    "enroll.error.pending_limit": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This building doesn't support Anastrophe yet."
+            "value": "This card already has several requests waiting for your building management. Contact your building management."
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gedung ini belum mendukung Anastrophe."
+            "value": "Kartu ini sudah punya beberapa permintaan yang menunggu pengelola gedung. Hubungi pengelola gedung."
+          }
+        }
+      }
+    },
+    "enroll.error.site_unsupported": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This building doesn't support adding cards with a physical card yet. Ask your building management for an invitation link."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gedung ini belum memakai pendaftaran dengan kartu fisik. Minta tautan undangan dari pengelola gedung."
           }
         }
       }

@@ -125,3 +125,38 @@ func TestEnrolmentPerangkatBaruBersamaan(t *testing.T) {
 		t.Fatalf("baris perangkat = %d, ingin 1", n)
 	}
 }
+
+func TestPermintaanMenungguPerKartuDibatasi(t *testing.T) {
+	// Review akhir #2 (ADR-0047): satu identitas kartu dengan device_id acak tidak bisa membanjiri antrean
+	// persetujuan; batas 4 permintaan menunggu per kartu (default batas anggota FR-36).
+	f := newFixture(t)
+	card := map[string]string{"tech": "iso14443a", "id": labCardHex(0)}
+	body := func(device string) map[string]any {
+		return map[string]any{"device_id": device, "site_id": f.siteID, "card": card}
+	}
+	if rec := f.do(t, http.MethodPost, "/v1/enrollments", "", body(f.deviceID)); rec.Code != http.StatusCreated {
+		t.Fatalf("pemegang pertama: %d %s", rec.Code, rec.Body)
+	}
+	var waiting []string
+	for i := 0; i < 4; i++ {
+		device := newDeviceID(t)
+		rec := f.do(t, http.MethodPost, "/v1/enrollments", "", body(device))
+		if _, status := enrolResult(t, rec.Body); rec.Code != http.StatusCreated || status != "PENDING_APPROVAL" {
+			t.Fatalf("perangkat tambahan %d: %d %s", i+1, rec.Code, rec.Body)
+		}
+		waiting = append(waiting, device)
+	}
+	extra := newDeviceID(t)
+	rec := f.do(t, http.MethodPost, "/v1/enrollments", "", body(extra))
+	if rec.Code != http.StatusConflict || problemType(t, rec) != "ENR-PENDING-LIMIT" {
+		t.Fatalf("permintaan ke-5: %d %s", rec.Code, rec.Body)
+	}
+	if n := f.deviceRows(t, extra); n != 0 {
+		t.Fatalf("baris perangkat tertinggal setelah ENR-PENDING-LIMIT: %d", n)
+	}
+	// Perangkat yang sudah menunggu tetap bisa melanjutkan permintaannya (ADR-0034).
+	rec = f.do(t, http.MethodPost, "/v1/enrollments", "", body(waiting[0]))
+	if _, status := enrolResult(t, rec.Body); rec.Code != http.StatusOK || status != "PENDING_APPROVAL" {
+		t.Fatalf("melanjutkan permintaan menunggu: %d %s", rec.Code, rec.Body)
+	}
+}

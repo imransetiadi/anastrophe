@@ -26,6 +26,9 @@ var (
 	ErrNotRegistered = errors.New("store: kartu tidak terdaftar")
 	// ErrDuplicateEnrollment: perangkat ini sudah memegang card instance aktif untuk kartu itu.
 	ErrDuplicateEnrollment = errors.New("store: kartu sudah ada di perangkat ini")
+	// ErrPendingLimit: kartu sudah punya MaxPendingPerCard permintaan perangkat tambahan yang menunggu
+	// operator (ENR-PENDING-LIMIT, ADR-0047).
+	ErrPendingLimit = errors.New("store: terlalu banyak permintaan menunggu untuk kartu ini")
 	// ErrNotPending: card instance tidak berstatus PENDING_APPROVAL.
 	ErrNotPending = errors.New("store: card instance tidak menunggu persetujuan")
 	// ErrInvalidOperator: nama operator kosong atau di luar [A-Za-z0-9._-]{1,64}.
@@ -94,6 +97,11 @@ func (s *Store) UpsertPhysicalCards(ctx context.Context, siteID, operator string
 // AbandonedEnrollmentTTL: PROVISIONING tanpa kredensial yang melewati batas ini (sejak masuk
 // PROVISIONING atau terakhir dilanjutkan) menjadi ABANDONED (ADR-0034).
 const AbandonedEnrollmentTTL = 15 * time.Minute
+
+// MaxPendingPerCard: permintaan perangkat tambahan yang boleh menunggu operator per kartu fisik, sama
+// dengan default batas anggota (FR-36, ADR-0015). Perangkat yang sudah menunggu tetap bisa melanjutkan
+// permintaannya (ADR-0034); permintaan yang ditolak operator tidak dihitung.
+const MaxPendingPerCard = 4
 
 // CardEnrollment adalah hasil enrolment kartu. Resumed = instance perangkat yang belum selesai
 // dilanjutkan, bukan dibuat baru (ADR-0034).
@@ -180,6 +188,7 @@ func (t *Tx) enrollCard(ctx context.Context, deviceID, siteID string, cardHMAC [
 		return CardEnrollment{}, err
 	}
 	others := false
+	pending := 0 // permintaan perangkat lain untuk kartu ini yang menunggu operator
 	if card != "" {
 		rows, err := t.tx.Query(ctx, `SELECT id::text, device_id::text, status FROM card_instances WHERE physical_card_id = $1 AND status = ANY($2)`, card, activeStatuses)
 		if err != nil {
@@ -197,6 +206,9 @@ func (t *Tx) enrollCard(ctx context.Context, deviceID, siteID string, cardHMAC [
 		for _, h := range holders {
 			if h.device != device {
 				others = true
+				if h.status == "PENDING_APPROVAL" {
+					pending++
+				}
 				continue
 			}
 			if h.status != "PROVISIONING" && h.status != "PENDING_APPROVAL" {
@@ -233,6 +245,10 @@ func (t *Tx) enrollCard(ctx context.Context, deviceID, siteID string, cardHMAC [
 	status := "PROVISIONING"
 	if others {
 		status = "PENDING_APPROVAL"
+		// Review akhir #2 (ADR-0047): baris kartu terkunci FOR UPDATE, jadi hitungan ini atomik.
+		if pending >= MaxPendingPerCard {
+			return CardEnrollment{}, ErrPendingLimit
+		}
 	}
 	id := newUUID()
 	if _, err := t.tx.Exec(ctx, `INSERT INTO card_instances (id, device_id, site_id, physical_card_id, status, status_changed_at) VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -341,15 +357,17 @@ func (s *Store) DecideEnrollment(ctx context.Context, cardInstanceID string, app
 	})
 }
 
-// lockDevice mengunci baris perangkat dan menghitung card instance aktifnya (FR-15).
 // ensureDevice membuat baris perangkat app yang belum terdaftar di dalam transaksi enrolment (ADR-0045).
 // device_id dibuat app (UUID v4 acak); enrolment yang ditolak me-rollback transaksi sehingga tidak ada
-// baris perangkat yang tertinggal, dan jumlah baris dibatasi kartu terdaftar serta undangan yang sah.
+// baris perangkat yang tertinggal. Baris dari enrolment yang berhasil tidak dibatasi jumlah kartu
+// terdaftar: satu identitas kartu dengan device_id acak bisa terus membuat permintaan menunggu, jadi
+// jumlahnya per kartu dibatasi MaxPendingPerCard (review akhir #2, ADR-0047).
 func ensureDevice(ctx context.Context, tx pgx.Tx, deviceID string) error {
 	_, err := tx.Exec(ctx, `INSERT INTO devices (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`, deviceID)
 	return err
 }
 
+// lockDevice mengunci baris perangkat dan menghitung card instance aktifnya (FR-15).
 func lockDevice(ctx context.Context, tx pgx.Tx, deviceID string) (device string, active int, err error) {
 	if err := tx.QueryRow(ctx, `SELECT id::text FROM devices WHERE id = $1 FOR UPDATE`, deviceID).Scan(&device); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

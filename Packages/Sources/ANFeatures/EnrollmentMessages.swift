@@ -12,6 +12,7 @@ enum EnrollmentMessages {
         case .enrollmentRejected(.invitationInvalid): return localized("enroll.error.invitation_invalid")
         case .cardLimitReached: return localized("enroll.error.limit")
         case .enrollmentRejected(.siteCodeUnknown): return localized("add.error.site_code_unknown")
+        case .enrollmentRejected(.pendingLimit): return localized("enroll.error.pending_limit")
         case .cardUnreadable: return localized("add.error.unreadable")
         case .cardReaderUnavailable: return localized("add.error.reader_unavailable")
         case .serviceUnavailable: return localized("add.error.service_unavailable")

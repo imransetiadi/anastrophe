@@ -50,6 +50,10 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
   - Waktu respons berbeda per jalur (tak dikenal ±122 µs, terpakai ±183 µs); tidak bisa dieksploitasi tanpa token 256 bit, perlu dicatat di TC-ENR-08 (M3).
   - Belum ada pencabutan undangan (bersama FR-51) (sisa M7).
   - Test kecil: galat tebusan pertama diabaikan (M12).
+- **Gerbang pra-pilot (prioritas tinggi, keamanan; review akhir alur Tambah Kartu):**
+  - **Enumerasi kartu (ADR-0046, menunggu pengguna):** enrolment adalah oracle tebakan identitas kartu tanpa autentikasi (NUID 4 byte, `site_id` dari kode gedung, `device_id` bebas). Wajib App Attest ditambah pembatas atau deteksi kegagalan `ENR-NOT-REGISTERED` sebelum backend dibuka untuk pilot (TC-SEC-15).
+  - **Kedaluwarsa permintaan (ADR-0047, menunggu pengguna):** `PENDING_APPROVAL` masih tanpa kedaluwarsa, walau batas 4 per kartu sudah diterapkan.
+  - **Info perangkat:** CLI `list` belum menampilkan info perangkat (mis. waktu pertama terlihat) untuk membedakan permintaan menunggu.
 - **Alur Tambah Kartu (sisa, ADR-0043):**
   - **Persetujuan operator:** instance yang disetujui ditandai `ABANDONED` 15 menit setelah persetujuan bila perangkat belum kembali. Tanpa push (FR-62), penghuni sering melewatkan jendela itu dan permintaannya kembali menunggu. Memperpanjang umurnya melebarkan jendela risiko ADR-0041, jadi diputuskan bersama ADR-0041. Jalur yang andal saat ini: undangan berkartu (ADR-0035).
   - **Kartu placeholder:** "Menunggu persetujuan" di daftar (tampilan FR-17) belum ada; hasilnya hanya tampil di lembar.
@@ -59,5 +63,17 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
   - **Universal Link:** entitlement Associated Domains dan berkas AASA menunggu domain produksi. Sampai itu, tautan undangan ditempel ke field.
   - **Pembatasan laju:** `GET /v1/sites/lookup` belum dibatasi laju (diserahkan ke infrastruktur). Kode 40 bit tidak praktis ditebak.
   - **Sisa instal ulang:** item Keychain dari instalasi lama (kunci kredensial, token status) tidak dibersihkan.
+  - **Minor review akhir** (pengguna memutuskan apakah dikerjakan):
+    - **#4 pembacaan kartu:** cabang ISO 7816 belum terjangkau tanpa `select-identifiers` (Unknown, uji H). App belum punya batas waktu baca sendiri (±20 dtk) maupun petunjuk undangan setelah Batal; kartu yang tidak pernah dilaporkan Core NFC menunggu batas waktu sistem ±60 dtk.
+    - **#5 siklus hidup pembaca:** batal sebelum sesi dimulai masih memulai sesi, dan panggilan kedua bersamaan dijawab `cardReaderUnavailable`. Penjaga identitas sesi sudah diperbaiki.
+    - **#6 test identitas:** `identitasKartuTidakTertinggal` lebih lemah dari klaim Review Focus 1, karena deskripsi `CardIdentity` sudah disamarkan. Perlu tambahan cek base64, huruf besar, dan `Mirror`.
+    - **#8 tautan saat app dingin:** `onOpenURL` kemungkinan melewatkan tautan yang membuka app dari keadaan mati (`KeysView` baru ada setelah layanan siap). `-ANLabOpenURL` juga tidak lewat `onOpenURL`. Laten sampai Associated Domains.
+    - **#9 normalisasi kode:** karakter tak terlihat (U+200B, U+FEFF, U+200E) dan tanda hubung tipografis ditolak; `ß` diterima Swift tetapi ditolak Go. Vektor test disalin, bukan fixture bersama.
+    - **#11 nits:**
+      - subject audit rotasi memakai `siteID` dari pemanggil;
+      - `deviceID()` melakukan I/O sinkron di main actor;
+      - doc paket devseed masih menyebut keluaran lama;
+      - `site-code` tanpa `--site` dijawab "gedung tidak ditemukan";
+      - `SiteJoinCode.display` belum terpakai.
 - **Test flaky:** `BLETapTests.autentikasiBatalMembatalkanPemindaian` sesekali gagal (pembatalan pemindaian bergantung waktu); lulus 6/6 saat diulang.
 - **Riwayat tap:** judul baris "Ditolak · alasan" dirakit di kode (M8; dikerjakan saat bahasa ketiga ditambahkan); VoiceOver baris Status belum diperiksa dengan Accessibility Inspector.
