@@ -22,7 +22,9 @@ final class SpyLauncher: PresentationLaunching {
 @MainActor
 func services(launcher: SpyLauncher) -> AppServices {
     let base = AppServices.inMemory()
-    return AppServices(cards: base.cards, keys: base.keys, records: base.records, availability: { [:] }, launcher: launcher, foreground: ForegroundState(), authenticator: ImmediateAuthenticator(), tapHistory: InMemoryTapHistoryStore())
+    let history = InMemoryTapHistoryStore()
+    // Komposisi produksi: launcher dibungkus pencatat riwayat, jadi batal di background harus menembus wrapper (M6).
+    return AppServices(cards: base.cards, keys: base.keys, records: base.records, availability: { [:] }, launcher: RecordingLauncher(base: launcher, history: history), foreground: ForegroundState(), authenticator: ImmediateAuthenticator(), tapHistory: history)
 }
 
 @MainActor

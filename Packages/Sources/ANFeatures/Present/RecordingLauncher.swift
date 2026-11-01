@@ -43,7 +43,8 @@ final class RecordingLauncher: PresentationLaunching {
             TapEntry(cardID: cardID, date: date, channel: channel, granted: true, denyReason: nil)
         case .denied(let reason):
             TapEntry(cardID: cardID, date: date, channel: channel, granted: false, denyReason: reason)
-        default:
+        // Tanpa `default`: event baru harus diputuskan di sini (M4).
+        case .coolingDown, .waitingForReader, .readerFound, .exchanging, .timedOut, .cancelled, .unavailable, .readerOutOfRange:
             nil
         }
     }
