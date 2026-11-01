@@ -38,6 +38,17 @@ public struct APIClient: Sendable {
         return try Self.decoder.decode(RemoteConfig.self, from: data)
     }
 
+    /// `GET /v1/sites/lookup?code=`: gedung dari kode gedung yang diketik penghuni (ADR-0044). Kode yang
+    /// tidak sah ditolak tanpa permintaan jaringan, dengan galat yang sama seperti kode tak dikenal.
+    public func lookupSite(code: String) async throws -> SiteSummary {
+        guard let normalized = SiteJoinCode.normalized(code),
+              var components = URLComponents(url: baseURL.appending(path: "v1/sites/lookup"), resolvingAgainstBaseURL: false)
+        else { throw ANError.enrollmentRejected(.siteCodeUnknown) }
+        components.queryItems = [URLQueryItem(name: "code", value: normalized)]
+        guard let url = components.url else { throw ANError.enrollmentRejected(.siteCodeUnknown) }
+        return try Self.decoder.decode(SiteSummary.self, from: try await perform(URLRequest(url: url)))
+    }
+
     /// `POST /v1/enrollments`: enrolment untuk kartu fisik terdaftar (ADR-0031). Identitas kartu hanya
     /// lewat TLS; server menghitung HMAC per gedung. Security code dan App Attest menyusul (SDD §8.4.1).
     public func createEnrollment(deviceID: String, siteID: String, card: CardIdentity, provisioningKeyHash: Data, idempotencyKey: UUID) async throws -> EnrollmentStart {
@@ -155,6 +166,19 @@ public struct APIClient: Sendable {
         }
         return data
     }
+}
+
+/// Gedung hasil pencarian kode gedung, untuk dikonfirmasi pengguna sebelum menempelkan kartu.
+public struct SiteSummary: Equatable, Sendable, Decodable {
+    public let siteID: String
+    public let name: String
+
+    public init(siteID: String, name: String) {
+        self.siteID = siteID
+        self.name = name
+    }
+
+    enum CodingKeys: String, CodingKey { case siteID = "site_id", name }
 }
 
 /// Hasil `POST /v1/enrollments`: perangkat pertama diprovisikan, perangkat tambahan menunggu

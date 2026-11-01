@@ -16,4 +16,8 @@ SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) $(AN_SWIFT_CONDITION_$(AN_NFC
 AN_APPATTEST_ENVIRONMENT = development
 AN_APPATTEST_ENVIRONMENT[config=Release] = production
 
+// Alamat API untuk alur Tambah Kartu (Info.plist ANAPIBaseURL), wajib https. Kosong = layanan belum
+// tersedia karena domain produksi belum ditentukan (SDD §5.6). Isi di Local.xcconfig.
+AN_API_BASE_URL =
+
 #include? "Local.xcconfig"
