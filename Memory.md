@@ -12,13 +12,15 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 ## Status terkini
 
 - Branch kerja: `feat/r1-scaffold`, di-push ke GitHub private `imransetiadi/anastrophe` (origin) atas permintaan pengguna; belum di-merge.
-- Suite terakhir: Swift host 288 test (1 dilewati, tanpa gagal), simulator 286 test (1 dilewati), backend Go 10 paket lulus dengan PostgreSQL.
+- Suite terakhir: Swift host 334 test (1 dilewati, tanpa gagal), simulator 332 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 10 paket lulus dengan PostgreSQL.
 - Menunggu keputusan pengguna:
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
   - ADR-0038: cara mencegah pemegang kartu membatalkan suspend/revoke operator; rekomendasi `hold_pending_approval`, JEV 0,45.
   - ADR-0041: pengambilalihan enrolment yang belum selesai lewat id perangkat + identitas kartu; rekomendasi `first_writer_wins`, JEV 0,44.
+  - ADR-0046: kontrol enumerasi identitas kartu lewat enrolment, yang menjadi **gerbang pra-pilot** bersama App Attest; rekomendasi deteksi per gedung + pembatas per perangkat yang di-attest, JEV 0,49.
+  - ADR-0047: kedaluwarsa permintaan `PENDING_APPROVAL` (batas 4 per kartu sudah diterapkan), JEV 0,51.
 
-  - Tinjauan 11 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor (`docs/adr/jev-log/*-gate.json`).
+  - Tinjauan 12 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu (`docs/adr/jev-log/*-gate.json`).
   - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
 
@@ -38,6 +40,52 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Siklus hidup kartu | Operator: `list`, `suspend`, `resume`, `revoke` (audit, denylist); app membaca status kartu dengan token baca status tanpa Face ID/passcode. Keterbatasan terbuka: pendaftaran ulang kartu fisik bisa membatalkan suspend/revoke (ADR-0038) | FR-38, FR-50 (sebagian), FR-51, ADR-0036, ADR-0037, ADR-0038 |
 | Provisioning aman | Rahasia enrolment dari app (hanya hash di server) wajib untuk kredensial pertama; tambah kanal ke kartu aktif ditolak. Risiko sisa: id perangkat + identitas kartu bisa mengambil alih enrolment yang belum selesai (ADR-0041) | FR-16, ADR-0039, ADR-0040, ADR-0041 |
 | Ketahanan | Update dijaga status, urutan kunci instance → kredensial, denylist dari sertifikat terpanjang + purge, pembaruan kartu atomik, jam monotonik yang ikut berjalan saat tidur | ADR-0042 |
+| Tambah Kartu | Alur produksi di semua build: kode gedung + tempel kartu (pembaca identifier saja) atau tautan undangan, kanal otomatis, perangkat dibuat saat enrolment, batas 4 permintaan menunggu per kartu. Gerbang pra-pilot terbuka: App Attest + kontrol enumerasi kartu (ADR-0046) | FR-05, FR-10–FR-13, ADR-0043–ADR-0047 |
+
+## APP-2026-11-02-0445 - Alur Tambah Kartu produksi (Selesai, commit lokal; gate tereskalasi; gerbang pra-pilot terbuka)
+
+Fokus dari ADR-0043 (JEV 0,98): build Release belum punya cara menambah kartu, karena tombolnya hanya di DEBUG dan membuka Lab. Keputusan pendukung:
+- kode gedung untuk jalur kartu fisik (ADR-0044, 0,96);
+- baris perangkat dibuat di transaksi enrolment (ADR-0045, 0,77 Provisional).
+
+Isi pekerjaan:
+- **Backend:**
+  - migrasi 0013 `sites.join_code`;
+  - `GET /v1/sites/lookup` (404 `SITE-NOT-FOUND` identik, `no-store`);
+  - CLI `site-code` dan `join_code` di devseed;
+  - `ensureDevice` di transaksi enrolment kartu dan undangan.
+- **App:**
+  - `SiteJoinCode`, `lookupSite`, dan `KeychainDeviceIdentityStore` (dibuat ulang setelah instal ulang);
+  - `BackendConfiguration` (Info.plist `ANAPIBaseURL`, https);
+  - `CardProvisioner` produksi (kanal otomatis N-HCE > B, tanpa enrolment bila tidak ada kanal);
+  - pembaca Core NFC yang hanya membaca identifier, sesudah `connect`;
+  - `AddCardModel`/`AddCardView`, tombol "Tambah kartu akses" di semua build, dan `onOpenURL` yang hanya mengisi field;
+  - teks ID/EN.
+- **E2e:** argumen lab `-ANAPIBaseURL`, `-ANLabCardReader`, `-ANLabAddCode`, `-ANLabOpenURL`.
+
+Review akhir (opus) memberi verdict "With fixes": 0 Critical, 3 Important.
+
+- **Diperbaiki:**
+  - #2 banjir permintaan menunggu: batas 4 per kartu (`ENR-PENDING-LIMIT`, ADR-0047, tereskalasi 0,51; diterapkan sebagai inti bersama dua kandidat teratas);
+  - #3 identifier setelah `connect` (tanpa test otomatis; uji H);
+  - #7 gedung tanpa registri ditawari undangan (dinaikkan dari minor).
+- **#1 oracle tebakan identitas kartu:** dicatat sebagai gerbang pra-pilot (ADR-0046, tereskalasi 0,49). Backend tidak boleh dibuka untuk pilot sebelum App Attest dan kontrol enumerasi ada.
+- **Minor lain:** di [backlog](docs/agentmemory/backlog.md).
+
+Bukti:
+- Go 10 paket lulus; Swift host 334 test; simulator 332 test (flaky BLE yang dikenal gagal sekali, lulus saat diulang; modul BLE tidak berubah).
+- Build Debug dan Release sukses.
+- Mutasi tertangkap: aturan Bluetooth, guard ketuk ganda (setelah test diperkuat), batas pending.
+- E2e simulator:
+  - kode gedung + pembaca palsu → kartu aktif, perangkat 1→2;
+  - instal ulang + kartu tak terdaftar → pesan + tawaran undangan, perangkat tetap 2;
+  - undangan → kartu aktif, perangkat 3;
+  - teks ID dan "Layanan belum tersedia" benar.
+- `check_docs` 0 masalah.
+
+`jev_gate` tereskalasi (composite 0,64, `spec_match`); 8/8 klaim terverifikasi.
+
+Commit unit ini: `a34c090`, `c375487`, `c270989`, `ffddcc1`, `bfa90dd`, `fba0e33`, `a0505a3`, `5794516`, `c512bdc`, `9ea64a0`, dan commit ini. Obsidian: `sessions/2026-11-02-alur-tambah-kartu.md`, `decisions/ADR-0043…0045`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
 
 ## API-2026-11-02-0207 - Perbaikan minor tertunda dari tiga review terakhir (Selesai, commit lokal; gate tereskalasi)
 

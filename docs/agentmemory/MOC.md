@@ -11,6 +11,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Sesi
 
+- [2026-11-02 — Alur Tambah Kartu produksi](sessions/2026-11-02-alur-tambah-kartu.md)
 - [2026-11-02 — Perbaikan minor tertunda](sessions/2026-11-02-perbaikan-minor.md)
 - [2026-11-02 — Provisioning kredensial yang aman](sessions/2026-11-02-provisioning-aman.md)
 - [2026-11-02 — Siklus hidup kartu oleh operator dan status kartu di app](sessions/2026-11-02-siklus-hidup-kartu.md)
@@ -23,6 +24,9 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Keputusan
 
+- [ADR-0045 — Perangkat dibuat di dalam transaksi enrolment](decisions/ADR-0045-perangkat-dibuat-saat-enrolment.md) · JEV 0,77 (provisional)
+- [ADR-0044 — Kode gedung untuk enrolment kartu fisik](decisions/ADR-0044-kode-gedung-untuk-enrolment-kartu.md) · JEV 0,96
+- [ADR-0043 — Fokus berikutnya: alur Tambah Kartu produksi](decisions/ADR-0043-fokus-alur-tambah-kartu.md) · JEV 0,98
 - [ADR-0042 — Fokus berikutnya setelah provisioning aman](decisions/ADR-0042-fokus-setelah-provisioning-aman.md) · JEV 0,41 (eskalasi; rekomendasi diterapkan)
 - [ADR-0041 — Pengambilalihan enrolment yang belum selesai lewat id perangkat](decisions/ADR-0041-pengambilalihan-enrolment-belum-selesai.md) · JEV 0,44 (eskalasi)
 - [ADR-0040 — Rahasia enrolment untuk kredensial pertama](decisions/ADR-0040-rahasia-enrolment-kredensial-pertama.md) · JEV 0,83
@@ -50,7 +54,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Menunggu pengguna
 
-- ADR-0017 (entitas hukum untuk entitlement), ADR-0022 (bentuk reader uji BLE), ADR-0038 (cegah pembatalan suspend/revoke; rekomendasi `hold_pending_approval`), ADR-0041 (pengambilalihan enrolment yang belum selesai; rekomendasi `first_writer_wins`).
-- Tinjauan gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor.
+- ADR-0017 (entitas hukum untuk entitlement), ADR-0022 (bentuk reader uji BLE), ADR-0038 (cegah pembatalan suspend/revoke; rekomendasi `hold_pending_approval`), ADR-0041 (pengambilalihan enrolment yang belum selesai; rekomendasi `first_writer_wins`), ADR-0046 (kontrol enumerasi kartu sebagai gerbang pra-pilot; rekomendasi deteksi per gedung + App Attest), ADR-0047 (kedaluwarsa permintaan menunggu).
+- Tinjauan gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu.
 - Integrasi branch `feat/r1-scaffold`: merge ke `main` atau PR (sudah di-push ke GitHub private).
 - `DEVELOPMENT_TEAM` serta iPhone dan reader untuk uji bertipe H.
