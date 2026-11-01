@@ -44,11 +44,22 @@ public struct ANPrimaryButtonStyle: ButtonStyle {
     public init() {}
 
     public func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.headline)
-            .padding(.horizontal, 24)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .foregroundStyle(ANColor.onAccent)
-            .background(ANColor.accent.opacity(configuration.isPressed ? 0.8 : 1), in: .rect(cornerRadius: 12))
+        PrimaryButtonBody(configuration: configuration)
+    }
+
+    /// Membaca `isEnabled` agar tombol nonaktif tidak tampak sama dengan yang aktif.
+    private struct PrimaryButtonBody: View {
+        let configuration: ButtonStyleConfiguration
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            configuration.label
+                .font(.headline)
+                .padding(.horizontal, 24)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .foregroundStyle(ANColor.onAccent)
+                .background(ANColor.accent.opacity(configuration.isPressed ? 0.8 : 1), in: .rect(cornerRadius: 12))
+                .opacity(isEnabled ? 1 : 0.4)
+        }
     }
 }

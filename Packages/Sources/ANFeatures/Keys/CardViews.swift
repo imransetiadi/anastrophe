@@ -98,6 +98,8 @@ struct CardDetailView: View {
                     Spacer(minLength: 8)
                     StatusBadge(status: card.status)
                 }
+                // Tanpa ini separator mengikuti teks badge, bukan tepi baris seperti baris lain.
+                .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
                 LabeledContent(localized("detail.channels"), value: channels)
                 if let notAfter = card.notAfter {
                     LabeledContent(localized("detail.expires"), value: notAfter.formatted(date: .abbreviated, time: .shortened))
@@ -109,11 +111,13 @@ struct CardDetailView: View {
                     .disabled(!presentability.canPresent)
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                 if case .unavailable(let reason) = presentability {
                     Text(Self.text(for: reason))
                         .font(.footnote)
                         .foregroundStyle(ANColor.mutedForeground)
                         .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 }
             }
         }
