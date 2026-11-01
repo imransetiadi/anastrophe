@@ -18,6 +18,7 @@
 | 2.2 | 2026-11-01 | Perpanjangan sertifikat (ADR-0023): pemicu hanya setelah autentikasi tap (§5.5), challenge + format bukti kepemilikan (§8.4.2), endpoint (§8.5), kode `CRED-*` (§15). |
 | 2.3 | 2026-11-01 | Audit log berantai hash per gedung (ADR-0024): kolom `chain`/`site_id`/`seq`, append-only, rumus hash (§8.1). |
 | 2.4 | 2026-11-01 | Audit: tag hash `ANP1-AUDIT-v1`, data = teks `jsonb`, CHECK chain kanonik, batas deteksi dan head per jam (§8.1, §11), pseudonim sejak ditulis (§8.4.6, ADR-0025). |
+| 2.5 | 2026-11-01 | Hapus kartu (ADR-0026): `DELETE /cards/{id}` dengan bukti kepemilikan kunci (§8.5), kode `CARD-*` (§15). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -669,7 +670,7 @@ Semua POST mutasi menerima header `Idempotency-Key`. Error memakai RFC 9457 (`ty
 | `POST /enrollments/{id}/credentials` | Kirim pubkey per kanal → sertifikat | FR-16 |
 | `POST /enrollments/{id}/se-personalization` | Sesi personalisasi applet (N-SE) | FR-16 |
 | `GET /cards` · `GET /cards/{id}` | Daftar & detail kartu | FR-30, FR-38 |
-| `DELETE /cards/{id}` | Hapus kartu | FR-31 |
+| `DELETE /cards/{id}` | Hapus kartu dengan bukti kepemilikan kunci: body `credential_id`, `nonce` (dari `:challenge`), `signature` atas `"ANP1-REVOKE"` ‖ `cred_id` ‖ `nonce` ‖ ID kartu; card instance + kredensial REVOKED, audit `credential.revoked` (ADR-0026) | FR-31 |
 | `POST /credentials/{cred}:challenge` · `POST /credentials/{cred}:renew` | Nonce perpanjangan; perpanjang sertifikat (§8.4.2) | FR-45 |
 | `GET /ownerships/{id}/members` · `DELETE /ownerships/{id}/members/{uid}` | Kelola anggota | FR-33 |
 | `PUT /ownerships/{id}/security-code` | Ganti code | FR-34 |
@@ -807,6 +808,8 @@ Tidak ada GPS, tidak ada tracking lintas app (ATT tidak dipakai). Privacy Manife
 | `CRED-NOT-RENEWABLE` | Kredensial atau kartu ditangguhkan/dicabut | "Kartu sedang ditangguhkan. Hubungi pengelola gedung." | Hubungi admin |
 | `CRED-CHALLENGE-INVALID` | Nonce tidak dikenal, terpakai, kedaluwarsa, atau milik kredensial lain | — (diulang otomatis pada tap berikutnya) | Minta nonce baru |
 | `CRED-PROOF-INVALID` | Tanda tangan bukti kepemilikan tidak valid | "Kartu perlu didaftarkan ulang." | Enrolment ulang |
+| `CARD-NOT-FOUND` | ID kartu tidak dikenal saat hapus kartu | — (kartu lokal tetap dihapus) | Tidak ada |
+| `CARD-NOT-REMOVABLE` | Kartu tidak ACTIVE (mis. sudah dicabut) saat hapus kartu | — (kartu lokal tetap dihapus) | Tidak ada |
 | `DEV-KEY-MISSING` | Restore/passcode dimatikan | "Kartu perlu dipindahkan ke iPhone ini." | Alur transfer |
 | `NET-OFFLINE` | Aksi butuh online | "Butuh koneksi internet untuk langkah ini." | Retry otomatis |
 

@@ -6,6 +6,7 @@ import ANProtocol
 import ANStorage
 import ANWallet
 import Foundation
+import LocalAuthentication
 import SwiftUI
 
 /// Status foreground app, dibaca coordinator BLE (ADR-0012) dan diperbarui dari `scenePhase`.
@@ -50,6 +51,8 @@ public final class AppServices {
     public let foreground: ForegroundState
     public let cardsRevision: CardsRevision
     let connectivity: any ConnectivityStatus
+    /// Autentikasi untuk aksi sensitif di luar presentasi (hapus kartu, FR-31).
+    let authenticator: any UserAuthenticator
     /// Store kartu tidak bisa dibuka; UI memberi tahu alih-alih menampilkan daftar kosong.
     public let storageFailed: Bool
     #if DEBUG
@@ -59,6 +62,8 @@ public final class AppServices {
     var pendingLabBackend: LabBackendTarget?
     /// Perpanjangan lab saat peluncuran (`-ANLabRenew`) untuk verifikasi di simulator.
     var pendingLabRenewal = false
+    /// Hapus kartu lab saat peluncuran (`-ANLabDelete`) untuk verifikasi di simulator.
+    var pendingLabDelete = false
     #endif
 
     init(
@@ -70,6 +75,7 @@ public final class AppServices {
         foreground: ForegroundState,
         cardsRevision: CardsRevision = CardsRevision(),
         connectivity: any ConnectivityStatus = FixedConnectivity(isOnline: true),
+        authenticator: any UserAuthenticator = ImmediateAuthenticator(),
         storageFailed: Bool = false
     ) {
         self.cards = cards
@@ -80,6 +86,7 @@ public final class AppServices {
         self.foreground = foreground
         self.cardsRevision = cardsRevision
         self.connectivity = connectivity
+        self.authenticator = authenticator
         self.storageFailed = storageFailed
     }
 
@@ -132,7 +139,8 @@ public final class AppServices {
             launcher: launcher,
             foreground: foreground,
             cardsRevision: revision,
-            connectivity: LiveConnectivity(onChange: { Task { @MainActor in revision.bump() } })
+            connectivity: LiveConnectivity(onChange: { Task { @MainActor in revision.bump() } }),
+            authenticator: LAUserAuthenticator()
         )
     }
 
@@ -141,7 +149,8 @@ public final class AppServices {
         inMemory(events: [.waitingForReader])
     }
 
-    static func inMemory(events: [PresentmentEvent], connectivity: any ConnectivityStatus = FixedConnectivity(isOnline: true)) -> AppServices {
+    static func inMemory(events: [PresentmentEvent], connectivity: any ConnectivityStatus = FixedConnectivity(isOnline: true),
+                         authenticator: any UserAuthenticator = ImmediateAuthenticator()) -> AppServices {
         let secrets = InMemorySecretStore()
         let keys = DeviceKeyStore(store: secrets, factory: SoftwareKeyFactory())
         let directory = FileManager.default.temporaryDirectory.appending(path: "anastrophe-\(UUID().uuidString)")
@@ -152,8 +161,16 @@ public final class AppServices {
             availability: { [.ble: .available, .nfcHCE: .notEligible] },
             launcher: ScriptedPresentationLauncher(events: events),
             foreground: ForegroundState(),
-            connectivity: connectivity
+            connectivity: connectivity,
+            authenticator: authenticator
         )
+    }
+
+    /// Hapus kartu (FR-31): autentikasi pengguna, cabut di server (ADR-0026), lalu hapus lokal.
+    public func removeCard(_ card: Card) async throws {
+        let context = try await authenticator.authenticate(reason: localized("detail.delete.auth_reason"))
+        defer { context.laContext.invalidate() }
+        try await CardRemover(keys: keys, records: records, cards: cards).remove(card: card, context: context)
     }
 
     private static func liveAvailability(config: RemoteConfig, nfcEmulationEntitled: Bool, bluetoothPoweredOn: Bool?) async -> [ChannelKind: ChannelAvailability] {
@@ -202,6 +219,13 @@ private struct SimulatorSecretStore: SecretStore {
     func delete(_ key: String) throws { try base.delete(key) }
 }
 #endif
+
+/// Autentikasi langsung berhasil untuk preview, demo, dan penyimpanan sementara.
+struct ImmediateAuthenticator: UserAuthenticator {
+    func authenticate(reason: String) async throws -> AuthorizedContext {
+        AuthorizedContext(laContext: LAContext())
+    }
+}
 
 /// Kartu kosong bila SwiftData tidak bisa dibuka sama sekali.
 private struct EmptyCardStore: CardStore {

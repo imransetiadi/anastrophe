@@ -14,14 +14,17 @@ public struct CredentialRecord: Codable, Equatable, Sendable {
     public let notBefore: Date?
     /// Base URL backend penerbit untuk perpanjangan (ADR-0023); nil = tidak diperpanjang.
     public let renewalURL: URL?
+    /// ID card instance di server untuk hapus kartu (ADR-0026); nil untuk kartu lab_ca.py.
+    public let serverCardID: String?
 
-    public init(credentialID: Data, certificate: Data, notAfter: Date, groupKeys: [String: [Data]], notBefore: Date? = nil, renewalURL: URL? = nil) {
+    public init(credentialID: Data, certificate: Data, notAfter: Date, groupKeys: [String: [Data]], notBefore: Date? = nil, renewalURL: URL? = nil, serverCardID: String? = nil) {
         self.credentialID = credentialID
         self.certificate = certificate
         self.notAfter = notAfter
         self.groupKeys = groupKeys
         self.notBefore = notBefore
         self.renewalURL = renewalURL
+        self.serverCardID = serverCardID
     }
 
     public func material(suspended: Bool) throws -> CredentialMaterial {

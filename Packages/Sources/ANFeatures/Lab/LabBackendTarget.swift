@@ -52,6 +52,23 @@ extension AppServices {
     public func configureLabBackend(arguments: [String]) {
         pendingLabBackend = LabBackendTarget(arguments: arguments)
         pendingLabRenewal = arguments.contains("-ANLabRenew")
+        pendingLabDelete = arguments.contains("-ANLabDelete")
+    }
+
+    /// Hapus kartu pertama dari `-ANLabDelete`, sekali per peluncuran; nil bila tidak diminta.
+    func runPendingLabDelete(transport: any HTTPTransport = LabNetwork.session) async -> String? {
+        guard pendingLabDelete else { return nil }
+        pendingLabDelete = false
+        guard let card = try? await cards.all().first else { return nil }
+        do {
+            try await CardRemover(keys: keys, records: records, cards: cards, transport: transport)
+                .remove(card: card, context: AuthorizedContext(laContext: LAContext()))
+            return localized("lab.deleted")
+        } catch let problem as ProblemDetails {
+            return "\(localized("detail.delete.failed")) (\(problem.type))"
+        } catch {
+            return localized("detail.delete.failed")
+        }
     }
 
     /// Perpanjangan dari `-ANLabRenew`, sekali per peluncuran; nil bila tidak diminta.

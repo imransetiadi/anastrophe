@@ -321,6 +321,86 @@
         }
       }
     },
+    "detail.delete": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete card"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hapus kartu"
+          }
+        }
+      }
+    },
+    "detail.delete.auth_reason": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete the card from this iPhone"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hapus kartu dari iPhone ini"
+          }
+        }
+      }
+    },
+    "detail.delete.confirm_message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Access with this iPhone is revoked. Your physical card isn't affected."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akses lewat iPhone ini dicabut. Kartu fisik Anda tidak terpengaruh."
+          }
+        }
+      }
+    },
+    "detail.delete.confirm_title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this card from your iPhone?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hapus kartu ini dari iPhone?"
+          }
+        }
+      }
+    },
+    "detail.delete.failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The card couldn't be deleted. Connect to the internet, then try again."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu belum bisa dihapus. Sambungkan ke internet, lalu coba lagi."
+          }
+        }
+      }
+    },
     "detail.expires": {
       "localizations": {
         "en": {
@@ -333,6 +413,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Berlaku hingga"
+          }
+        }
+      }
+    },
+    "detail.settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pengaturan"
           }
         }
       }
@@ -669,6 +765,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Buat kunci kredensial"
+          }
+        }
+      }
+    },
+    "lab.deleted": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Card deleted."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu dihapus."
           }
         }
       }

@@ -80,6 +80,18 @@ public struct APIClient: Sendable {
         return try ProvisionedCredential.decode(try await perform(request))
     }
 
+    /// `DELETE /v1/cards/{id}`: hapus kartu dengan bukti kepemilikan kunci (FR-31, ADR-0026).
+    public func deleteCard(cardID: String, credentialID: Data, nonce: Data, signature: Data, idempotencyKey: UUID) async throws {
+        var request = URLRequest(url: baseURL.appending(path: "v1/cards/\(cardID)"))
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(idempotencyKey.uuidString, forHTTPHeaderField: "Idempotency-Key")
+        request.httpBody = try JSONEncoder().encode([
+            "credential_id": credentialID.base64EncodedString(), "nonce": nonce.base64EncodedString(), "signature": signature.base64EncodedString(),
+        ])
+        _ = try await perform(request)
+    }
+
     /// `cred_id` dalam hex huruf kecil, diikuti `:aksi` (SDD §8.5).
     private func credentialURL(_ credentialID: Data, action: String) -> URL {
         baseURL.appending(path: "v1/credentials/\(credentialID.hexString):\(action)")

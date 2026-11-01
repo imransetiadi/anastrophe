@@ -52,7 +52,7 @@ enum LabProvisioning {
             guard provisioned.channel == channel else { throw ANError.invalidData }
             try keys.moveKey(from: localID, to: provisioned.credentialID)
             movedTo = provisioned.credentialID
-            return try await store(provisioned, keys: keys, records: records, cards: cards, renewalURL: api.baseURL)
+            return try await store(provisioned, keys: keys, records: records, cards: cards, renewalURL: api.baseURL, serverCardID: enrollmentID)
         } catch {
             try? keys.deleteKey(for: localID)
             if let movedTo { try? keys.deleteKey(for: movedTo) }
@@ -60,7 +60,7 @@ enum LabProvisioning {
         }
     }
 
-    private static func store(_ provisioned: ProvisionedCredential, keys: any CredentialKeyStore, records: any CredentialRecordStore, cards: any CardStore, renewalURL: URL? = nil) async throws -> Card {
+    private static func store(_ provisioned: ProvisionedCredential, keys: any CredentialKeyStore, records: any CredentialRecordStore, cards: any CardStore, renewalURL: URL? = nil, serverCardID: String? = nil) async throws -> Card {
         guard [.ble, .nfcHCE].contains(provisioned.channel),
               (try? keys.hasKey(for: provisioned.credentialID)) == true
         else { throw ANError.invalidData }
@@ -70,7 +70,8 @@ enum LabProvisioning {
             notAfter: provisioned.notAfter,
             groupKeys: provisioned.groupKeys,
             notBefore: provisioned.notBefore,
-            renewalURL: renewalURL
+            renewalURL: renewalURL,
+            serverCardID: serverCardID
         )
         _ = try record.material(suspended: false)  // kunci reader group harus valid
         let card = Card(

@@ -93,6 +93,7 @@ struct LabBackendProvisioningTests {
         let record = try #require(try records.record(for: serverCredID))
         #expect(record.renewalURL == base)
         #expect(record.notBefore == Date(timeIntervalSince1970: 1_793_491_200))
+        #expect(record.serverCardID == "e1")  // ADR-0026: ID kartu server untuk hapus kartu
     }
 
     @Test(arguments: [

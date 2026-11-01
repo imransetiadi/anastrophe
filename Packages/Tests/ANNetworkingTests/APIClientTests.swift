@@ -119,6 +119,27 @@ struct APIClientTests {
         #expect(challenge.message(credentialID: credentialID) == Data("ANP1-RENEW".utf8) + credentialID + Data(repeating: 0x4E, count: 32))
     }
 
+    @Test func deleteCardMengirimBuktiKepemilikan() async throws {
+        // FR-31, ADR-0026.
+        let transport = FakeTransport(status: 204, body: "")
+        let key = UUID()
+        let credentialID = Data(repeating: 0xC1, count: 16), nonce = Data(repeating: 0x4E, count: 32), signature = Data(repeating: 0x51, count: 64)
+        try await APIClient(baseURL: base, transport: transport).deleteCard(cardID: "6f1c2a9e-0000-4000-8000-000000000001", credentialID: credentialID, nonce: nonce, signature: signature, idempotencyKey: key)
+        let request = try #require(transport.lastRequest)
+        #expect(request.httpMethod == "DELETE")
+        #expect(request.url?.path(percentEncoded: false) == "/v1/cards/6f1c2a9e-0000-4000-8000-000000000001")
+        #expect(request.value(forHTTPHeaderField: "Idempotency-Key") == key.uuidString)
+        let body = try JSONSerialization.jsonObject(with: try #require(request.httpBody)) as? [String: String]
+        #expect(body == ["credential_id": credentialID.base64EncodedString(), "nonce": nonce.base64EncodedString(), "signature": signature.base64EncodedString()])
+    }
+
+    @Test func pesanHapusKartu() {
+        let challenge = RenewalChallenge(nonce: Data(repeating: 0x4E, count: 32), expiresAt: .now)
+        let credentialID = Data(repeating: 0xC1, count: 16)
+        #expect(challenge.revokeMessage(credentialID: credentialID, cardID: "6F1C2A9E-0000-4000-8000-00000000000A")
+                == Data("ANP1-REVOKE".utf8) + credentialID + Data(repeating: 0x4E, count: 32) + Data("6f1c2a9e-0000-4000-8000-00000000000a".utf8))
+    }
+
     @Test func createEnrollmentMengirimPerangkatDanGedung() async throws {
         // Endpoint tracer backend R1 (pengganti sementara enrolment kartu fisik).
         let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"6f1c2a9e-0000-4000-8000-000000000001"}"#)

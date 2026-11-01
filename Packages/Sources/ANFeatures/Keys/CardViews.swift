@@ -87,7 +87,9 @@ struct CardDetailView: View {
     let card: Card
     let presentability: Presentability
     var notice: RenewalNotice?
+    var onDelete: (() -> Void)?
     let onUse: () -> Void
+    @State private var confirmsDelete = false
 
     var body: some View {
         List {
@@ -129,10 +131,21 @@ struct CardDetailView: View {
                         .listRowSeparator(.hidden)
                 }
             }
+            if onDelete != nil {
+                // FR-31: Detail → Pengaturan → Hapus, dengan konfirmasi + autentikasi.
+                Section(localized("detail.settings")) {
+                    Button(localized("detail.delete"), role: .destructive) { confirmsDelete = true }
+                }
+            }
         }
         .scrollContentBackground(.hidden)
         .background(ANColor.background)
         .navigationTitle(card.name)
+        .confirmationDialog(localized("detail.delete.confirm_title"), isPresented: $confirmsDelete, titleVisibility: .visible) {
+            Button(localized("detail.delete"), role: .destructive) { onDelete?() }
+        } message: {
+            Text(localized("detail.delete.confirm_message"))
+        }
     }
 
     private var channels: String {

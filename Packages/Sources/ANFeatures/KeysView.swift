@@ -10,6 +10,7 @@ public struct KeysView: View {
     @State private var path: [Card.ID] = []
     @State private var presentation: PresentationController
     @State private var showsLab = false
+    @State private var deleteFailed = false
     #if DEBUG
     @State private var labMessage: String?
     #endif
@@ -32,7 +33,7 @@ public struct KeysView: View {
                 .navigationTitle(localized("keys.title"))
                 .navigationDestination(for: Card.ID.self) { id in
                     if let card = model.cards.first(where: { $0.id == id }) {
-                        CardDetailView(card: card, presentability: model.presentability(of: card), notice: model.renewalNotice(for: card)) { use(card) }
+                        CardDetailView(card: card, presentability: model.presentability(of: card), notice: model.renewalNotice(for: card), onDelete: { delete(card) }) { use(card) }
                             #if DEBUG
                             .toolbar {
                                 ToolbarItem(placement: .primaryAction) {
@@ -67,8 +68,15 @@ public struct KeysView: View {
                 labMessage = message
                 await model.load()
             }
+            if let message = await services.runPendingLabDelete() {
+                labMessage = message
+                await model.load()
+            }
             #endif
             openDemoScreen()
+        }
+        .alert(localized("detail.delete.failed"), isPresented: $deleteFailed) {
+            Button(localized("present.done"), role: .cancel) {}
         }
         .onChange(of: services.cardsRevision.value) { _, _ in
             Task { await model.load() }
@@ -142,6 +150,18 @@ public struct KeysView: View {
         }
     }
     #endif
+
+    private func delete(_ card: Card) {
+        Task {
+            do {
+                try await services.removeCard(card)
+                path.removeAll()
+                await model.load()
+            } catch {
+                deleteFailed = true
+            }
+        }
+    }
 
     private func use(_ card: Card) {
         guard case .available(let channel) = model.presentability(of: card) else { return }

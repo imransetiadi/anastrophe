@@ -63,4 +63,9 @@ public struct RenewalChallenge: Decodable, Equatable, Sendable {
     public func message(credentialID: Data) -> Data {
         Data("ANP1-RENEW".utf8) + credentialID + nonce
     }
+
+    /// Pesan hapus kartu (ADR-0026): `"ANP1-REVOKE"` ‖ `cred_id` ‖ `nonce` ‖ ID kartu server huruf kecil.
+    public func revokeMessage(credentialID: Data, cardID: String) -> Data {
+        Data("ANP1-REVOKE".utf8) + credentialID + nonce + Data(cardID.lowercased().utf8)
+    }
 }
