@@ -6,33 +6,6 @@ import Foundation
 import Testing
 @testable import ANChannelNFC
 
-/// Sinyal sekali pakai untuk menahan sebuah langkah async sampai test mengizinkan.
-final class AsyncGate: @unchecked Sendable {
-    private let lock = NSLock()
-    private var opened = false
-    private var waiters: [CheckedContinuation<Void, Never>] = []
-
-    func wait() async {
-        await withCheckedContinuation { continuation in
-            let resumeNow = lock.withLock {
-                if opened { return true }
-                waiters.append(continuation)
-                return false
-            }
-            if resumeNow { continuation.resume() }
-        }
-    }
-
-    func open() {
-        let pending = lock.withLock {
-            opened = true
-            defer { waiters = [] }
-            return waiters
-        }
-        pending.forEach { $0.resume() }
-    }
-}
-
 final class FakeCardEmulationSession: CardEmulationSession, @unchecked Sendable {
     let events: AsyncStream<CardEmulationEvent>
     private let continuation: AsyncStream<CardEmulationEvent>.Continuation

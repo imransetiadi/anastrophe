@@ -67,16 +67,21 @@ final class FakeBLECentral: BLECentral, @unchecked Sendable {
     let link: FakeBLELink
     let scanError: (any Error)?
     let connectHangs: Bool
+    let scanHangs: Bool
     private let scans = LockedBox(0)
+    private let cancelledScan = LockedBox(false)
     private let connects = LockedBox<[UUID]>([])
     private let cancelledConnect = LockedBox(false)
 
-    init(advertisements: [BLEReaderAdvertisement], link: FakeBLELink = FakeBLELink(), scanError: (any Error)? = nil, connectHangs: Bool = false) {
+    init(advertisements: [BLEReaderAdvertisement], link: FakeBLELink = FakeBLELink(), scanError: (any Error)? = nil, connectHangs: Bool = false, scanHangs: Bool = false) {
         self.advertisements = advertisements
         self.link = link
         self.scanError = scanError
         self.connectHangs = connectHangs
+        self.scanHangs = scanHangs
     }
+
+    var scanWasCancelled: Bool { cancelledScan.value }
 
     var scanCount: Int { scans.value }
     var connectedIDs: [UUID] { connects.value }
@@ -84,6 +89,14 @@ final class FakeBLECentral: BLECentral, @unchecked Sendable {
 
     func scan(_ window: ScanWindow) async throws -> [BLEReaderAdvertisement] {
         scans.withLock { $0 += 1 }
+        if scanHangs {
+            do {
+                try await Task.sleep(for: .seconds(3600))
+            } catch {
+                cancelledScan.withLock { $0 = true }
+                throw error
+            }
+        }
         if let scanError { throw scanError }
         return advertisements
     }
@@ -112,19 +125,21 @@ struct BLEHarness {
     let central: FakeBLECentral
     let foreground: LockedBox<Bool>
     let authSucceeds: Bool
+    let authGate: AsyncGate?
 
-    init(advertisements: [BLEReaderAdvertisement], mtu: Int = 185, foreground: Bool = true, authSucceeds: Bool = true, credential: ANP1TestCredential = ANP1TestCredential(), scanError: (any Error)? = nil, connectHangs: Bool = false) {
+    init(advertisements: [BLEReaderAdvertisement], mtu: Int = 185, foreground: Bool = true, authSucceeds: Bool = true, credential: ANP1TestCredential = ANP1TestCredential(), scanError: (any Error)? = nil, connectHangs: Bool = false, scanHangs: Bool = false, authGate: AsyncGate? = nil) {
         self.credential = credential
-        central = FakeBLECentral(advertisements: advertisements, link: FakeBLELink(mtu: mtu), scanError: scanError, connectHangs: connectHangs)
+        central = FakeBLECentral(advertisements: advertisements, link: FakeBLELink(mtu: mtu), scanError: scanError, connectHangs: connectHangs, scanHangs: scanHangs)
         self.foreground = LockedBox(foreground)
         self.authSucceeds = authSucceeds
+        self.authGate = authGate
     }
 
     func coordinator() -> BLETapCoordinator<ManualClock> {
         let credential = credential, foreground = foreground
         return BLETapCoordinator(
             central: central,
-            authenticator: FakeAuthenticator(succeeds: authSucceeds),
+            authenticator: FakeAuthenticator(succeeds: authSucceeds, gate: authGate),
             authenticationReason: "Gunakan kartu",
             makeProvider: { _ in credential.provider() },
             isForeground: { foreground.value },
@@ -298,11 +313,27 @@ struct BLETapTests {
         #expect(h.central.scanCount == 0)
     }
 
-    @Test func autentikasiBatalTanpaPemindaian() async {
-        let h = BLEHarness(advertisements: [advertisement(rssi: -45)], authSucceeds: false)
+    @Test(.timeLimit(.minutes(1)))
+    func pemindaianBerjalanSelamaAutentikasi() async throws {
+        // ADR-0019: pindai dimulai bersamaan dengan Face ID agar NFR-P04 tercapai.
+        let gate = AsyncGate()
+        let h = BLEHarness(advertisements: [advertisement(rssi: -45)], authGate: gate)
+        var events = await h.coordinator().tap().makeAsyncIterator()
+        for _ in 0..<200 where h.central.scanCount == 0 { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(h.central.scanCount == 1)
+        #expect(h.central.connectedIDs.isEmpty)  // connect hanya setelah autentikasi
+        gate.open()
+        #expect(await events.next() == .waitingForReader)
+        #expect(await events.next() == .readerFound(name: nil))
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func autentikasiBatalMembatalkanPemindaian() async {
+        let h = BLEHarness(advertisements: [advertisement(rssi: -45)], authSucceeds: false, scanHangs: true)
         var events = await h.coordinator().tap().makeAsyncIterator()
         #expect(await events.rest() == [.cancelled])
-        #expect(h.central.scanCount == 0)
+        #expect(h.central.connectedIDs.isEmpty)
+        #expect(h.central.scanCount == 0 || h.central.scanWasCancelled)
     }
 
     @Test func bluetoothMatiDiTengahTransaksi() async throws {

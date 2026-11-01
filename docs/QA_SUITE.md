@@ -518,7 +518,7 @@ Laporan per milestone memuat: pass rate per area & kanal, cakupan traceability (
 
 ### 11.1 Hasil verifikasi — M1 tracer bullet sisi app (2026-11-01)
 
-Lingkungan: branch `feat/r1-scaffold` (belum di-commit), Xcode 27.2 (27B52), host macOS dan iOS Simulator 27.2 (iPhone 17 Pro). Hasil (setelah putaran perbaikan review akhir dan iterasi 2): 143 unit test lulus dan 1 dilewati (khusus perangkat) di host maupun simulator; `python3 -I -m unittest discover -s scripts/anp1` 6 OK. "Logika lulus" berarti alur diuji terhadap reader ANP/1 perangkat lunak dan sesi/link palsu, **bukan** perangkat keras. Kasus bertipe H tetap tertunda sampai diuji di iPhone fisik dan reader.
+Lingkungan: branch `feat/r1-scaffold` (belum di-commit), Xcode 27.2 (27B52), host macOS dan iOS Simulator 27.2 (iPhone 17 Pro). Hasil (setelah putaran perbaikan review akhir, iterasi 2 dan 3): 144 unit test lulus dan 1 dilewati (khusus perangkat) di host maupun simulator; `python3 -I -m unittest discover -s scripts/anp1` 6 OK. "Logika lulus" berarti alur diuji terhadap reader ANP/1 perangkat lunak dan sesi/link palsu, **bukan** perangkat keras. Kasus bertipe H tetap tertunda sampai diuji di iPhone fisik dan reader.
 
 | Kasus | Hasil | Bukti |
 |---|---|---|
@@ -531,7 +531,7 @@ Lingkungan: branch `feat/r1-scaffold` (belum di-commit), Xcode 27.2 (27B52), hos
 | TC-PRSN-01, TC-PRSN-03, TC-PRSN-04, TC-PRSN-05, TC-PRSN-15, TC-PRSN-16 | Logika lulus; H **tertunda** (entitlement HCE belum ada — D1, ADR-0017) | `HCEPresentmentTests` (11 test, 15× ulang tanpa gagal) |
 | TC-PRSB-01 | **Tertunda** (H: butuh reader uji BLE) | — |
 | TC-PRSB-02, TC-PRSB-03 | Logika lulus (panduan Bluetooth mati/izin ditolak); H tertunda | `bluetoothTidakTersediaMemberiPanduan`, `bluetoothDimatikanDiTengahTransaksiMemberiPanduan`, `bluetoothMatiAtauDitolakMemberiAlasanSpesifik` |
-| TC-PRSB-04, TC-PRSB-05, TC-PRSB-06, TC-PRSB-07 | Logika lulus; H tertunda | `BLETapTests`, `BLESelectionTests`, `ScanWindowTests` |
+| TC-PRSB-04, TC-PRSB-05, TC-PRSB-06, TC-PRSB-07 | Logika lulus (termasuk pindai paralel dengan autentikasi, ADR-0019); H tertunda | `BLETapTests`, `BLESelectionTests`, `ScanWindowTests`, `pemindaianBerjalanSelamaAutentikasi` |
 | TC-PRSB-08 | Logika lulus di link palsu (MTU 23); adapter live memotong frame sesuai ATT MTU − 3 (`.withoutResponse`). Uji di perangkat dengan MTU kecil tertunda | `mtuKecilTetapGrant` |
 | TC-ELG-02 | Logika lulus | `GatingTests`, `gatingGagalTidakMembuatSesi` |
 | TC-ELG-03 | Logika lulus: tanpa entitlement, gating mengembalikan `entitlementMissing` tanpa menyentuh API CardSession, dan build default (`AN_NFC_EMULATION = NO`) tidak mengaktifkan kanal N. Uji build tanpa entitlement di perangkat tertunda | `tanpaEntitlementTidakMenyentuhCardSession` |

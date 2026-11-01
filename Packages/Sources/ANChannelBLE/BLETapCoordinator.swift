@@ -3,9 +3,9 @@ import ANCrypto
 import ANProtocol
 import Foundation
 
-/// Presentasi kanal B "Tap" (SDD §6.3): foreground saja (ADR-0012), autentikasi,
-/// pindai 5 dtk, reader dengan RSSI tertinggi di atas ambang, lalu ANP/1 lewat
-/// framing BLE (§7.9).
+/// Presentasi kanal B "Tap" (SDD §6.3): foreground saja (ADR-0012), pindai paralel dengan
+/// autentikasi dan berhenti cepat (ADR-0019), reader dengan RSSI tertinggi di atas ambang,
+/// lalu ANP/1 lewat framing BLE (§7.9).
 public actor BLETapCoordinator<C: Clock> where C.Duration == Duration {
     /// Batas atas pemindaian; biasanya berhenti jauh lebih cepat (early exit, ADR-0019).
     public static var scanDuration: Duration { .seconds(5) }
@@ -67,8 +67,12 @@ public actor BLETapCoordinator<C: Clock> where C.Duration == Duration {
     }
 
     private func run(_ out: AsyncStream<PresentmentEvent>.Continuation) async {
-        guard isForeground(),
-              let context = try? await authenticator.authenticate(reason: authenticationReason),
+        guard isForeground(), !Task.isCancelled else { return finish(out, with: .cancelled) }
+        // ADR-0019: pemindaian berjalan bersamaan dengan autentikasi (Face ID) agar NFR-P04
+        // tercapai. Child task ini otomatis dibatalkan bila autentikasi gagal atau app ke
+        // background; connect tetap hanya setelah autentikasi berhasil.
+        async let scanned = central.scan(ScanWindow(threshold: rssiThreshold, settle: Self.scanSettle, maximum: Self.scanDuration))
+        guard let context = try? await authenticator.authenticate(reason: authenticationReason),
               let provider = try? makeProvider(context),
               isForeground(), !Task.isCancelled
         else { return finish(out, with: .cancelled) }
@@ -76,7 +80,7 @@ public actor BLETapCoordinator<C: Clock> where C.Duration == Duration {
         out.yield(.waitingForReader)
         let advertisements: [BLEReaderAdvertisement]
         do {
-            advertisements = try await central.scan(ScanWindow(threshold: rssiThreshold, settle: Self.scanSettle, maximum: Self.scanDuration))
+            advertisements = try await scanned
         } catch {
             return finish(out, with: Self.terminal(for: error))
         }

@@ -361,7 +361,7 @@ Aturan: maks 2 assertion per 80 dtk (O-A21). Bila app masuk background, sesi dii
 
 **Alur Tap (R1, foreground; FR-80):**
 1. Pengguna membuka app/widget dan memilih kartu → autentikasi (`LAContext`).
-2. Pemindaian dengan filter service UUID, **maksimal** 5 dtk: berhenti segera setelah reader pertama memenuhi ambang ditambah jeda ±300 ms untuk membandingkan RSSI (*early exit*, interim ADR-0019; usulan memulai pindai saat lembar dibuka masih menunggu keputusan). Hanya reader dengan **RSSI tertinggi di atas ambang** (dikonfigurasi per reader, mis. −55 dBm) yang dipilih (FR-83).
+2. Pemindaian dengan filter service UUID dimulai **bersamaan dengan autentikasi** (saat pengguna memilih kartu, foreground) dan berlangsung **maksimal** 5 dtk: berhenti segera setelah reader pertama memenuhi ambang ditambah jeda ±300 ms untuk membandingkan RSSI (*early exit*, ADR-0019). Pemindaian dibatalkan bila autentikasi gagal atau app ke background; connect hanya setelah autentikasi berhasil. Hanya reader dengan **RSSI tertinggi di atas ambang** (dikonfigurasi per reader, mis. −55 dBm) yang dipilih (FR-83).
 3. Connect → negosiasi MTU → pertukaran ANP/1 (§7) dibungkus framing BLE (§7.9) → RESULT → disconnect.
 4. Maksimal 1 transaksi per 3 dtk per reader. Tap kedua yang terlalu cepat **ditunda** hingga jeda habis (UI menampilkan hitung mundur `coolingDown`), bukan ditolak.
 5. Connect + persiapan GATT dibatasi 3 dtk (koneksi dibatalkan bila lewat), lalu pertukaran dibatasi 5 dtk, agar reader yang menjauh atau diam tidak membuat UI menggantung. Putusnya link atau Bluetooth yang dimatikan mengakhiri sesi dengan status batal.

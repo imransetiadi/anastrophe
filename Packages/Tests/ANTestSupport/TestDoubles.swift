@@ -71,12 +71,16 @@ public struct ANP1TestCredential: Sendable {
 public struct FakeAuthenticator: UserAuthenticator {
     public struct Cancelled: Error {}
     public let succeeds: Bool
+    /// Bila diisi, autentikasi menunggu sampai gate dibuka (meniru prompt Face ID).
+    public let gate: AsyncGate?
 
-    public init(succeeds: Bool = true) {
+    public init(succeeds: Bool = true, gate: AsyncGate? = nil) {
         self.succeeds = succeeds
+        self.gate = gate
     }
 
     public func authenticate(reason: String) async throws -> AuthorizedContext {
+        await gate?.wait()
         guard succeeds else { throw Cancelled() }
         return AuthorizedContext(laContext: LAContext())
     }
@@ -95,5 +99,34 @@ public final class LockedBox<Value>: @unchecked Sendable {
 
     public func withLock<R>(_ body: (inout Value) throws -> R) rethrows -> R {
         try lock.withLock { try body(&stored) }
+    }
+}
+
+/// Sinyal sekali pakai untuk menahan sebuah langkah async sampai test mengizinkan.
+public final class AsyncGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var opened = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    public init() {}
+
+    public func wait() async {
+        await withCheckedContinuation { continuation in
+            let resumeNow = lock.withLock {
+                if opened { return true }
+                waiters.append(continuation)
+                return false
+            }
+            if resumeNow { continuation.resume() }
+        }
+    }
+
+    public func open() {
+        let pending = lock.withLock {
+            opened = true
+            defer { waiters = [] }
+            return waiters
+        }
+        pending.forEach { $0.resume() }
     }
 }
