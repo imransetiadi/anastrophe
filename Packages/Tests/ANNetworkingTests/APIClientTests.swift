@@ -83,6 +83,25 @@ struct APIClientTests {
         #expect(credential.groupKeys == ["a1a2a3a4a5a6a7a8": [Data([0x04, 0x01]), Data([0x04, 0x02])]])
     }
 
+    @Test func createEnrollmentMengirimPerangkatDanGedung() async throws {
+        // Endpoint tracer backend R1 (pengganti sementara enrolment kartu fisik).
+        let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"6f1c2a9e-0000-4000-8000-000000000001"}"#)
+        let id = try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", siteID: "site-1")
+        #expect(id == "6f1c2a9e-0000-4000-8000-000000000001")
+        let request = try #require(transport.lastRequest)
+        #expect(request.httpMethod == "POST")
+        #expect(request.url?.path() == "/v1/enrollments")
+        let body = try JSONSerialization.jsonObject(with: try #require(request.httpBody)) as? [String: String]
+        #expect(body == ["device_id": "dev-1", "site_id": "site-1"])
+    }
+
+    @Test func createEnrollmentBatasKartu() async {
+        let transport = FakeTransport(status: 409, body: #"{"type":"ENR-LIMIT","status":409}"#, contentType: "application/problem+json")
+        await #expect(throws: ANError.cardLimitReached) {
+            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", siteID: "site-1")
+        }
+    }
+
     @Test func configDecode() async throws {
         let transport = FakeTransport(body: #"{"enabled_channels":["ble","nfcHCE"],"wallet_program_enabled":false}"#)
         let config = try await APIClient(baseURL: base, transport: transport).fetchConfig()

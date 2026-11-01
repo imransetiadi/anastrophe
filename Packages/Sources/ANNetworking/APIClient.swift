@@ -38,6 +38,20 @@ public struct APIClient: Sendable {
         return try Self.decoder.decode(RemoteConfig.self, from: data)
     }
 
+    /// `POST /v1/enrollments` versi tracer backend R1: mendaftarkan kartu untuk perangkat di gedung.
+    /// Enrolment produksi memakai identitas kartu fisik, security code, dan App Attest (SDD §8.4.1).
+    public func createEnrollment(deviceID: String, siteID: String) async throws -> String {
+        var request = URLRequest(url: baseURL.appending(path: "v1/enrollments"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["device_id": deviceID, "site_id": siteID])
+        struct Created: Decodable {
+            let enrollmentID: String
+            enum CodingKeys: String, CodingKey { case enrollmentID = "enrollment_id" }
+        }
+        return try Self.decoder.decode(Created.self, from: try await perform(request)).enrollmentID
+    }
+
     /// `POST /v1/enrollments/{id}/credentials`: kirim kunci publik kanal, terima sertifikat (FR-16).
     public func submitCredentialKey(enrollmentID: String, channel: ChannelKind, publicKey: Data, idempotencyKey: UUID) async throws -> ProvisionedCredential {
         var request = URLRequest(url: baseURL.appending(path: "v1/enrollments/\(enrollmentID)/credentials"))
