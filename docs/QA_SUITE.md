@@ -145,6 +145,7 @@ Format ID: `TC-<AREA>-<NN>`. **Prio:** P0/P1/P2. **Tipe:** U unit · I integrasi
 | TC-ENR-16 | Lanjutkan enrolment terputus | Tutup app setelah baca kartu, buka lagi < 15 menit | Enrolment dilanjutkan; setelah 15 menit kedaluwarsa tanpa kredensial yatim | FR-19 | P1 | I | Semua |
 | TC-ENR-17 | App Attest gagal | Assertion dimanipulasi/jailbreak | Provisioning ditolak (403) | NFR-S03 | P0 | S | Semua |
 | TC-ENR-18 | Personalisasi applet N-SE | Enrolment di SG dengan N-SE | `provisionCredential` + mode wired + relai APDU sukses; jeda < 15 dtk antar `transceive` | FR-16 | P0 | H | N |
+| TC-ENR-19 | Provisioning hanya dari perangkat enrolment | Kirim kredensial dengan id instance dari `:challenge` tanpa rahasia enrolment; tambah kanal ke kartu aktif | 404 `ENR-NOT-FOUND` identik dengan id tak dikenal; tambah kanal 409; rahasia mentah tidak tersimpan | FR-16 | P0 | E | N, B |
 
 ### 5.4 Presentasi NFC in-app (PRSN)
 
@@ -615,7 +616,7 @@ Jadwal mengikuti milestone PRD §13; uji pilot mencakup 2 lokasi (ADR-0011).
 | FR-13 | TC-ENR-04, TC-ENR-05, TC-ENR-06 |
 | FR-14 | TC-ENR-01, TC-ENR-09, TC-ENR-10 |
 | FR-15 | TC-ENR-11, TC-ENR-12 |
-| FR-16 | TC-ENR-01, TC-ENR-13, TC-ENR-18 |
+| FR-16 | TC-ENR-01, TC-ENR-13, TC-ENR-18, TC-ENR-19 |
 | FR-17 | TC-ENR-02 |
 | FR-18 | TC-ENR-01, TC-ENR-02, TC-ENR-03, TC-SEC-09 |
 | FR-19 | TC-ENR-16 |
