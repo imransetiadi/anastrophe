@@ -155,6 +155,9 @@ func (h *Handler) renew(ctx context.Context, tx *store.Tx, credID, nonce, sig []
 	if err := tx.CompleteRenewal(ctx, cred.ID, nonce, cert, notAfter, now); err != nil {
 		return 0, nil, err
 	}
+	if err := tx.AppendAudit(ctx, credentialAudit("credential.renewed", cred.Site, cred.CredID, cred.Channel, notAfter, now)); err != nil {
+		return 0, nil, err
+	}
 	groupKeys, err := tx.ReaderGroupKeys(ctx, cred.Site.SiteID)
 	if err != nil {
 		return 0, nil, err

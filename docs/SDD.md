@@ -16,6 +16,7 @@
 | 2.0 | 2026-11-01 | Abstraksi tiga kanal (W/N/B); desain `CredentialSession` (personalisasi wired) dan BLE; **ANP/1 didesain ulang** (ECDH ephemeral, reader group diautentikasi lebih dulu, identitas terenkripsi, semua APDU < 255 B). Backend: kartu ↔ kredensial per kanal, perpanjangan sertifikat 7 hari, sengketa klaim, hapus akun. Reader referensi + gateway OSDP Transparent Mode. Keamanan, privasi, infrastruktur, observabilitas, katalog error. ADR dipindah ke `docs/adr/` dan diputuskan lewat JEV. |
 | 2.1 | 2026-11-01 | ANP/1: format plaintext AUTH1/GET_CERT/RESULT, `cert_hash`, AAD respons, dan seq per pesan dipatok (§7.4, §7.6); penyamaan kerja verifikasi pada jalur `6982`; test vector v1 (§7.11). |
 | 2.2 | 2026-11-01 | Perpanjangan sertifikat (ADR-0023): pemicu hanya setelah autentikasi tap (§5.5), challenge + format bukti kepemilikan (§8.4.2), endpoint (§8.5), kode `CRED-*` (§15). |
+| 2.3 | 2026-11-01 | Audit log berantai hash per gedung (ADR-0024): kolom `chain`/`site_id`/`seq`, append-only, rumus hash (§8.1). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -552,7 +553,7 @@ invitations(id uuid pk, site_id fk, physical_card_id fk null, contact_hmac bytea
 claim_disputes(id uuid pk, physical_card_id fk, reporter_user_id fk, status text, decision text, decided_by fk, decided_at timestamptz)
 denylist_entries(site_id fk, cred_id bytea, revoked_at timestamptz, expires_at timestamptz, primary key(site_id, cred_id))
 admin_users(id uuid pk, org_id fk, idp_subject text, role text, mfa_enrolled bool)
-audit_events(id bigserial pk, at timestamptz, actor text, action text, subject text, data jsonb, prev_hash bytea, hash bytea)
+audit_events(id bigserial pk, chain text /* site:<uuid> | platform (ADR-0024) */, site_id fk null, seq bigint, at timestamptz, actor text, action text, subject text, data jsonb, prev_hash bytea, hash bytea, unique(chain, seq)) /* append-only via trigger; hash = SHA-256("ANP1-AUDIT" ‖ prev_hash ‖ seq ‖ field berawalan panjang) */
 ```
 
 **Invarian:**

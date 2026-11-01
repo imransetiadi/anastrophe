@@ -134,6 +134,35 @@ func (s *Store) AddCardInstance(ctx context.Context, deviceID, siteID string) (s
 	return id, nil
 }
 
+// StartEnrollment membuat card instance dan mencatat enrollment.started di transaksi yang sama.
+func (s *Store) StartEnrollment(ctx context.Context, deviceID, siteID string, at time.Time) (string, error) {
+	var id string
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		var err error
+		id, err = (&Tx{tx: tx}).StartEnrollment(ctx, deviceID, siteID, at)
+		return err
+	})
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+// StartEnrollment di dalam transaksi idempotency.
+func (t *Tx) StartEnrollment(ctx context.Context, deviceID, siteID string, at time.Time) (string, error) {
+	id, err := addCardInstance(ctx, t.tx, deviceID, siteID)
+	if err != nil {
+		return "", err
+	}
+	err = t.AppendAudit(ctx, AuditEvent{
+		SiteID: siteID, Actor: "device:" + deviceID, Action: "enrollment.started", Subject: "card_instance:" + id, At: at,
+	})
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
 // AddCardInstance di dalam transaksi idempotency (satu koneksi per permintaan).
 func (t *Tx) AddCardInstance(ctx context.Context, deviceID, siteID string) (string, error) {
 	return addCardInstance(ctx, t.tx, deviceID, siteID)
@@ -209,8 +238,10 @@ func (s *Store) AddReaderGroup(ctx context.Context, groupID []byte, siteID strin
 
 // Enrollment adalah card instance yang sedang diprovisikan beserta data gedungnya.
 type Enrollment struct {
-	ID       string
-	Status   string
+	ID     string
+	Status string
+	// DeviceID pemilik card instance (aktor event audit).
+	DeviceID string
 	SiteID   string
 	SiteName string
 	SiteCode []byte
@@ -249,13 +280,13 @@ func (t *Tx) EnrollmentForUpdate(ctx context.Context, id string) (Enrollment, er
 	var zones []string
 	var bitmap, validity *string
 	err := t.tx.QueryRow(ctx, `
-		SELECT ci.id, ci.status, s.id, s.name, s.site_code,
+		SELECT ci.id, ci.status, ci.device_id, s.id, s.name, s.site_code,
 		       COALESCE(ARRAY(SELECT jsonb_array_elements_text(s.policy -> 'zones')), '{}'),
 		       s.policy ->> 'zones_bitmap',
 		       s.policy ->> 'cert_validity_days'
 		FROM card_instances ci JOIN sites s ON s.id = ci.site_id
 		WHERE ci.id = $1
-		FOR UPDATE OF ci`, id).Scan(&e.ID, &e.Status, &e.SiteID, &e.SiteName, &e.SiteCode, &zones, &bitmap, &validity)
+		FOR UPDATE OF ci`, id).Scan(&e.ID, &e.Status, &e.DeviceID, &e.SiteID, &e.SiteName, &e.SiteCode, &zones, &bitmap, &validity)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Enrollment{}, ErrNotFound
 	}
@@ -346,7 +377,7 @@ func (t *Tx) CredentialForRenewal(ctx context.Context, credID []byte) (Renewable
 	var zones []string
 	var bitmap, validity *string
 	err := t.tx.QueryRow(ctx, `
-		SELECT c.id, c.channel, c.status, c.cred_id, c.pubkey, ci.id, ci.status, s.id, s.name, s.site_code,
+		SELECT c.id, c.channel, c.status, c.cred_id, c.pubkey, ci.id, ci.status, ci.device_id, s.id, s.name, s.site_code,
 		       COALESCE(ARRAY(SELECT jsonb_array_elements_text(s.policy -> 'zones')), '{}'),
 		       s.policy ->> 'zones_bitmap',
 		       s.policy ->> 'cert_validity_days'
@@ -354,7 +385,7 @@ func (t *Tx) CredentialForRenewal(ctx context.Context, credID []byte) (Renewable
 		JOIN card_instances ci ON ci.id = c.card_instance_id
 		JOIN sites s ON s.id = ci.site_id
 		WHERE c.cred_id = $1
-		FOR UPDATE OF c`, credID).Scan(&c.ID, &c.Channel, &c.Status, &c.CredID, &c.PubKey, &c.Site.ID, &c.CardStatus,
+		FOR UPDATE OF c`, credID).Scan(&c.ID, &c.Channel, &c.Status, &c.CredID, &c.PubKey, &c.Site.ID, &c.CardStatus, &c.Site.DeviceID,
 		&c.Site.SiteID, &c.Site.SiteName, &c.Site.SiteCode, &zones, &bitmap, &validity)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return RenewableCredential{}, ErrNotFound

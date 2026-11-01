@@ -157,3 +157,31 @@ func (s *Store) VerifyAuditChain(ctx context.Context, chain string) (int, error)
 	}
 	return valid, rows.Err()
 }
+
+// AuditRecord adalah baris audit yang dibaca kembali (ekspor per gedung, verifikasi manual).
+type AuditRecord struct {
+	Seq     int64
+	At      time.Time
+	Actor   string
+	Action  string
+	Subject string
+	Data    map[string]any
+}
+
+// AuditEvents membaca seluruh rantai berurutan seq.
+func (s *Store) AuditEvents(ctx context.Context, chain string) ([]AuditRecord, error) {
+	rows, err := s.pool.Query(ctx, `SELECT seq, at, actor, action, subject, data FROM audit_events WHERE chain = $1 ORDER BY seq`, chain)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []AuditRecord
+	for rows.Next() {
+		var r AuditRecord
+		if err := rows.Scan(&r.Seq, &r.At, &r.Actor, &r.Action, &r.Subject, &r.Data); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}

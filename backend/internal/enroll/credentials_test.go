@@ -48,6 +48,7 @@ func TestMain(m *testing.M) {
 }
 
 type fixture struct {
+	dsn      string
 	h        *Handler
 	handler  http.Handler
 	store    *store.Store
@@ -106,6 +107,7 @@ func newFixtureWithPool(t *testing.T, poolParams string) fixture {
 		EnabledChannels: []string{"ble", "nfcHCE"},
 	}
 	return fixture{
+		dsn:      dsn,
 		h:        h,
 		handler:  httpapi.New(httpapi.Config{}, httpapi.Deps{Routes: h.Register}),
 		store:    s,

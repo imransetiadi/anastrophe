@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -121,10 +122,10 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 		}
 		hash := sha256.Sum256([]byte(r.URL.Path + "\n" + req.DeviceID + "\n" + req.SiteID))
 		status, resp, err = h.Store.Idempotent(r.Context(), key, hash[:], func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
-			return enroll(func() (string, error) { return tx.AddCardInstance(ctx, req.DeviceID, req.SiteID) })
+			return enroll(func() (string, error) { return tx.StartEnrollment(ctx, req.DeviceID, req.SiteID, h.Now()) })
 		})
 	} else {
-		status, resp, err = enroll(func() (string, error) { return h.Store.AddCardInstance(r.Context(), req.DeviceID, req.SiteID) })
+		status, resp, err = enroll(func() (string, error) { return h.Store.StartEnrollment(r.Context(), req.DeviceID, req.SiteID, h.Now()) })
 	}
 	h.writeResult(w, status, resp, err, "create enrollment failed")
 }
@@ -270,12 +271,25 @@ func (h *Handler) issue(ctx context.Context, tx *store.Tx, enrollmentID string, 
 	}); err != nil {
 		return 0, nil, err
 	}
+	if err := tx.AppendAudit(ctx, credentialAudit("credential.provisioned", enrollment, credID, req.Channel, notAfter, notBefore)); err != nil {
+		return 0, nil, err
+	}
 	out, err := json.Marshal(provisioned{
 		CredentialID: credID, Channel: req.Channel, Certificate: cert,
 		NotBefore: notBefore.Format(time.RFC3339), NotAfter: notAfter.Format(time.RFC3339), SiteName: enrollment.SiteName,
 		Zones: enrollment.Zones, GroupKeys: groupKeys,
 	})
 	return http.StatusOK, out, err
+}
+
+// credentialAudit: event kredensial tanpa data pribadi, hanya kanal dan masa berlaku (FR-54).
+func credentialAudit(action string, site store.Enrollment, credID []byte, channel string, notAfter, at time.Time) store.AuditEvent {
+	return store.AuditEvent{
+		SiteID: site.SiteID, Actor: "device:" + site.DeviceID, Action: action,
+		Subject: "credential:" + hex.EncodeToString(credID),
+		Data:    map[string]any{"channel": channel, "not_after": notAfter.UTC().Format(time.RFC3339)},
+		At:      at,
+	}
 }
 
 // validity: masa berlaku dari kebijakan gedung (1–30 hari), atau default handler (ADR-0010).
