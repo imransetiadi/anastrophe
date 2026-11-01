@@ -1281,6 +1281,566 @@
         }
       }
     },
+    "help.channel.available": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tersedia"
+          }
+        }
+      }
+    },
+    "help.channel.bluetooth_denied": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow Bluetooth in Settings"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Izinkan Bluetooth di Pengaturan"
+          }
+        }
+      }
+    },
+    "help.channel.bluetooth_off": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bluetooth is off"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bluetooth mati"
+          }
+        }
+      }
+    },
+    "help.channel.unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not available on this iPhone or in this region yet"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum tersedia di iPhone atau wilayah ini"
+          }
+        }
+      }
+    },
+    "help.devices.list": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone 11 and later, plus iPhone SE (2nd and 3rd generation), running iOS 26 or later."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone 11 dan yang lebih baru, serta iPhone SE generasi 2 dan 3, dengan iOS 26 atau lebih baru."
+          }
+        }
+      }
+    },
+    "help.devices.note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“Hold near reader” is only available in some regions and when your building supports it. Bluetooth works in every supported region."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“Tempel ke pembaca” hanya tersedia di wilayah tertentu dan bila gedung Anda mendukungnya. Bluetooth tersedia di semua wilayah yang didukung."
+          }
+        }
+      }
+    },
+    "help.diagnostics.note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The report contains the app version, iOS version, access method status, and card status. It doesn't include keys, tokens, card identities, or card names."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan berisi versi app, versi iOS, status cara akses, dan status kartu. Laporan tidak memuat kunci, token, identitas kartu, atau nama kartu."
+          }
+        }
+      }
+    },
+    "help.diagnostics.share": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share diagnostic report"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bagikan laporan diagnostik"
+          }
+        }
+      }
+    },
+    "help.faq.cards.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Building access cards that your building management has registered with Anastrophe. You hold your physical card to your iPhone once to prove it's yours; Anastrophe doesn't copy your physical card. If the card can't be read (for example a 125 kHz card) or isn't registered, ask your building management for an invitation link."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu akses gedung yang sudah didaftarkan pengelola gedung di Anastrophe. Kartu fisik hanya ditempelkan sekali untuk membuktikan bahwa kartu itu milik Anda; Anastrophe tidak menyalin kartu fisik. Bila kartu tidak terbaca (misalnya kartu 125 kHz) atau belum terdaftar, minta tautan undangan dari pengelola gedung."
+          }
+        }
+      }
+    },
+    "help.faq.cards.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Which cards can I add?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu apa yang bisa ditambahkan?"
+          }
+        }
+      }
+    },
+    "help.faq.delete.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the card details, tap “Delete card”, then confirm. Access through this iPhone is revoked; your physical card isn't affected."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buka detail kartu, ketuk “Hapus kartu”, lalu konfirmasi. Akses lewat iPhone ini dicabut; kartu fisik Anda tidak terpengaruh."
+          }
+        }
+      }
+    },
+    "help.faq.delete.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How do I delete a card?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bagaimana cara menghapus kartu?"
+          }
+        }
+      }
+    },
+    "help.faq.devices.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone 11 and later, plus iPhone SE (2nd and 3rd generation), running iOS 26 or later. “Hold near reader” is only available in some regions and when your building supports it; Bluetooth works in every supported region. See “Access methods on this iPhone” above."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone 11 dan yang lebih baru, serta iPhone SE generasi 2 dan 3, dengan iOS 26 atau lebih baru. “Tempel ke pembaca” hanya tersedia di wilayah tertentu dan bila gedung Anda mendukungnya; Bluetooth bisa dipakai di semua wilayah yang didukung. Lihat “Cara akses di iPhone ini” di atas."
+          }
+        }
+      }
+    },
+    "help.faq.devices.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Which iPhones are supported?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone apa saja yang didukung?"
+          }
+        }
+      }
+    },
+    "help.faq.limit.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up to 8 cards per iPhone. Delete a card you no longer use to add a new one."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hingga 8 kartu per iPhone. Hapus kartu yang tidak dipakai lagi untuk menambah kartu baru."
+          }
+        }
+      }
+    },
+    "help.faq.limit.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How many cards can I keep?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Berapa banyak kartu yang bisa saya simpan?"
+          }
+        }
+      }
+    },
+    "help.faq.lockedScreen.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No. Cards in the app can't be used while your iPhone is locked, the screen is off, or the battery is empty. Open the app, choose a card, then confirm with Face ID, Touch ID, or your passcode."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak. Kartu di app tidak bisa dipakai saat iPhone terkunci, layar mati, atau baterai habis. Buka app, pilih kartu, lalu konfirmasi dengan Face ID, Touch ID, atau kode sandi."
+          }
+        }
+      }
+    },
+    "help.faq.lockedScreen.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can I use a card while my iPhone is locked?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bisakah kartu dipakai saat iPhone terkunci?"
+          }
+        }
+      }
+    },
+    "help.faq.lost.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cards in the app can't be used without unlocking the iPhone and authenticating. Contact your building management right away so they can suspend or revoke the card. Erasing the iPhone, for example with Find My, also removes the cards from it."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu di app tidak bisa dipakai tanpa membuka kunci iPhone dan autentikasi. Segera hubungi pengelola gedung agar kartu ditangguhkan atau dicabut. Menghapus isi iPhone, misalnya lewat Lacak, juga menghapus kartu dari iPhone itu."
+          }
+        }
+      }
+    },
+    "help.faq.lost.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What if I lose my iPhone?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bagaimana bila iPhone saya hilang?"
+          }
+        }
+      }
+    },
+    "help.faq.members.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everyone adds the card on their own iPhone. If the same card is already on another iPhone, your building management needs to approve the additional iPhone, or can send an invitation link."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Setiap orang menambahkan kartu di iPhone-nya sendiri. Bila kartu yang sama sudah ada di iPhone lain, pengelola gedung perlu menyetujui iPhone tambahan, atau bisa mengirim tautan undangan."
+          }
+        }
+      }
+    },
+    "help.faq.members.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can family members use the same card?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bisakah anggota keluarga memakai kartu yang sama?"
+          }
+        }
+      }
+    },
+    "help.faq.offline.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes. Cards work without mobile data or Wi-Fi. They're renewed automatically when you use them with an internet connection, so connect your iPhone to the internet now and then to keep your cards valid."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ya. Kartu bisa dipakai tanpa data seluler atau Wi-Fi. Kartu diperbarui otomatis saat dipakai dengan koneksi internet, jadi sambungkan iPhone ke internet sesekali agar kartu tetap berlaku."
+          }
+        }
+      }
+    },
+    "help.faq.offline.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Do cards work without internet?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apakah kartu bisa dipakai tanpa internet?"
+          }
+        }
+      }
+    },
+    "help.faq.sharing.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No. Cards are tied to this iPhone and can't be shared with other people."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak. Kartu terikat ke iPhone ini dan tidak bisa dibagikan ke orang lain."
+          }
+        }
+      }
+    },
+    "help.faq.sharing.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can I share or forward a card?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bisakah kartu dibagikan atau diteruskan?"
+          }
+        }
+      }
+    },
+    "help.faq.transfer.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cards don't move to a new iPhone through iCloud backup or by signing in. On your new iPhone, add the card again; your building management may need to approve it. Delete the card from your old iPhone if you still can."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu tidak ikut pindah lewat cadangan iCloud atau login di iPhone lain. Di iPhone baru, tambahkan kartu lagi; pengelola gedung mungkin perlu menyetujuinya. Hapus kartu dari iPhone lama bila masih bisa."
+          }
+        }
+      }
+    },
+    "help.faq.transfer.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What if I get a new iPhone?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bagaimana bila saya ganti iPhone?"
+          }
+        }
+      }
+    },
+    "help.section.channels": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Access methods on this iPhone"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cara akses di iPhone ini"
+          }
+        }
+      }
+    },
+    "help.section.devices": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supported iPhones"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone yang didukung"
+          }
+        }
+      }
+    },
+    "help.section.diagnostics": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostics"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostik"
+          }
+        }
+      }
+    },
+    "help.section.faq": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frequently asked questions"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pertanyaan umum"
+          }
+        }
+      }
+    },
+    "help.section.support": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Support"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dukungan"
+          }
+        }
+      }
+    },
+    "help.support.text": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For cards and building access, contact your building management."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Untuk kartu dan akses gedung, hubungi pengelola gedung Anda."
+          }
+        }
+      }
+    },
+    "help.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Help"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bantuan"
+          }
+        }
+      }
+    },
     "history.reason.expired": {
       "localizations": {
         "en": {
@@ -1421,6 +1981,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Belum ada kartu"
+          }
+        }
+      }
+    },
+    "keys.help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Help"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bantuan"
           }
         }
       }

@@ -32,6 +32,19 @@ struct StringCatalogTests {
         }
     }
 
+    @Test func teksBantuanTanpaJargon() throws {
+        // Layar Bantuan (ADR-0048) memakai aturan teks presentasi: tanpa istilah teknis.
+        let catalog = try Self.load()
+        let help = catalog.strings.filter { $0.key.hasPrefix("help.") }
+        #expect(help.count >= 25)
+        for (key, entry) in help {
+            for (_, localization) in entry.localizations ?? [:] {
+                let text = localization.stringUnit.value.uppercased()
+                #expect(!["NFC", "HCE", "APDU"].contains { text.contains($0) }, "\(key) memuat istilah teknis")
+            }
+        }
+    }
+
     @Test func teksTambahKartuTanpaJargon() throws {
         // Alur Tambah Kartu (ADR-0043) memakai aturan teks presentasi: tanpa istilah teknis.
         let catalog = try Self.load()
