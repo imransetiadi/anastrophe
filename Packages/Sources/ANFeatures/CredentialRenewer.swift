@@ -44,11 +44,13 @@ struct CredentialRenewer: Sendable {
             renewalURL: backend
         )
         _ = try updated.material(suspended: false)  // kunci reader group harus valid sebelum menimpa
+        // Baca ulang kartu: perubahan selama perpanjangan (mis. status) tidak boleh tertimpa salinan
+        // lama, dan kartu yang sudah dihapus tidak mendapat record baru.
+        guard var current = try await cards.all().first(where: { $0.id == card.id }) else { throw ANError.keyUnavailable }
         try records.save(updated)
-        var refreshed = card
-        refreshed.notAfter = renewed.notAfter
-        refreshed.zones = renewed.zones
-        try await cards.update(refreshed)
-        return refreshed
+        current.notAfter = renewed.notAfter
+        current.zones = renewed.zones
+        try await cards.update(current)
+        return current
     }
 }

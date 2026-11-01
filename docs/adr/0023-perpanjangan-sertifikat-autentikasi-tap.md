@@ -25,6 +25,13 @@ Perpanjangan hanya terjadi **setelah pengguna mengautentikasi untuk tap**. App m
 - Pengguna yang tidak memakai kartu sampai sertifikatnya kedaluwarsa butuh koneksi internet saat tap berikutnya, karena perpanjangan harus berhasil sebelum presentasi.
 - SDD §5.5 diubah sesuai keputusan ini. App Attest tetap bagian dari §8.4.2 dan ditambahkan setelah tim pengembang Apple tersedia.
 
+## Catatan implementasi (2026-11-01)
+
+- Perpanjangan untuk sisa < 50% berjalan **tepat setelah aliran tap selesai**, bukan bersamaan, agar tidak ada dua operasi tanda tangan pada satu `LAContext`. Tap tetap tidak ditahan.
+- Tanda tangan hanya dibuat saat app di foreground (dicek tepat sebelum menandatangani). Pekerjaan tertunda dibuang bila presentasi dibatalkan, dan `LAContext` di-invalidate setelahnya.
+- Kartu kedaluwarsa yang punya backend penerbit tetap bisa di-tap supaya perpanjangan sebelum presentasi dapat terjadi (TC-DEV-11). Kartu tanpa backend penerbit tetap nonaktif.
+- Kill switch kanal (FR-04) juga menghentikan perpanjangan.
+
 ## Catatan keputusan JEV
 
 - **Alat:** `jev_decide` (model `jev-1.14.0`), `escalate_on_contradiction: true`

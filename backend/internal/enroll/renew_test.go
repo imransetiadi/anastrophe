@@ -303,3 +303,18 @@ func TestKanalDimatikanTidakDiperpanjang(t *testing.T) {
 		t.Fatalf("challenge kanal mati: %d %s", rec.Code, rec.Body)
 	}
 }
+
+func TestKredensialDicabutTidakDiperpanjang(t *testing.T) {
+	// Review perpanjangan M1: status kredensial (bukan card instance) juga dihormati.
+	f := provisionedForRenewal(t)
+	nonce := f.challenge(t, f.credID)
+	f.exec(t, `UPDATE credentials SET status = 'REVOKED'`)
+	rec := f.renew(t, f.credID, nonce, renewalSignature(t, f.key, f.credID, nonce), "renew-revoked")
+	if rec.Code != http.StatusConflict || problemType(t, rec) != "CRED-NOT-RENEWABLE" {
+		t.Fatalf("renew dicabut: %d %s", rec.Code, rec.Body)
+	}
+	rec = f.do(t, http.MethodPost, "/v1/credentials/"+hex.EncodeToString(f.credID)+":challenge", "", map[string]string{})
+	if rec.Code != http.StatusConflict || problemType(t, rec) != "CRED-NOT-RENEWABLE" {
+		t.Fatalf("challenge dicabut: %d %s", rec.Code, rec.Body)
+	}
+}

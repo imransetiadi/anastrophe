@@ -20,7 +20,9 @@ enum AppEnvironment {
         let services = (try? AppServices.live(nfcEmulationEntitled: nfcEmulationEntitled)) ?? AppServices.storageUnavailable()
         #if DEBUG
         services.configureLabBackend(arguments: arguments)  // -ANLabBackend <url> -ANLabDevice <id> -ANLabSite <id>, -ANLabRenew
-        services.demoScreen = screen  // verifikasi visual alur lab dengan layanan live
+        // Verifikasi visual lab dengan layanan live; layar presentasi tidak dibuka otomatis karena
+        // akan memulai presentasi nyata tanpa pengguna memilih kartu (CLAUDE.md aturan 4).
+        services.demoScreen = ["detail", "lab"].contains(screen ?? "") ? screen : nil
         #endif
         return services
     }

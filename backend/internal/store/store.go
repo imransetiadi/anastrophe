@@ -386,7 +386,7 @@ func (t *Tx) CredentialForRenewal(ctx context.Context, credID []byte) (Renewable
 		JOIN card_instances ci ON ci.id = c.card_instance_id
 		JOIN sites s ON s.id = ci.site_id
 		WHERE c.cred_id = $1
-		FOR UPDATE OF c`, credID).Scan(&c.ID, &c.Channel, &c.Status, &c.CredID, &c.PubKey, &c.Site.ID, &c.CardStatus, &c.Site.DeviceID,
+		FOR NO KEY UPDATE OF c`, credID).Scan(&c.ID, &c.Channel, &c.Status, &c.CredID, &c.PubKey, &c.Site.ID, &c.CardStatus, &c.Site.DeviceID,
 		&c.Site.SiteID, &c.Site.SiteName, &c.Site.SiteCode, &zones, &bitmap, &validity)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return RenewableCredential{}, ErrNotFound

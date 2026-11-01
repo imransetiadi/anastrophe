@@ -76,9 +76,9 @@ public actor BLETapCoordinator<C: Clock> where C.Duration == Duration {
         // tercapai. Child task ini otomatis dibatalkan bila autentikasi gagal atau app ke
         // background; connect tetap hanya setelah autentikasi berhasil.
         async let scanned = central.scan(ScanWindow(threshold: rssiThreshold, settle: Self.scanSettle, maximum: Self.scanDuration))
-        guard let context = try? await authenticator.authenticate(reason: authenticationReason) else {
-            return finish(out, with: .cancelled)
-        }
+        guard let context = try? await authenticator.authenticate(reason: authenticationReason),
+              isForeground(), !Task.isCancelled
+        else { return finish(out, with: .cancelled) }
         await prepare(context)
         guard let provider = try? makeProvider(context), isForeground(), !Task.isCancelled else {
             return finish(out, with: .cancelled)

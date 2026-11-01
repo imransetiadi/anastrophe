@@ -66,7 +66,7 @@ func (h *Handler) renewalChallenge(w http.ResponseWriter, r *http.Request, credI
 	case errors.Is(err, store.ErrNotRenewable):
 		httpapi.WriteProblem(w, problem("CRED-NOT-RENEWABLE", http.StatusConflict))
 	case err != nil:
-		slog.Error("renewal challenge failed", "error_type", errorType(err))
+		slog.Error("renewal challenge failed", "err_type", errorType(err))
 		httpapi.WriteProblem(w, problem("INTERNAL", http.StatusInternalServerError))
 	default:
 		out, _ := json.Marshal(struct {

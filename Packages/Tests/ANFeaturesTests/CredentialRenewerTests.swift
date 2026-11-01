@@ -92,4 +92,83 @@ struct CredentialRenewerTests {
         }
         #expect(transport.paths.isEmpty)
     }
+
+    @Test func responsKanalBerbedaDitolak() async throws {
+        // Review perpanjangan M1: separuh Review Focus 3 (kanal) kini diuji.
+        let (card, cards, _, record) = try setUp(renewalURL: backend)
+        try await cards.add(card)
+        let transport = SequenceTransport([
+            challengeReply,
+            (200, provisionedBody(credentialID: credentialID, notAfter: "2026-11-12T00:00:00Z", channel: "nfcHCE"), "application/json"),
+        ])
+        await #expect(throws: ANError.invalidData) {
+            try await CredentialRenewer(keys: keys, records: records, cards: cards, transport: transport).renew(card: card, channel: .ble, context: context)
+        }
+        #expect(try records.record(for: credentialID) == record)
+    }
+
+    @Test func kunciGroupTidakValidDitolak() async throws {
+        let (card, cards, _, record) = try setUp(renewalURL: backend)
+        try await cards.add(card)
+        let invalidPoint = Data([0x04] + [UInt8](repeating: 0x04, count: 64)).base64EncodedString()
+        let transport = SequenceTransport([
+            challengeReply,
+            (200, provisionedBody(credentialID: credentialID, groupKey: invalidPoint, notAfter: "2026-11-12T00:00:00Z"), "application/json"),
+        ])
+        await #expect(throws: (any Error).self) {
+            try await CredentialRenewer(keys: keys, records: records, cards: cards, transport: transport).renew(card: card, channel: .ble, context: context)
+        }
+        #expect(try records.record(for: credentialID) == record)
+    }
+
+    @Test func statusKartuTidakTertimpaSaatPerpanjangan() async throws {
+        // Review perpanjangan M4: perubahan status selama perpanjangan tidak boleh hilang.
+        let (card, cards, _, _) = try setUp(renewalURL: backend)
+        try await cards.add(card)
+        var changed = card
+        changed.status = .suspended
+        let suspended = changed
+        let transport = HookTransport(replies: [
+            challengeReply,
+            (200, provisionedBody(credentialID: credentialID, notAfter: "2026-11-12T00:00:00Z"), "application/json"),
+        ]) { try? await cards.update(suspended) }
+        _ = try await CredentialRenewer(keys: keys, records: records, cards: cards, transport: transport).renew(card: card, channel: .ble, context: context)
+        let stored = try #require(try await cards.all().first)
+        #expect(stored.status == .suspended)
+        #expect(stored.notAfter == Date(timeIntervalSince1970: 1_794_441_600))
+    }
 }
+
+/// Menjawab berurutan; menjalankan `onFirst` saat permintaan pertama (meniru perubahan bersamaan).
+final class HookTransport: HTTPTransport, @unchecked Sendable {
+    private let replies: LockedReplies
+    private let onFirst: @Sendable () async -> Void
+
+    init(replies: [(status: Int, body: String, contentType: String)], onFirst: @escaping @Sendable () async -> Void) {
+        self.replies = LockedReplies(replies)
+        self.onFirst = onFirst
+    }
+
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        let (reply, first) = replies.next()
+        if first { await onFirst() }
+        guard let reply else { throw URLError(.cannotConnectToHost) }
+        return (Data(reply.body.utf8), HTTPURLResponse(url: request.url!, statusCode: reply.status, httpVersion: nil, headerFields: ["Content-Type": reply.contentType])!)
+    }
+}
+
+final class LockedReplies: @unchecked Sendable {
+    private let lock = NSLock()
+    private var replies: [(status: Int, body: String, contentType: String)]
+    private var served = 0
+
+    init(_ replies: [(status: Int, body: String, contentType: String)]) { self.replies = replies }
+
+    func next() -> ((status: Int, body: String, contentType: String)?, Bool) {
+        lock.withLock {
+            defer { served += 1 }
+            return (replies.isEmpty ? nil : replies.removeFirst(), served == 0)
+        }
+    }
+}
+
