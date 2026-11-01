@@ -372,12 +372,14 @@ func (s *Store) PurgeRenewalChallenges(ctx context.Context, before time.Time) (i
 
 // RevokedCredential adalah kredensial yang baru dicabut bersama kartunya.
 type RevokedCredential struct {
-	CredID  []byte
-	Channel string
+	CredID   []byte
+	Channel  string
+	NotAfter time.Time
 }
 
 // RevokeCard menandai nonce terpakai, lalu mencabut semua kredensial ACTIVE kartu dan card
-// instance-nya dalam transaksi pemanggil (hapus kartu, ADR-0026). Slot batas 8 kartu terbebas.
+// instance-nya dalam transaksi pemanggil (hapus kartu, ADR-0026). Slot batas 8 kartu terbebas, dan
+// kredensialnya masuk denylist seperti pencabutan oleh operator.
 func (t *Tx) RevokeCard(ctx context.Context, cardID string, nonce []byte, reason string, now time.Time) ([]RevokedCredential, error) {
 	tag, err := t.tx.Exec(ctx, `UPDATE renewal_challenges SET used_at = $2 WHERE nonce = $1 AND used_at IS NULL`, nonce, now)
 	if err != nil {
@@ -386,30 +388,7 @@ func (t *Tx) RevokeCard(ctx context.Context, cardID string, nonce []byte, reason
 	if tag.RowsAffected() != 1 {
 		return nil, ErrNotRenewable
 	}
-	rows, err := t.tx.Query(ctx, `
-		UPDATE credentials SET status = 'REVOKED', revoked_at = $2, revoke_reason = $3
-		WHERE card_instance_id = $1 AND status IN ('ACTIVE', 'SUSPENDED')
-		RETURNING cred_id, channel`, cardID, now, reason)
-	if err != nil {
-		return nil, err
-	}
-	var revoked []RevokedCredential
-	for rows.Next() {
-		var r RevokedCredential
-		if err := rows.Scan(&r.CredID, &r.Channel); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		revoked = append(revoked, r)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	if _, err := t.tx.Exec(ctx, `UPDATE card_instances SET status = 'REVOKED' WHERE id = $1`, cardID); err != nil {
-		return nil, err
-	}
-	return revoked, nil
+	return t.revokeInstance(ctx, cardID, reason, now)
 }
 
 // CredentialCert membaca sertifikat dan masa berlaku yang tersimpan (diagnostik dan test).
