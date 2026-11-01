@@ -31,8 +31,37 @@ type Handler struct {
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {
-	mux.HandleFunc("POST /v1/enrollments", h.createEnrollment)
-	mux.HandleFunc("POST /v1/enrollments/{id}/credentials", h.issueCredential)
+	httpapi.Route(mux, http.MethodPost, "/v1/enrollments", h.createEnrollment)
+	httpapi.Route(mux, http.MethodPost, "/v1/enrollments/{id}/credentials", h.issueCredential)
+}
+
+// validIdempotencyKey: klien mengirim UUID; batasi ke [A-Za-z0-9_-]{1,128} agar byte aneh
+// (mis. non-UTF-8) tidak sampai ke PostgreSQL sebagai 500.
+func validIdempotencyKey(key string) bool {
+	if len(key) == 0 || len(key) > 128 {
+		return false
+	}
+	for _, c := range key {
+		if !(c == '-' || c == '_' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z') {
+			return false
+		}
+	}
+	return true
+}
+
+// readBody membaca body maksimal maxBody; lebih besar → 413, bukan dipotong diam-diam.
+func readBody(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBody))
+	var tooLarge *http.MaxBytesError
+	switch {
+	case errors.As(err, &tooLarge):
+		httpapi.WriteProblem(w, problem("REQ-TOO-LARGE", http.StatusRequestEntityTooLarge))
+		return nil, false
+	case err != nil:
+		httpapi.WriteProblem(w, problem("REQ-INVALID", http.StatusBadRequest))
+		return nil, false
+	}
+	return body, true
 }
 
 const maxBody = 4 << 10
@@ -46,7 +75,11 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 		DeviceID string `json:"device_id"`
 		SiteID   string `json:"site_id"`
 	}
-	if err := json.NewDecoder(io.LimitReader(r.Body, maxBody)).Decode(&req); err != nil {
+	body, ok := readBody(w, r)
+	if !ok {
+		return
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
 		httpapi.WriteProblem(w, problem("REQ-INVALID", http.StatusBadRequest))
 		return
 	}
@@ -67,19 +100,25 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) issueCredential(w http.ResponseWriter, r *http.Request) {
 	key := r.Header.Get("Idempotency-Key")
-	if key == "" || len(key) > 128 {
+	if !validIdempotencyKey(key) {
 		httpapi.WriteProblem(w, problem("REQ-IDEMPOTENCY-KEY", http.StatusBadRequest))
 		return
 	}
-	body, err := io.ReadAll(io.LimitReader(r.Body, maxBody))
-	if err != nil {
-		httpapi.WriteProblem(w, problem("REQ-INVALID", http.StatusBadRequest))
+	body, ok := readBody(w, r)
+	if !ok {
+		return
+	}
+	req, failure := parseCredentialRequest(body)
+	if failure != nil {
+		httpapi.WriteProblem(w, *failure)
 		return
 	}
 	id := r.PathValue("id")
-	hash := sha256.Sum256(append([]byte(r.URL.Path+"\n"), body...))
+	// Hash atas isi yang sudah dinormalkan, bukan byte mentah: urutan kunci JSON dari klien
+	// (mis. dictionary Swift) bisa berbeda antar-retry.
+	hash := sha256.Sum256([]byte(r.URL.Path + "\n" + req.Channel + "\n" + base64.StdEncoding.EncodeToString(req.PublicKey)))
 	status, resp, err := h.Store.Idempotent(r.Context(), key, hash[:], func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
-		return h.issue(ctx, tx, id, body)
+		return h.issue(ctx, tx, id, req)
 	})
 	switch {
 	case errors.Is(err, store.ErrIdempotencyConflict):
@@ -109,27 +148,42 @@ type provisioned struct {
 	GroupKeys    map[string][][]byte `json:"group_keys"`
 }
 
-// issue mengembalikan (status, body JSON); error hanya untuk kegagalan infrastruktur.
-// Semua kerja berjalan di transaksi idempotency, sehingga gagal di tengah tidak menyisakan
-// kredensial yatim.
-func (h *Handler) issue(ctx context.Context, tx *store.Tx, enrollmentID string, body []byte) (int, []byte, error) {
-	var req struct {
+type credentialRequest struct {
+	Channel   string
+	PublicKey []byte
+}
+
+// parseCredentialRequest memvalidasi isi permintaan sebelum menyentuh database.
+func parseCredentialRequest(body []byte) (credentialRequest, *httpapi.Problem) {
+	var raw struct {
 		Channel   string `json:"channel"`
 		PublicKey string `json:"public_key"`
 	}
-	if err := json.Unmarshal(body, &req); err != nil {
-		return problemBody("REQ-INVALID", http.StatusBadRequest)
+	if err := json.Unmarshal(body, &raw); err != nil {
+		p := problem("REQ-INVALID", http.StatusBadRequest)
+		return credentialRequest{}, &p
 	}
-	if !supportedChannels[req.Channel] {
-		return problemBody("ENR-INVALID-CHANNEL", http.StatusBadRequest)
+	if !supportedChannels[raw.Channel] {
+		p := problem("ENR-INVALID-CHANNEL", http.StatusBadRequest)
+		return credentialRequest{}, &p
 	}
-	pub, err := base64.StdEncoding.DecodeString(req.PublicKey)
+	pub, err := base64.StdEncoding.DecodeString(raw.PublicKey)
 	if err != nil || len(pub) != 65 {
-		return problemBody("ENR-INVALID-KEY", http.StatusBadRequest)
+		p := problem("ENR-INVALID-KEY", http.StatusBadRequest)
+		return credentialRequest{}, &p
 	}
 	if _, err := anp1.ParsePublicKey(pub); err != nil {
-		return problemBody("ENR-INVALID-KEY", http.StatusBadRequest)
+		p := problem("ENR-INVALID-KEY", http.StatusBadRequest)
+		return credentialRequest{}, &p
 	}
+	return credentialRequest{Channel: raw.Channel, PublicKey: pub}, nil
+}
+
+// issue mengembalikan (status, body JSON); error hanya untuk kegagalan infrastruktur.
+// Semua kerja berjalan di transaksi idempotency, sehingga gagal di tengah tidak menyisakan
+// kredensial yatim.
+func (h *Handler) issue(ctx context.Context, tx *store.Tx, enrollmentID string, req credentialRequest) (int, []byte, error) {
+	pub := req.PublicKey
 	enrollment, err := tx.EnrollmentForUpdate(ctx, enrollmentID)
 	if errors.Is(err, store.ErrNotFound) {
 		return problemBody("ENR-NOT-FOUND", http.StatusNotFound)
@@ -184,7 +238,7 @@ func (h *Handler) issue(ctx context.Context, tx *store.Tx, enrollmentID string, 
 }
 
 func problem(code string, status int) httpapi.Problem {
-	return httpapi.Problem{Type: code, Title: http.StatusText(status), Status: status}
+	return httpapi.NewProblem(code, status)
 }
 
 func problemBody(code string, status int) (int, []byte, error) {

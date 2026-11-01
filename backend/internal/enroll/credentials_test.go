@@ -119,6 +119,16 @@ func (f fixture) do(t *testing.T, method, path, idempotencyKey string, body any)
 	return rec
 }
 
+func (f fixture) doRaw(t *testing.T, path, idempotencyKey, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", idempotencyKey)
+	rec := httptest.NewRecorder()
+	f.handler.ServeHTTP(rec, req)
+	return rec
+}
+
 func (f fixture) enroll(t *testing.T) string {
 	t.Helper()
 	rec := f.do(t, http.MethodPost, "/v1/enrollments", "", map[string]string{"device_id": f.deviceID, "site_id": f.siteID})
@@ -313,6 +323,56 @@ func TestSatuKredensialPerKanal(t *testing.T) {
 	}
 	if n, _ := f.store.CredentialCount(context.Background(), id); n != 2 {
 		t.Fatalf("kredensial = %d, ingin 2", n)
+	}
+}
+
+func TestIdempotencyKeyTidakValidDitolak400(t *testing.T) {
+	// Minor 1: key non-UTF-8 atau berkarakter aneh → 400, bukan 500 dari Postgres.
+	f := newFixture(t)
+	id := f.enroll(t)
+	for _, key := range []string{"\xff\xfe", "ada spasi", strings.Repeat("a", 129)} {
+		rec := f.do(t, http.MethodPost, "/v1/enrollments/"+id+"/credentials", key, map[string]string{"channel": "ble", "public_key": base64.StdEncoding.EncodeToString(phoneKey(t))})
+		if rec.Code != http.StatusBadRequest || problemType(t, rec) != "REQ-IDEMPOTENCY-KEY" {
+			t.Fatalf("key %q: status %d: %s", key, rec.Code, rec.Body)
+		}
+	}
+}
+
+func TestBodyTerlaluBesarDitolak413(t *testing.T) {
+	// Minor 10: body > 4 KiB tidak boleh dipotong diam-diam lalu diproses.
+	f := newFixture(t)
+	id := f.enroll(t)
+	padding := strings.Repeat(" ", 5000)
+	raw := `{"channel":"ble","public_key":"` + base64.StdEncoding.EncodeToString(phoneKey(t)) + `"}` + padding + "sampah"
+	req := httptest.NewRequest(http.MethodPost, "/v1/enrollments/"+id+"/credentials", strings.NewReader(raw))
+	req.Header.Set("Idempotency-Key", "besar")
+	rec := httptest.NewRecorder()
+	f.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusRequestEntityTooLarge || problemType(t, rec) != "REQ-TOO-LARGE" {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+}
+
+func TestHashPermintaanKanonik(t *testing.T) {
+	// Minor 8: urutan kunci JSON berbeda (klien Swift tanpa .sortedKeys) tetap dianggap sama.
+	f := newFixture(t)
+	id := f.enroll(t)
+	pub := base64.StdEncoding.EncodeToString(phoneKey(t))
+	path := "/v1/enrollments/" + id + "/credentials"
+	first := f.doRaw(t, path, "urutan", `{"channel":"ble","public_key":"`+pub+`"}`)
+	second := f.doRaw(t, path, "urutan", `{"public_key":"`+pub+`","channel":"ble"}`)
+	if first.Code != http.StatusOK || second.Code != http.StatusOK || first.Body.String() != second.Body.String() {
+		t.Fatalf("pertama %d, kedua %d: %s", first.Code, second.Code, second.Body)
+	}
+}
+
+func TestRespons4xxTidakDisimpanSebagaiIdempoten(t *testing.T) {
+	// Minor 9: hanya 2xx yang disimpan, agar penyerang tak bisa menumbuhkan tabel dengan 4xx.
+	f := newFixture(t)
+	id := f.enroll(t)
+	f.do(t, http.MethodPost, "/v1/enrollments/"+id+"/credentials", "salah", map[string]string{"channel": "ble", "public_key": "bukan-base64"})
+	if n, err := f.store.IdempotencyKeyCount(context.Background()); err != nil || n != 0 {
+		t.Fatalf("baris idempotency = %d (err %v), ingin 0", n, err)
 	}
 }
 

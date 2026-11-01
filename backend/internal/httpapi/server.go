@@ -39,9 +39,19 @@ func New(cfg Config, deps Deps) http.Handler {
 		deps.Routes(mux)
 	}
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-		WriteProblem(w, Problem{Type: "NOT-FOUND", Title: "Not found", Status: http.StatusNotFound})
+		WriteProblem(w, NewProblem("NOT-FOUND", http.StatusNotFound))
 	})
 	return recoverer(withDeadline(mux))
+}
+
+// Route mendaftarkan handler untuk satu metode, plus jawaban 405 problem+json untuk metode
+// lain pada path yang sama (tanpa ini catch-all "/" mengubah 405 menjadi 404).
+func Route(mux *http.ServeMux, method, path string, handler http.HandlerFunc) {
+	mux.HandleFunc(method+" "+path, handler)
+	mux.HandleFunc(path, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Allow", method)
+		WriteProblem(w, NewProblem("METHOD-NOT-ALLOWED", http.StatusMethodNotAllowed))
+	})
 }
 
 // RequestTimeout membatasi setiap permintaan; query database ikut dibatalkan lewat context,
@@ -61,8 +71,11 @@ func recoverer(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if v := recover(); v != nil {
+				if v == http.ErrAbortHandler {
+					panic(v) // sinyal net/http untuk memutus koneksi; jangan ditelan
+				}
 				slog.Error("panic in handler", "path", r.URL.Path) // nilai panik tidak di-log: bisa memuat data sensitif
-				WriteProblem(w, Problem{Type: "INTERNAL", Title: "Internal error", Status: http.StatusInternalServerError})
+				WriteProblem(w, NewProblem("INTERNAL", http.StatusInternalServerError))
 			}
 		}()
 		next.ServeHTTP(w, r)

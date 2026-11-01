@@ -143,10 +143,17 @@ func newUUID() string {
 	return h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:]
 }
 
-func randomHex(n int) string {
-	b := make([]byte, n)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
+// IdempotencyKeyCount dipakai test dan observabilitas.
+func (s *Store) IdempotencyKeyCount(ctx context.Context) (int, error) {
+	var n int
+	err := s.pool.QueryRow(ctx, `SELECT count(*) FROM idempotency_keys`).Scan(&n)
+	return n, err
+}
+
+// PurgeIdempotencyKeys menghapus baris yang dibuat sebelum batas waktu (TTL).
+func (s *Store) PurgeIdempotencyKeys(ctx context.Context, before time.Time) (int64, error) {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM idempotency_keys WHERE created_at < $1`, before)
+	return tag.RowsAffected(), err
 }
 
 // ErrNotFound: data yang diminta tidak ada.
@@ -295,6 +302,9 @@ func (s *Store) Idempotent(ctx context.Context, key string, requestHash []byte, 
 	status, body, err = fn(ctx, &Tx{tx: tx})
 	if err != nil || status >= 500 {
 		return status, body, err // rollback lewat defer: tidak ada yang tersimpan
+	}
+	if status < 200 || status > 299 {
+		return status, body, nil // 4xx tidak disimpan: tabel tak bisa ditumbuhkan penyerang
 	}
 	if body == nil {
 		body = []byte{}

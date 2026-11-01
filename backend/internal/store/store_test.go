@@ -191,6 +191,21 @@ func TestSatuKredensialAktifPerKanal(t *testing.T) {
 	}
 }
 
+func TestPurgeIdempotencyKeys(t *testing.T) {
+	// Minor 9: baris idempotency lama dibersihkan.
+	s := freshStore(t)
+	ctx := context.Background()
+	if _, _, err := s.Idempotent(ctx, "lama", []byte("h"), func(context.Context, *Tx) (int, []byte, error) { return 200, []byte("{}"), nil }); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := s.PurgeIdempotencyKeys(ctx, time.Now().Add(time.Hour)); err != nil || n != 1 {
+		t.Fatalf("dihapus = %d (err %v), ingin 1", n, err)
+	}
+	if n, _ := s.IdempotencyKeyCount(ctx); n != 0 {
+		t.Fatalf("tersisa %d", n)
+	}
+}
+
 func bytesOf(b byte) []byte {
 	out := make([]byte, 16)
 	out[15] = b

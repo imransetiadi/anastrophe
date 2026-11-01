@@ -71,6 +71,21 @@ func TestErrorTidakMembocorkanDetail(t *testing.T) {
 	}
 }
 
+func TestMetodeSalahMenjadi405(t *testing.T) {
+	// Minor 10: rute ada tetapi metode salah → 405 problem+json, bukan 404.
+	h := New(Config{}, Deps{Routes: func(mux *http.ServeMux) {
+		Route(mux, http.MethodPost, "/v1/enrollments", func(w http.ResponseWriter, r *http.Request) {})
+	}})
+	rec := serve(t, h, http.MethodGet, "/v1/enrollments")
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	var p Problem
+	if err := json.Unmarshal(rec.Body.Bytes(), &p); err != nil || p.Type != "METHOD-NOT-ALLOWED" {
+		t.Fatalf("problem = %+v", p)
+	}
+}
+
 func TestSetiapPermintaanPunyaDeadline(t *testing.T) {
 	var hasDeadline bool
 	h := New(Config{}, Deps{Routes: func(mux *http.ServeMux) {

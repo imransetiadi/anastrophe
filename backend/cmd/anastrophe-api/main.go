@@ -63,6 +63,15 @@ func run() error {
 		Now:      time.Now,
 		Validity: 7 * 24 * time.Hour,
 	}
+	go func() {
+		for range time.Tick(time.Hour) {
+			if n, err := db.PurgeIdempotencyKeys(ctx, time.Now().Add(-24*time.Hour)); err != nil {
+				slog.Error("purge idempotency keys failed")
+			} else if n > 0 {
+				slog.Info("purged idempotency keys", "count", n)
+			}
+		}
+	}()
 	addr := os.Getenv("ANASTROPHE_ADDR")
 	if addr == "" {
 		addr = ":8080"

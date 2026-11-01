@@ -12,6 +12,11 @@ type Problem struct {
 	Status int    `json:"status"`
 }
 
+// NewProblem membuat Problem dengan judul baku dari kode status HTTP.
+func NewProblem(code string, status int) Problem {
+	return Problem{Type: code, Title: http.StatusText(status), Status: status}
+}
+
 // WriteProblem menulis Problem sebagai application/problem+json.
 func WriteProblem(w http.ResponseWriter, p Problem) {
 	w.Header().Set("Content-Type", "application/problem+json")
