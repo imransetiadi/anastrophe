@@ -1,6 +1,6 @@
 // Command anastrophe-registry adalah alat operator untuk registri kartu fisik (FR-52, ADR-0031),
-// persetujuan perangkat tambahan sebelum ada akun (ADR-0032), undangan sekali pakai (ADR-0033), dan
-// siklus hidup kartu (FR-51, ADR-0036).
+// persetujuan perangkat tambahan sebelum ada akun (ADR-0032), undangan sekali pakai (ADR-0033),
+// siklus hidup kartu (FR-51, ADR-0036), dan kode gedung untuk enrolment dari app (ADR-0044).
 //
 //	ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_REGISTRY_KEY=<32 byte hex> \
 //	  go -C backend run ./cmd/anastrophe-registry import --site <uuid> --file kartu.csv --operator <pegangan>
@@ -9,6 +9,7 @@
 //	go -C backend run ./cmd/anastrophe-registry list --site <uuid> [--status ACTIVE]
 //	go -C backend run ./cmd/anastrophe-registry suspend|resume --card-instance <uuid> --operator <pegangan>
 //	go -C backend run ./cmd/anastrophe-registry revoke --card-instance <uuid> [--reason <kode>] --operator <pegangan>
+//	go -C backend run ./cmd/anastrophe-registry site-code --site <uuid> --operator <pegangan>
 //
 // CSV: tech,card_id,holder_contact,zones (zones = nama zona dipisah ";", dipetakan lewat kebijakan
 // gedung). Berkas kartu undangan berisi satu baris <tech>:<hex>; "-" membacanya dari stdin. Identitas
@@ -38,7 +39,7 @@ import (
 	"github.com/imransetiadi/anastrophe/backend/internal/store"
 )
 
-const usage = "pemakaian: anastrophe-registry import --site <uuid> --file <csv> --operator <pegangan> | invite --site <uuid> [--zones A;B | --card-file <berkas>|-] [--ttl <hari>] [--link-base <url>] --operator <pegangan> | approve|reject|suspend|resume --card-instance <uuid> --operator <pegangan> | revoke --card-instance <uuid> [--reason <kode>] --operator <pegangan> | list --site <uuid> [--status <STATUS>]"
+const usage = "pemakaian: anastrophe-registry import --site <uuid> --file <csv> --operator <pegangan> | invite --site <uuid> [--zones A;B | --card-file <berkas>|-] [--ttl <hari>] [--link-base <url>] --operator <pegangan> | approve|reject|suspend|resume --card-instance <uuid> --operator <pegangan> | revoke --card-instance <uuid> [--reason <kode>] --operator <pegangan> | list --site <uuid> [--status <STATUS>] | site-code --site <uuid> --operator <pegangan>"
 
 func main() {
 	os.Exit(run(context.Background(), os.Args[1:], os.Stdout, os.Stderr, os.Getenv))
@@ -96,6 +97,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 		return list(ctx, args[1:], stdout, stderr, getenv)
 	case "suspend", "resume", "revoke":
 		return lifecycle(ctx, args[0], args[1:], stdout, stderr, getenv)
+	case "site-code":
+		return siteCode(ctx, args[1:], stdout, stderr, getenv)
 	case "approve", "reject":
 		fs := flag.NewFlagSet(args[0], flag.ContinueOnError)
 		fs.SetOutput(stderr)
@@ -404,6 +407,46 @@ func lifecycle(ctx context.Context, action string, args []string, stdout, stderr
 	if action != "resume" {
 		// Keterbatasan terbuka sampai ADR-0038 diputuskan.
 		fmt.Fprintln(stderr, "anastrophe-registry: peringatan: pendaftaran ulang kartu fisik yang sama belum diblokir (ADR-0038, menunggu keputusan)")
+	}
+	return 0
+}
+
+// siteCode membuat kode gedung baru untuk enrolment dari app (ADR-0044) dan mencetaknya sekali. Kode
+// lama langsung tidak berlaku. Kode bukan rahasia (boleh dicetak di poster), tetapi tidak ditulis ke
+// audit karena audit tidak membutuhkannya.
+func siteCode(ctx context.Context, args []string, stdout, stderr io.Writer, getenv func(string) string) int {
+	fail := func(err error) int {
+		fmt.Fprintln(stderr, "anastrophe-registry:", err)
+		return 2
+	}
+	fs := flag.NewFlagSet("site-code", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	site := fs.String("site", "", "UUID gedung")
+	operator := fs.String("operator", "", "pegangan operator untuk audit (kode staf, bukan nama atau email)")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	dsn := getenv("ANASTROPHE_DATABASE_URL")
+	if dsn == "" {
+		return fail(errors.New("ANASTROPHE_DATABASE_URL wajib diisi"))
+	}
+	db, err := store.Open(ctx, dsn)
+	if err != nil {
+		return fail(err)
+	}
+	defer db.Close()
+	code, replaced, err := db.RotateSiteJoinCode(ctx, strings.ToLower(strings.TrimSpace(*site)), *operator, time.Now())
+	switch {
+	case errors.Is(err, store.ErrInvalidOperator):
+		return fail(errors.New("--operator wajib diisi: [A-Za-z0-9._-], maksimal 64 karakter"))
+	case errors.Is(err, store.ErrNotFound):
+		return fail(errors.New("gedung tidak ditemukan"))
+	case err != nil:
+		return fail(err)
+	}
+	fmt.Fprintf(stdout, "kode: %s\n", store.FormatJoinCode(code))
+	if replaced {
+		fmt.Fprintln(stderr, "anastrophe-registry: kode lama tidak berlaku lagi; bagikan kode baru ke penghuni")
 	}
 	return 0
 }

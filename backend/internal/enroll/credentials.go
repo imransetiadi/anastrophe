@@ -53,6 +53,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	httpapi.Route(mux, http.MethodPost, "/v1/credentials/{action}", h.credentialAction)
 	httpapi.Route(mux, http.MethodDelete, "/v1/cards/{id}", h.deleteCard)
 	httpapi.Route(mux, http.MethodGet, "/v1/cards/{id}/status", h.cardStatus)
+	httpapi.Route(mux, http.MethodGet, "/v1/sites/lookup", h.lookupSite)
 }
 
 // validIdempotencyKey: klien mengirim UUID; batasi ke [A-Za-z0-9_-]{1,128} agar byte aneh

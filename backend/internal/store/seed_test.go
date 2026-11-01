@@ -127,3 +127,20 @@ func TestSeedLabTanpaZonaTidakNull(t *testing.T) {
 		t.Fatalf("kebijakan tanpa zona tidak terbaca: %v", err)
 	}
 }
+
+func TestSeedLabMembuatKodeGedung(t *testing.T) {
+	// ADR-0044: gedung lab punya kode gedung agar alur Tambah Kartu bisa diuji e2e.
+	s := freshStore(t)
+	ctx := context.Background()
+	out, err := s.SeedLab(ctx, labSeedInput(t, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.JoinCode) != 9 || out.JoinCode[4] != '-' {
+		t.Fatalf("join_code = %q, ingin XXXX-XXXX", out.JoinCode)
+	}
+	ref, err := s.SiteByJoinCode(ctx, out.JoinCode)
+	if err != nil || ref.ID != out.SiteID {
+		t.Fatalf("kode lab tidak menemukan gedung: %+v %v", ref, err)
+	}
+}

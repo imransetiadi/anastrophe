@@ -108,6 +108,7 @@ func run() error {
 		return err
 	}
 	fmt.Fprintln(os.Stderr, "devseed: kartu lab terdaftar di registri (pakai -ANLabCard yang sama di app)")
+	fmt.Fprintf(os.Stderr, "devseed: kode gedung lab %s (Tambah Kartu di app, atau -ANLabAddCode)\n", out.JoinCode)
 	return json.NewEncoder(os.Stdout).Encode(out)
 }
 

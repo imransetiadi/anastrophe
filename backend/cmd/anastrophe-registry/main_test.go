@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -652,6 +653,68 @@ func TestInviteLinkBaseHarusHttpsDenganGarisMiring(t *testing.T) {
 		code := run(context.Background(), []string{"invite", "--site", site, "--zones", "Lobi", "--link-base", base, "--operator", "staf-01"}, &out, &errOut, env(dsn))
 		if code != want {
 			t.Errorf("%s: kode %d, ingin %d (%s)", base, code, want, errOut.String())
+		}
+	}
+}
+
+var siteCodeLine = regexp.MustCompile(`^kode: ([0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4})\n$`)
+
+func TestSiteCodeMencetakKode(t *testing.T) {
+	// ADR-0044: operator membuat kode gedung yang diketik penghuni di app.
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	var out, errOut bytes.Buffer
+	if code := run(ctx, []string{"site-code", "--site", site, "--operator", "staf-01"}, &out, &errOut, env(dsn)); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	m := siteCodeLine.FindStringSubmatch(out.String())
+	if m == nil {
+		t.Fatalf("keluaran = %q", out.String())
+	}
+	if ref, err := db.SiteByJoinCode(ctx, m[1]); err != nil || ref.ID != site {
+		t.Fatalf("kode tidak menemukan gedung: %+v %v", ref, err)
+	}
+	if errOut.Len() != 0 {
+		t.Fatalf("kode pertama tanpa peringatan, dapat %q", errOut.String())
+	}
+}
+
+func TestSiteCodeRotasiMemperingatkan(t *testing.T) {
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	var first, second, errOut bytes.Buffer
+	if code := run(ctx, []string{"site-code", "--site", site, "--operator", "staf-01"}, &first, &errOut, env(dsn)); code != 0 {
+		t.Fatal(errOut.String())
+	}
+	errOut.Reset()
+	if code := run(ctx, []string{"site-code", "--site", strings.ToUpper(site), "--operator", "staf-01"}, &second, &errOut, env(dsn)); code != 0 {
+		t.Fatal(errOut.String())
+	}
+	if !strings.Contains(errOut.String(), "kode lama tidak berlaku") {
+		t.Fatalf("tanpa peringatan rotasi: %q", errOut.String())
+	}
+	old := siteCodeLine.FindStringSubmatch(first.String())[1]
+	if _, err := db.SiteByJoinCode(ctx, old); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("kode lama masih berlaku: %v", err)
+	}
+}
+
+func TestSiteCodeArgumenSalah(t *testing.T) {
+	db, dsn := freshStore(t)
+	site := siteWithZones(t, db)
+	for _, c := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"site-code", "--operator", "staf-01"}, "gedung tidak ditemukan"},
+		{[]string{"site-code", "--site", site}, "--operator wajib diisi"},
+		{[]string{"site-code", "--site", "bukan-uuid", "--operator", "staf-01"}, "gedung tidak ditemukan"},
+	} {
+		var out, errOut bytes.Buffer
+		if code := run(context.Background(), c.args, &out, &errOut, env(dsn)); code != 2 || out.Len() != 0 || !strings.Contains(errOut.String(), c.want) {
+			t.Fatalf("%v: exit %d out %q err %q", c.args, code, out.String(), errOut.String())
 		}
 	}
 }
