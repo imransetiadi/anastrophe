@@ -25,6 +25,7 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
 | `-ANDemoScreen presentation` memulai presentasi live | Layar presentasi tidak dibuka otomatis |
 | Peringatan Swift 6 di `LiveCardEmulation` | Tidak muncul lagi di build terakhir |
 | Kebersihan skrip lab (`__pycache__`, `init` menimpa `site.json`, tmp berisi kunci CA) | `__pycache__/` di-ignore; `init` butuh `--force` dan menulis dengan izin 0600; test memakai `addCleanup(shutil.rmtree, ...)` |
+| Penerbitan kredensial lewat id instance dari `:challenge` (prioritas tinggi, review akhir siklus hidup) | ADR-0040: provisioning wajib rahasia enrolment dan hanya untuk instance `PROVISIONING` (`TestProvisioningTanpaRahasiaIdentik`; lab: 404 tanpa rahasia) |
 
 ## Terbuka
 
@@ -32,7 +33,6 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
 - **Hapus kartu:** penghapusan lokal masih *best-effort*; penghapusan yang terputus setelah 204 pulih lewat `CARD-GONE`; `DELETE` membawa body (RFC 9110).
 - **Perpanjangan:** celah test (cek kanal dan kunci group di renewer, kredensial non-ACTIVE di backend); slot pekerjaan tunggal tidak terikat ke tap; renewer menulis salinan kartu lama; endpoint `:challenge` tanpa autentikasi bisa memperbesar tabel (dibersihkan per jam) dan membedakan status kredensial; drift dokumen (ADR-0023 "paralel", SDD §8.4.2 App Attest, QA TC-DEV-09).
 - **Presentasi:** hitung mundur HCE mulai saat lembar muncul dan angka `coolingDown` tidak berkurang (belum diverifikasi ulang); presentasi tumpang tindih (`heldIntent` dan `connectWaiters`); panjang fragmen BLE memakai panjang tulis `.withResponse`; paritas timing mengasumsikan maksimal 2 kunci per group.
-- **Prioritas tinggi, keamanan (review akhir siklus hidup, celah pra-ada):** `POST /v1/enrollments/{id}/credentials` hanya dilindungi id card instance, padahal `:challenge` mengembalikan id itu kepada siapa pun yang tahu `cred_id`. Kredensial bisa diterbitkan untuk kanal aktif yang belum diprovisikan pada instance ACTIVE milik orang lain. Di lab saat ini hanya kanal `ble` yang aktif, jadi belum bisa dieksploitasi; perlu diselesaikan sebelum ada lingkungan selain lab.
 - **Siklus hidup kartu (review akhir rencana siklus hidup):**
   - Pendaftaran ulang kartu fisik bisa membatalkan suspend/revoke (C1): menunggu keputusan pengguna di ADR-0038.
   - Deadlock jarang antara perpanjangan yang memasang hash (kredensial → instance) dan transisi operator (instance → kredensial); retry berhasil (M1).
