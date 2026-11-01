@@ -1,5 +1,6 @@
 import ANCore
 import ANDesignSystem
+import LocalAuthentication
 import SwiftUI
 
 /// Tab "Kunci": daftar kartu, detail, dan presentasi. Kartu ditampilkan sebagai
@@ -10,7 +11,8 @@ public struct KeysView: View {
     @State private var path: [Card.ID] = []
     @State private var presentation: PresentationController
     @State private var showsLab = false
-    @State private var deleteFailed = false
+    @State private var deleteMessage: String?
+    @State private var deleting: Card.ID?
     #if DEBUG
     @State private var labMessage: String?
     #endif
@@ -33,7 +35,7 @@ public struct KeysView: View {
                 .navigationTitle(localized("keys.title"))
                 .navigationDestination(for: Card.ID.self) { id in
                     if let card = model.cards.first(where: { $0.id == id }) {
-                        CardDetailView(card: card, presentability: model.presentability(of: card), notice: model.renewalNotice(for: card), onDelete: { delete(card) }) { use(card) }
+                        CardDetailView(card: card, presentability: model.presentability(of: card), notice: model.renewalNotice(for: card), onDelete: { delete(card) }, isDeleting: deleting == card.id) { use(card) }
                             #if DEBUG
                             .toolbar {
                                 ToolbarItem(placement: .primaryAction) {
@@ -75,7 +77,7 @@ public struct KeysView: View {
             #endif
             openDemoScreen()
         }
-        .alert(localized("detail.delete.failed"), isPresented: $deleteFailed) {
+        .alert(deleteMessage ?? "", isPresented: Binding(get: { deleteMessage != nil }, set: { if !$0 { deleteMessage = nil } })) {
             Button(localized("present.done"), role: .cancel) {}
         }
         .onChange(of: services.cardsRevision.value) { _, _ in
@@ -152,13 +154,20 @@ public struct KeysView: View {
     #endif
 
     private func delete(_ card: Card) {
+        guard deleting == nil else { return }
+        deleting = card.id
         Task {
+            defer { deleting = nil }
             do {
                 try await services.removeCard(card)
                 path.removeAll()
                 await model.load()
+            } catch let error as LAError where [.userCancel, .appCancel, .systemCancel].contains(error.code) {
+                // Dibatalkan pengguna: tanpa pesan.
+            } catch is URLError {
+                deleteMessage = localized("detail.delete.failed")
             } catch {
-                deleteFailed = true
+                deleteMessage = localized("detail.delete.failed_generic")
             }
         }
     }

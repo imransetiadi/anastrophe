@@ -75,7 +75,7 @@ public final class AppServices {
         foreground: ForegroundState,
         cardsRevision: CardsRevision = CardsRevision(),
         connectivity: any ConnectivityStatus = FixedConnectivity(isOnline: true),
-        authenticator: any UserAuthenticator = ImmediateAuthenticator(),
+        authenticator: any UserAuthenticator,
         storageFailed: Bool = false
     ) {
         self.cards = cards
@@ -100,6 +100,7 @@ public final class AppServices {
             availability: { [:] },
             launcher: ScriptedPresentationLauncher(events: [.cancelled], finishes: true),
             foreground: ForegroundState(),
+            authenticator: UnavailableAuthenticator(),
             storageFailed: true
         )
     }
@@ -168,9 +169,16 @@ public final class AppServices {
 
     /// Hapus kartu (FR-31): autentikasi pengguna, cabut di server (ADR-0026), lalu hapus lokal.
     public func removeCard(_ card: Card) async throws {
-        let context = try await authenticator.authenticate(reason: localized("detail.delete.auth_reason"))
-        defer { context.laContext.invalidate() }
-        try await CardRemover(keys: keys, records: records, cards: cards).remove(card: card, context: context)
+        let remover = CardRemover(keys: keys, records: records, cards: cards)
+        let hasKey = try card.credentials.values.contains { try keys.hasKey(for: $0) }
+        var context: AuthorizedContext?
+        do {
+            context = try await authenticator.authenticate(reason: localized("detail.delete.auth_reason"))
+        } catch let error as LAError where error.code == .passcodeNotSet && !hasKey {
+            // ADR-0028: kartu tanpa kunci tidak bisa dipakai; tetap bisa dihapus tanpa passcode.
+        }
+        defer { context?.laContext.invalidate() }
+        try await remover.remove(card: card, context: context)
     }
 
     private static func liveAvailability(config: RemoteConfig, nfcEmulationEntitled: Bool, bluetoothPoweredOn: Bool?) async -> [ChannelKind: ChannelAvailability] {
@@ -219,6 +227,11 @@ private struct SimulatorSecretStore: SecretStore {
     func delete(_ key: String) throws { try base.delete(key) }
 }
 #endif
+
+/// Autentikasi yang selalu gagal (layanan tanpa penyimpanan: tidak ada yang bisa dihapus).
+struct UnavailableAuthenticator: UserAuthenticator {
+    func authenticate(reason: String) async throws -> AuthorizedContext { throw ANError.internalError }
+}
 
 /// Autentikasi langsung berhasil untuk preview, demo, dan penyimpanan sementara.
 struct ImmediateAuthenticator: UserAuthenticator {

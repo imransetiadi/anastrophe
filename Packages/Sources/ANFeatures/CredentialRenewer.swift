@@ -35,14 +35,7 @@ struct CredentialRenewer: Sendable {
         let signature = try keys.signer(for: credentialID, context: context).sign(challenge.message(credentialID: credentialID))
         let renewed = try await api.renewCredential(credentialID: credentialID, nonce: challenge.nonce, signature: signature, idempotencyKey: UUID())
         guard renewed.credentialID == credentialID, renewed.channel == channel else { throw ANError.invalidData }
-        let updated = CredentialRecord(
-            credentialID: credentialID,
-            certificate: renewed.certificate,
-            notAfter: renewed.notAfter,
-            groupKeys: renewed.groupKeys,
-            notBefore: renewed.notBefore,
-            renewalURL: backend
-        )
+        let updated = record.renewed(certificate: renewed.certificate, notAfter: renewed.notAfter, notBefore: renewed.notBefore, groupKeys: renewed.groupKeys)
         _ = try updated.material(suspended: false)  // kunci reader group harus valid sebelum menimpa
         // Baca ulang kartu: perubahan selama perpanjangan (mis. status) tidak boleh tertimpa salinan
         // lama, dan kartu yang sudah dihapus tidak mendapat record baru.

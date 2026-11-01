@@ -88,6 +88,7 @@ struct CardDetailView: View {
     let presentability: Presentability
     var notice: RenewalNotice?
     var onDelete: (() -> Void)?
+    var isDeleting = false
     let onUse: () -> Void
     @State private var confirmsDelete = false
 
@@ -134,7 +135,16 @@ struct CardDetailView: View {
             if onDelete != nil {
                 // FR-31: Detail → Pengaturan → Hapus, dengan konfirmasi + autentikasi.
                 Section(localized("detail.settings")) {
-                    Button(localized("detail.delete"), role: .destructive) { confirmsDelete = true }
+                    Button(role: .destructive) { confirmsDelete = true } label: {
+                        HStack {
+                            Text(localized("detail.delete"))
+                            if isDeleting {
+                                Spacer()
+                                ProgressView()
+                            }
+                        }
+                    }
+                    .disabled(isDeleting)  // aksi async: cegah ketukan ganda
                 }
             }
         }

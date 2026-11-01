@@ -317,27 +317,41 @@ func (c RenewableCredential) Renewable() bool {
 	return c.Status == "ACTIVE" && c.CardStatus == "ACTIVE"
 }
 
-// CreateRenewalChallenge menyimpan nonce untuk kredensial ACTIVE. Nonce dipakai untuk
-// perpanjangan dan hapus kartu (ADR-0026); kill switch kanal hanya ditegakkan saat perpanjangan,
-// agar kartu di kanal yang dimatikan tetap bisa dihapus.
-func (s *Store) CreateRenewalChallenge(ctx context.Context, credID, nonce []byte, expiresAt time.Time) error {
-	var id, status, cardStatus string
+// ErrGone: kartu atau kredensial sudah dicabut/dihapus (ADR-0027: app boleh menghapus lokal).
+var ErrGone = errors.New("store: kartu sudah dicabut")
+
+// gone dan deletable mengikuti mesin status SDD §8.2.
+func gone(status string) bool      { return status == "REVOKED" || status == "DELETED" }
+func deletable(status string) bool { return status == "ACTIVE" || status == "SUSPENDED" }
+
+// CreateRenewalChallenge menyimpan nonce untuk kredensial ACTIVE atau SUSPENDED dan mengembalikan
+// ID card instance-nya. Nonce dipakai untuk perpanjangan (yang tetap mensyaratkan ACTIVE dan kanal
+// aktif) dan hapus kartu (ADR-0026/0027).
+func (s *Store) CreateRenewalChallenge(ctx context.Context, credID, nonce []byte, expiresAt time.Time) (string, error) {
+	var id, status, cardID, cardStatus string
 	err := s.pool.QueryRow(ctx, `
-		SELECT c.id, c.status, ci.status
+		SELECT c.id, c.status, ci.id, ci.status
 		FROM credentials c JOIN card_instances ci ON ci.id = c.card_instance_id
-		WHERE c.cred_id = $1`, credID).Scan(&id, &status, &cardStatus)
+		WHERE c.cred_id = $1`, credID).Scan(&id, &status, &cardID, &cardStatus)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return ErrNotFound
+		return "", ErrNotFound
 	}
 	if err != nil {
-		return err
+		return "", err
 	}
-	if !(RenewableCredential{Status: status, CardStatus: cardStatus}).Renewable() {
-		return ErrNotRenewable
+	switch {
+	case gone(status) || gone(cardStatus):
+		return "", ErrGone
+	case !deletable(status) || !deletable(cardStatus):
+		return "", ErrNotRenewable
 	}
 	_, err = s.pool.Exec(ctx, `INSERT INTO renewal_challenges (nonce, credential_id, expires_at) VALUES ($1, $2, $3)`, nonce, id, expiresAt)
-	return err
+	return cardID, err
 }
+
+// CardGone dan CardDeletable: status card instance untuk hapus kartu (ADR-0027).
+func CardGone(status string) bool      { return gone(status) }
+func CardDeletable(status string) bool { return deletable(status) }
 
 // PurgeRenewalChallenges menghapus nonce yang kedaluwarsa sebelum batas waktu.
 func (s *Store) PurgeRenewalChallenges(ctx context.Context, before time.Time) (int64, error) {
@@ -363,7 +377,7 @@ func (t *Tx) RevokeCard(ctx context.Context, cardID string, nonce []byte, reason
 	}
 	rows, err := t.tx.Query(ctx, `
 		UPDATE credentials SET status = 'REVOKED', revoked_at = $2, revoke_reason = $3
-		WHERE card_instance_id = $1 AND status = 'ACTIVE'
+		WHERE card_instance_id = $1 AND status IN ('ACTIVE', 'SUSPENDED')
 		RETURNING cred_id, channel`, cardID, now, reason)
 	if err != nil {
 		return nil, err

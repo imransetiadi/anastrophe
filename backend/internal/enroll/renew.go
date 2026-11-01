@@ -60,9 +60,12 @@ func (h *Handler) renewalChallenge(w http.ResponseWriter, r *http.Request, credI
 		return
 	}
 	expiresAt := h.Now().UTC().Add(RenewalChallengeTTL).Truncate(time.Second)
-	switch err := h.Store.CreateRenewalChallenge(r.Context(), credID, nonce, expiresAt); {
+	cardID, err := h.Store.CreateRenewalChallenge(r.Context(), credID, nonce, expiresAt)
+	switch {
 	case errors.Is(err, store.ErrNotFound):
 		httpapi.WriteProblem(w, problem("CRED-NOT-FOUND", http.StatusNotFound))
+	case errors.Is(err, store.ErrGone):
+		httpapi.WriteProblem(w, problem("CARD-GONE", http.StatusGone))
 	case errors.Is(err, store.ErrNotRenewable):
 		httpapi.WriteProblem(w, problem("CRED-NOT-RENEWABLE", http.StatusConflict))
 	case err != nil:
@@ -70,9 +73,10 @@ func (h *Handler) renewalChallenge(w http.ResponseWriter, r *http.Request, credI
 		httpapi.WriteProblem(w, problem("INTERNAL", http.StatusInternalServerError))
 	default:
 		out, _ := json.Marshal(struct {
-			Nonce     []byte `json:"nonce"`
-			ExpiresAt string `json:"expires_at"`
-		}{nonce, expiresAt.Format(time.RFC3339)})
+			Nonce          []byte `json:"nonce"`
+			ExpiresAt      string `json:"expires_at"`
+			CardInstanceID string `json:"card_instance_id"`
+		}{nonce, expiresAt.Format(time.RFC3339), cardID})
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write(out)

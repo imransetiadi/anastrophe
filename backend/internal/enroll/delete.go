@@ -63,14 +63,19 @@ func (h *Handler) deleteCard(w http.ResponseWriter, r *http.Request) {
 
 // revokeCard memeriksa berurutan dalam satu transaksi; jalur gagal tidak menulis apa pun.
 func (h *Handler) revokeCard(ctx context.Context, tx *store.Tx, cardID string, credID, nonce, sig []byte) (int, []byte, error) {
+	// ADR-0027: kartu tak dikenal atau sudah dicabut → 410 CARD-GONE (app boleh menghapus lokal);
+	// kartu ACTIVE atau SUSPENDED bisa dihapus pemiliknya.
 	card, err := tx.EnrollmentForUpdate(ctx, cardID)
 	if errors.Is(err, store.ErrNotFound) {
-		return problemBody("CARD-NOT-FOUND", http.StatusNotFound)
+		return problemBody("CARD-GONE", http.StatusGone)
 	}
 	if err != nil {
 		return 0, nil, err
 	}
-	if card.Status != "ACTIVE" {
+	if store.CardGone(card.Status) {
+		return problemBody("CARD-GONE", http.StatusGone)
+	}
+	if !store.CardDeletable(card.Status) {
 		return problemBody("CARD-NOT-REMOVABLE", http.StatusConflict)
 	}
 	cred, err := tx.CredentialForRenewal(ctx, credID)
@@ -80,7 +85,7 @@ func (h *Handler) revokeCard(ctx context.Context, tx *store.Tx, cardID string, c
 	if err != nil {
 		return 0, nil, err
 	}
-	if cred.Site.ID != card.ID || cred.Status != "ACTIVE" {
+	if cred.Site.ID != card.ID || !store.CardDeletable(cred.Status) {
 		return problemBody("CRED-PROOF-INVALID", http.StatusBadRequest)
 	}
 	now := h.Now().UTC().Truncate(time.Second)

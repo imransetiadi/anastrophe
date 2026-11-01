@@ -27,6 +27,13 @@ public struct CredentialRecord: Codable, Equatable, Sendable {
         self.serverCardID = serverCardID
     }
 
+    /// Record dengan sertifikat hasil perpanjangan; identitas (backend penerbit, ID kartu server)
+    /// dipertahankan agar tidak ada pemanggil yang tanpa sengaja menghapusnya (review hapus kartu C1).
+    public func renewed(certificate: Data, notAfter: Date, notBefore: Date?, groupKeys: [String: [Data]]) -> CredentialRecord {
+        CredentialRecord(credentialID: credentialID, certificate: certificate, notAfter: notAfter, groupKeys: groupKeys,
+                         notBefore: notBefore, renewalURL: renewalURL, serverCardID: serverCardID)
+    }
+
     public func material(suspended: Bool) throws -> CredentialMaterial {
         var keys: [Data: [P256.Signing.PublicKey]] = [:]
         let decoy = ANP1Signatures.timingDecoyKey.x963Representation

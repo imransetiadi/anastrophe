@@ -137,6 +137,19 @@ struct CredentialRenewerTests {
         #expect(stored.status == .suspended)
         #expect(stored.notAfter == Date(timeIntervalSince1970: 1_794_441_600))
     }
+
+    @Test func perpanjanganMempertahankanIDKartuServer() async throws {
+        // Review hapus kartu C1: perpanjangan tidak boleh menghapus serverCardID.
+        _ = try keys.createKey(for: credentialID)
+        try records.save(CredentialRecord(credentialID: credentialID, certificate: Data(repeating: 0xAA, count: 188), notAfter: Date(timeIntervalSince1970: 1_794_096_000),
+                                          groupKeys: ["a1a2a3a4a5a6a7a8": [P256.Signing.PrivateKey().publicKey.x963Representation]], renewalURL: backend, serverCardID: "card-1"))
+        let cards = try SwiftDataCardStore(directory: temporaryDirectory())
+        let card = Card(id: UUID(), name: "Gedung Lab", siteName: "Gedung Lab", zones: [], status: .active, credentials: [.ble: credentialID], notAfter: nil)
+        try await cards.add(card)
+        let transport = SequenceTransport([challengeReply, (200, provisionedBody(credentialID: credentialID, notAfter: "2026-11-12T00:00:00Z"), "application/json")])
+        _ = try await CredentialRenewer(keys: keys, records: records, cards: cards, transport: transport).renew(card: card, channel: .ble, context: context)
+        #expect(try records.record(for: credentialID)?.serverCardID == "card-1")
+    }
 }
 
 /// Menjawab berurutan; menjalankan `onFirst` saat permintaan pertama (meniru perubahan bersamaan).
@@ -171,4 +184,3 @@ final class LockedReplies: @unchecked Sendable {
         }
     }
 }
-

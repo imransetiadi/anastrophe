@@ -47,15 +47,19 @@ public struct ProvisionedCredential: Codable, Equatable, Sendable {
 public struct RenewalChallenge: Decodable, Equatable, Sendable {
     public let nonce: Data
     public let expiresAt: Date
+    /// ID card instance pemilik kredensial (untuk hapus kartu, ADR-0026); opsional.
+    public let cardInstanceID: String?
 
-    public init(nonce: Data, expiresAt: Date) {
+    public init(nonce: Data, expiresAt: Date, cardInstanceID: String? = nil) {
         self.nonce = nonce
         self.expiresAt = expiresAt
+        self.cardInstanceID = cardInstanceID
     }
 
     private enum CodingKeys: String, CodingKey {
         case nonce
         case expiresAt = "expires_at"
+        case cardInstanceID = "card_instance_id"
     }
 
     /// Pesan bukti kepemilikan yang ditandatangani kunci kredensial:

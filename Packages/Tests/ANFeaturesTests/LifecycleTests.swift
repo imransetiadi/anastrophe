@@ -21,7 +21,7 @@ final class SpyLauncher: PresentationLaunching {
 @MainActor
 func services(launcher: SpyLauncher) -> AppServices {
     let base = AppServices.inMemory()
-    return AppServices(cards: base.cards, keys: base.keys, records: base.records, availability: { [:] }, launcher: launcher, foreground: ForegroundState())
+    return AppServices(cards: base.cards, keys: base.keys, records: base.records, availability: { [:] }, launcher: launcher, foreground: ForegroundState(), authenticator: ImmediateAuthenticator())
 }
 
 @MainActor

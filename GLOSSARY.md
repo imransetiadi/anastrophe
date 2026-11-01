@@ -47,7 +47,7 @@ Bahasa domain bersama (*ubiquitous language*) untuk PRD, SDD, QA Suite, kode, da
 | **Transfer perangkat** | Re-provisioning ke iPhone baru dan pencabutan kredensial lama (ADR-0007). | `DeviceTransfer` |
 | **Perpanjangan** | Penerbitan ulang sertifikat untuk kunci yang sama (FR-45). Hanya setelah autentikasi tap: sertifikat kedaluwarsa diperpanjang sebelum presentasi, sisa < 50% setelah tap (ADR-0023). | `CredentialRenewer`, `RenewalScheduler`, `RenewalPolicy` |
 | **Nonce perpanjangan** | 32 B acak dari server, berlaku 120 dtk, sekali pakai, terikat ke satu kredensial (SDD §8.4.2). | `RenewalChallenge` |
-| **Bukti kepemilikan** | Tanda tangan kunci kredensial atas `"ANP1-RENEW"` ‖ `cred_id` ‖ nonce; membuktikan perangkat masih memegang kunci. | `RenewalChallenge.message(credentialID:)` |
+| **Bukti kepemilikan** | Tanda tangan kunci kredensial atas nonce server yang membuktikan perangkat masih memegang kunci: `"ANP1-RENEW"` ‖ `cred_id` ‖ nonce untuk perpanjangan, `"ANP1-REVOKE"` ‖ `cred_id` ‖ nonce ‖ ID kartu untuk hapus kartu (ADR-0026). | `RenewalChallenge.message(credentialID:)`, `revokeMessage(credentialID:cardID:)` |
 | **Backend penerbit** | Base URL backend yang menerbitkan kredensial, disimpan per record untuk perpanjangan. Kartu tanpa backend penerbit (lab `lab_ca.py`) tidak diperpanjang. | `CredentialRecord.renewalURL` |
 | **Rantai audit** | Urutan baris `audit_events` per gedung (`site:<uuid>`) yang saling terhubung lewat hash; satu rantai per gedung (ADR-0024). | `AuditChain(siteID)` |
 | **Rantai platform** | Rantai audit untuk event tanpa gedung (mis. `account.deleted`). | `AuditChain("")` |

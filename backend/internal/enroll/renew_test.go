@@ -228,8 +228,8 @@ func TestKredensialDitangguhkanTidakDiperpanjang(t *testing.T) {
 	if rec.Code != http.StatusConflict || problemType(t, rec) != "CRED-NOT-RENEWABLE" {
 		t.Fatalf("renew kartu ditangguhkan: %d %s", rec.Code, rec.Body)
 	}
-	rec = f.do(t, http.MethodPost, "/v1/credentials/"+hex.EncodeToString(f.credID)+":challenge", "", map[string]string{})
-	if rec.Code != http.StatusConflict || problemType(t, rec) != "CRED-NOT-RENEWABLE" {
+	// ADR-0027: challenge tetap boleh untuk kartu ditangguhkan (dipakai untuk hapus kartu).
+	if rec := f.do(t, http.MethodPost, "/v1/credentials/"+hex.EncodeToString(f.credID)+":challenge", "", map[string]string{}); rec.Code != http.StatusCreated {
 		t.Fatalf("challenge kartu ditangguhkan: %d %s", rec.Code, rec.Body)
 	}
 }
@@ -315,8 +315,20 @@ func TestKredensialDicabutTidakDiperpanjang(t *testing.T) {
 		t.Fatalf("renew dicabut: %d %s", rec.Code, rec.Body)
 	}
 	rec = f.do(t, http.MethodPost, "/v1/credentials/"+hex.EncodeToString(f.credID)+":challenge", "", map[string]string{})
-	if rec.Code != http.StatusConflict || problemType(t, rec) != "CRED-NOT-RENEWABLE" {
+	if rec.Code != http.StatusGone || problemType(t, rec) != "CARD-GONE" {
 		t.Fatalf("challenge dicabut: %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestChallengeMemuatIDKartu(t *testing.T) {
+	// Review hapus kartu C1 (rekomendasi 1): app tidak perlu menyimpan ID kartu server.
+	f := provisionedForRenewal(t)
+	rec := f.do(t, http.MethodPost, "/v1/credentials/"+hex.EncodeToString(f.credID)+":challenge", "", map[string]string{})
+	var out struct {
+		CardInstanceID string `json:"card_instance_id"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out.CardInstanceID != f.enrollmentID {
+		t.Fatalf("card_instance_id = %q, ingin %q (%v)", out.CardInstanceID, f.enrollmentID, err)
 	}
 }
 

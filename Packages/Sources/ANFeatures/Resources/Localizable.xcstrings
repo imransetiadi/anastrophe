@@ -358,13 +358,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Access with this iPhone is revoked. Your physical card isn't affected."
+            "value": "Access with this iPhone will be revoked. Your physical card isn't affected."
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Akses lewat iPhone ini dicabut. Kartu fisik Anda tidak terpengaruh."
+            "value": "Akses lewat iPhone ini akan dicabut. Kartu fisik Anda tidak terpengaruh."
           }
         }
       }
@@ -397,6 +397,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kartu belum bisa dihapus. Sambungkan ke internet, lalu coba lagi."
+          }
+        }
+      }
+    },
+    "detail.delete.failed_generic": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The card couldn't be deleted. Please try again later."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu belum bisa dihapus. Coba lagi nanti."
           }
         }
       }

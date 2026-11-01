@@ -1,6 +1,7 @@
 package enroll
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -48,7 +49,7 @@ func TestHapusKartuMencabutDanMencatatAudit(t *testing.T) {
 	}
 	// Kredensial dicabut: tidak bisa diperpanjang lagi.
 	rec := f.do(t, http.MethodPost, "/v1/credentials/"+hexString(f.credID)+":challenge", "", map[string]string{})
-	if rec.Code != http.StatusConflict || problemType(t, rec) != "CRED-NOT-RENEWABLE" {
+	if rec.Code != http.StatusGone || problemType(t, rec) != "CARD-GONE" {
 		t.Fatalf("challenge setelah hapus: %d %s", rec.Code, rec.Body)
 	}
 	events := f.audit(t)
@@ -99,7 +100,7 @@ func TestHapusTandaTanganSalahDitolak(t *testing.T) {
 	}
 }
 
-func TestHapusKartuDuaKali409(t *testing.T) {
+func TestHapusKartuDuaKaliGone(t *testing.T) {
 	f := provisionedForRenewal(t)
 	nonce := f.challenge(t, f.credID)
 	sig := revokeSignature(t, f.key, f.credID, nonce, f.enrollmentID)
@@ -107,7 +108,7 @@ func TestHapusKartuDuaKali409(t *testing.T) {
 		t.Fatalf("pertama: %d", rec.Code)
 	}
 	rec := f.deleteCard(t, f.enrollmentID, f.credID, nonce, sig, "del-b")
-	if rec.Code != http.StatusConflict || problemType(t, rec) != "CARD-NOT-REMOVABLE" {
+	if rec.Code != http.StatusGone || problemType(t, rec) != "CARD-GONE" {
 		t.Fatalf("kedua: %d %s", rec.Code, rec.Body)
 	}
 }
@@ -119,7 +120,22 @@ func TestHapusValidasiPermintaan(t *testing.T) {
 	if rec := f.deleteCard(t, f.enrollmentID, f.credID, nonce, sig, ""); rec.Code != http.StatusBadRequest || problemType(t, rec) != "REQ-IDEMPOTENCY-KEY" {
 		t.Fatalf("tanpa key: %d %s", rec.Code, rec.Body)
 	}
-	if rec := f.deleteCard(t, "6f1c2a9e-0000-4000-8000-000000000099", f.credID, nonce, sig, "del-unknown"); rec.Code != http.StatusNotFound || problemType(t, rec) != "CARD-NOT-FOUND" {
+	if rec := f.deleteCard(t, "6f1c2a9e-0000-4000-8000-000000000099", f.credID, nonce, sig, "del-unknown"); rec.Code != http.StatusGone || problemType(t, rec) != "CARD-GONE" {
 		t.Fatalf("kartu tak dikenal: %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestHapusKartuDitangguhkan(t *testing.T) {
+	// ADR-0027: kartu SUSPENDED bisa dihapus pemiliknya, slot terbebas.
+	f := provisionedForRenewal(t)
+	if err := f.store.SetCardInstanceStatus(context.Background(), f.enrollmentID, "SUSPENDED"); err != nil {
+		t.Fatal(err)
+	}
+	if rec := f.deleteOwnCard(t, "del-suspended"); rec.Code != http.StatusNoContent {
+		t.Fatalf("hapus kartu ditangguhkan: %d %s", rec.Code, rec.Body)
+	}
+	rec := f.do(t, http.MethodPost, "/v1/credentials/"+hexString(f.credID)+":challenge", "", map[string]string{})
+	if rec.Code != http.StatusGone {
+		t.Fatalf("setelah hapus: %d %s", rec.Code, rec.Body)
 	}
 }
