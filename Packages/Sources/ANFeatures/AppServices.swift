@@ -119,9 +119,9 @@ public final class AppServices {
 
     /// Status kartu dari server saat app masuk foreground (FR-38, ADR-0037); true bila ada kartu yang
     /// berubah sehingga daftar perlu dimuat ulang.
-    public func refreshCardStatuses(now: Date = .now, transport: any HTTPTransport = URLSession.shared) async -> Bool {
+    public func refreshCardStatuses(transport: any HTTPTransport = URLSession.shared) async -> Bool {
         guard !storageFailed else { return false }
-        return await statusRefresher.refresh(now: now, transport: transport)
+        return await statusRefresher.refresh(transport: transport)
     }
 
     /// Membatalkan presentasi yang sedang berjalan (Review Focus 2).

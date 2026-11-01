@@ -108,4 +108,20 @@ struct CardStoreTests {
         let card = makeCard("Kantor", credentials: [.ble: Data(repeating: 0x06, count: 16)], status: status)
         #expect(RestoreCheck.reconcile([card], keys: keys).first?.status == status)
     }
+
+    @Test func pembaruanTerarahMemakaiNilaiTerbaru() async throws {
+        // Review akhir siklus hidup M4: penulis lain (mis. perpanjangan) tidak tertimpa salinan basi.
+        let store = try SwiftDataCardStore(directory: temporaryDirectory())
+        let card = Card(id: UUID(), name: "Gedung", siteName: "Gedung", zones: [], status: .active, credentials: [:], notAfter: nil)
+        try await store.add(card)
+        var renewed = card
+        renewed.notAfter = Date(timeIntervalSince1970: 1_800_000_000)
+        try await store.update(renewed)
+        let changed = try await store.update(id: card.id) { current in
+            current.status = .suspended
+            return true
+        }
+        let stored = try #require(try await store.all().first)
+        #expect(changed && stored.status == .suspended && stored.notAfter == renewed.notAfter)
+    }
 }

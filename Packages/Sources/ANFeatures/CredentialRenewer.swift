@@ -44,7 +44,13 @@ struct CredentialRenewer: Sendable {
         let renewed = try await api.renewCredential(credentialID: credentialID, nonce: challenge.nonce, signature: signature,
                                                     statusTokenHash: newToken.map(StatusToken.hash), idempotencyKey: UUID())
         guard renewed.credentialID == credentialID, renewed.channel == channel else { throw ANError.invalidData }
-        let updated = record.renewed(certificate: renewed.certificate, notAfter: renewed.notAfter, notBefore: renewed.notBefore, groupKeys: renewed.groupKeys)
+        var updated = record.renewed(certificate: renewed.certificate, notAfter: renewed.notAfter, notBefore: renewed.notBefore, groupKeys: renewed.groupKeys)
+        if record.serverCardID == nil, let serverCardID {
+            // Review akhir siklus hidup M5: record lama memakai id dari challenge, agar penyegar status
+            // dan hapus kartu menemukan token di id yang sama.
+            updated = CredentialRecord(credentialID: updated.credentialID, certificate: updated.certificate, notAfter: updated.notAfter,
+                                       groupKeys: updated.groupKeys, notBefore: updated.notBefore, renewalURL: updated.renewalURL, serverCardID: serverCardID)
+        }
         _ = try updated.material(suspended: false)  // kunci reader group harus valid sebelum menimpa
         // Baca ulang kartu: perubahan selama perpanjangan (mis. status) tidak boleh tertimpa salinan
         // lama, dan kartu yang sudah dihapus tidak mendapat record baru.

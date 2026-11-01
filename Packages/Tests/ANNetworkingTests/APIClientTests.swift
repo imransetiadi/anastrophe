@@ -45,7 +45,7 @@ struct APIClientTests {
         let transport = FakeTransport(status: 409, body: #"{"type":"ENR-LIMIT","title":"Batas kartu","status":409}"#, contentType: "application/problem+json")
         let client = APIClient(baseURL: base, transport: transport)
         await #expect(throws: ANError.cardLimitReached) {
-            try await client.submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04]), idempotencyKey: UUID())
+            try await client.submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04]), provisioningSecret: Data(repeating: 0x11, count: 32), idempotencyKey: UUID())
         }
     }
 
@@ -53,7 +53,7 @@ struct APIClientTests {
         let transport = FakeTransport(status: 403, body: #"{"type":"ENR-ATTEST-FAILED","status":403}"#, contentType: "application/problem+json; charset=utf-8")
         let client = APIClient(baseURL: base, transport: transport)
         await #expect(throws: ProblemDetails(type: "ENR-ATTEST-FAILED", title: nil, status: 403)) {
-            try await client.submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04]), idempotencyKey: UUID())
+            try await client.submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04]), provisioningSecret: Data(repeating: 0x11, count: 32), idempotencyKey: UUID())
         }
     }
 
@@ -61,7 +61,7 @@ struct APIClientTests {
         let transport = FakeTransport(body: provisionedJSON)
         let key = UUID()
         _ = try await APIClient(baseURL: base, transport: transport)
-            .submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04, 0x01]), idempotencyKey: key)
+            .submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04, 0x01]), provisioningSecret: Data(repeating: 0x11, count: 32), idempotencyKey: key)
         let request = try #require(transport.lastRequest)
         #expect(request.httpMethod == "POST")
         #expect(request.url?.path() == "/v1/enrollments/E1/credentials")
@@ -73,7 +73,7 @@ struct APIClientTests {
 
     @Test func provisionedCredentialDecode() async throws {
         let credential = try await APIClient(baseURL: base, transport: FakeTransport(body: provisionedJSON))
-            .submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04]), idempotencyKey: UUID())
+            .submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04]), provisioningSecret: Data(repeating: 0x11, count: 32), idempotencyKey: UUID())
         #expect(credential.credentialID == Data(repeating: 0xC1, count: 16))
         #expect(credential.channel == .ble)
         #expect(credential.certificate == Data(repeating: 0xCE, count: 5))
@@ -145,7 +145,7 @@ struct APIClientTests {
         let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"6f1c2a9e-0000-4000-8000-000000000001","status":"PENDING_APPROVAL"}"#)
         let key = UUID()
         let card = try #require(CardIdentity("iso14443a:04A1B2C3D4E5F6"))
-        let start = try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", siteID: "site-1", card: card, idempotencyKey: key)
+        let start = try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", siteID: "site-1", card: card, provisioningKeyHash: Data(repeating: 0x22, count: 32), idempotencyKey: key)
         #expect(start == EnrollmentStart(enrollmentID: "6f1c2a9e-0000-4000-8000-000000000001", status: .pendingApproval))
         let request = try #require(transport.lastRequest)
         #expect(request.httpMethod == "POST")
@@ -162,11 +162,11 @@ struct APIClientTests {
         // ADR-0033: undangan menggantikan kartu fisik; body hanya perangkat dan token.
         let token = String(repeating: "A", count: 42) + "w"
         let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"e1","status":"PROVISIONING"}"#)
-        let start = try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", invitation: token, idempotencyKey: UUID())
+        let start = try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", invitation: token, provisioningKeyHash: Data(repeating: 0x22, count: 32), idempotencyKey: UUID())
         #expect(start == EnrollmentStart(enrollmentID: "e1", status: .provisioning))
         let raw = try #require(transport.lastRequest?.httpBody)
         let body = try #require(try JSONSerialization.jsonObject(with: raw) as? [String: String])
-        #expect(body == ["device_id": "dev-1", "invitation": token])
+        #expect(body == ["device_id": "dev-1", "invitation": token, "provisioning_key_hash": Data(repeating: 0x22, count: 32).base64EncodedString()])
     }
 
     @Test func submitCredentialKeyMengirimHashTokenStatus() async throws {
@@ -174,7 +174,7 @@ struct APIClientTests {
         let hash = Data(repeating: 0x5A, count: 32)
         let transport = FakeTransport(status: 200, body: provisionedJSON)
         _ = try await APIClient(baseURL: base, transport: transport)
-            .submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04]), statusTokenHash: hash, idempotencyKey: UUID())
+            .submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04]), statusTokenHash: hash, provisioningSecret: Data(repeating: 0x11, count: 32), idempotencyKey: UUID())
         let raw = try #require(transport.lastRequest?.httpBody)
         let body = try #require(try JSONSerialization.jsonObject(with: raw) as? [String: String])
         #expect(body["status_token_hash"] == hash.base64EncodedString())
@@ -239,7 +239,7 @@ struct APIClientTests {
         let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"e1","status":"MYSTERY"}"#)
         let card = try #require(CardIdentity("iso14443a:04a1b2c3d4e5f6"))
         await #expect(throws: (any Error).self) {
-            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "d", siteID: "s", card: card, idempotencyKey: UUID())
+            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "d", siteID: "s", card: card, provisioningKeyHash: Data(repeating: 0x22, count: 32), idempotencyKey: UUID())
         }
     }
 
@@ -254,14 +254,14 @@ struct APIClientTests {
         let transport = FakeTransport(status: status, body: #"{"type":"\#(code)","status":\#(status)}"#, contentType: "application/problem+json")
         let card = try #require(CardIdentity("iso14443a:04a1b2c3d4e5f6"))
         await #expect(throws: expected) {
-            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "d", siteID: "s", card: card, idempotencyKey: UUID())
+            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "d", siteID: "s", card: card, provisioningKeyHash: Data(repeating: 0x22, count: 32), idempotencyKey: UUID())
         }
     }
 
     @Test func createEnrollmentBatasKartu() async {
         let transport = FakeTransport(status: 409, body: #"{"type":"ENR-LIMIT","status":409}"#, contentType: "application/problem+json")
         await #expect(throws: ANError.cardLimitReached) {
-            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", siteID: "site-1", card: CardIdentity("iso14443a:04a1b2c3d4e5f6")!, idempotencyKey: UUID())
+            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", siteID: "site-1", card: CardIdentity("iso14443a:04a1b2c3d4e5f6")!, provisioningKeyHash: Data(repeating: 0x22, count: 32), idempotencyKey: UUID())
         }
     }
 

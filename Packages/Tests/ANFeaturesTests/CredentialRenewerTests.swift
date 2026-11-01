@@ -71,6 +71,19 @@ struct CredentialRenewerTests {
         #expect(try tokens.token(forCard: "srv-1") == existing)
     }
 
+    @Test func perpanjanganMenyimpanIDKartuServerDariChallenge() async throws {
+        // Review akhir siklus hidup M5: record lama tanpa serverCardID memakai id dari challenge, sehingga
+        // penyegar status dan hapus kartu menemukan token di id yang sama.
+        let (card, cards, _, _) = try setUp(renewalURL: backend)
+        try await cards.add(card)
+        let tokens = KeychainStatusTokenStore(store: InMemorySecretStore())
+        let challenge = (201, #"{"nonce":"\#(nonce.base64EncodedString())","expires_at":"2026-11-05T00:02:00Z","card_instance_id":"srv-2"}"#, "application/json")
+        let transport = SequenceTransport([challenge, renewedReply])
+        _ = try await CredentialRenewer(keys: keys, records: records, cards: cards, statusTokens: tokens, transport: transport).renew(card: card, channel: .ble, context: context)
+        #expect(try records.record(for: credentialID)?.serverCardID == "srv-2")
+        #expect(try tokens.token(forCard: "srv-2") != nil)
+    }
+
     @Test func perpanjanganMemperbaruiRecordDanKartu() async throws {
         let (card, cards, publicKey, _) = try setUp(renewalURL: backend)
         try await cards.add(card)

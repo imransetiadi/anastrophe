@@ -14,22 +14,27 @@ final class CardStatusRefresher {
     private let cards: any CardStore
     private let records: any CredentialRecordStore
     private let tokens: any StatusTokenStore
-    private var lastRefresh: Date?
+    /// Jam monotonik (detik sejak boot): mengubah jam dinding tidak menahan penyegaran (review M6).
+    private let uptime: @Sendable () -> TimeInterval
+    private var lastRefresh: TimeInterval?
 
-    init(cards: any CardStore, records: any CredentialRecordStore, tokens: any StatusTokenStore) {
+    init(cards: any CardStore, records: any CredentialRecordStore, tokens: any StatusTokenStore,
+         uptime: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) {
         self.cards = cards
         self.records = records
         self.tokens = tokens
+        self.uptime = uptime
     }
 
     /// Mengembalikan true bila ada kartu yang statusnya berubah. Galat jaringan dan jawaban server
     /// yang tidak dikenali membiarkan status lokal apa adanya.
-    func refresh(now: Date = .now, transport: any HTTPTransport = URLSession.shared) async -> Bool {
-        if let lastRefresh, now.timeIntervalSince(lastRefresh) < Self.minimumInterval { return false }
+    func refresh(transport: any HTTPTransport = URLSession.shared) async -> Bool {
+        let now = uptime()
+        if let lastRefresh, now - lastRefresh < Self.minimumInterval { return false }
         lastRefresh = now
         guard let all = try? await cards.all() else { return false }
         var changed = false
-        for card in all {
+        for card in all where card.status != .revoked {  // Dicabut bersifat final (review M6)
             guard let (backend, serverCardID) = server(of: card),
                   let token = try? tokens.token(forCard: serverCardID)
             else { continue }
@@ -44,12 +49,14 @@ final class CardStatusRefresher {
             } catch {
                 continue  // offline atau galat lain: status terakhir tetap dipakai (FR-25)
             }
-            // Baca ulang: kartu bisa berubah atau terhapus selama permintaan berjalan.
-            guard var current = try? await cards.all().first(where: { $0.id == card.id }),
-                  let next = Self.localStatus(server: status, current: current.status)
-            else { continue }
-            current.status = next
-            if (try? await cards.update(current)) != nil { changed = true }
+            // Pembaruan terarah di dalam store: perubahan lain selama permintaan (mis. perpanjangan) tidak
+            // tertimpa salinan kartu yang basi (review M4).
+            let updated = try? await cards.update(id: card.id) { current in
+                guard let next = Self.localStatus(server: status, current: current.status) else { return false }
+                current.status = next
+                return true
+            }
+            if updated == true { changed = true }
         }
         return changed
     }
@@ -57,7 +64,7 @@ final class CardStatusRefresher {
     /// Status lokal baru, atau nil bila tidak berubah. Dicabut bersifat final dan menang atas apa pun.
     /// Kunci lokal yang hilang ("Perlu dipindahkan") tidak ditimpa penangguhan maupun pemulihan, dan
     /// ACTIVE hanya memulihkan kartu yang ditangguhkan.
-    static func localStatus(server: String, current: CardStatus) -> CardStatus? {
+    nonisolated static func localStatus(server: String, current: CardStatus) -> CardStatus? {
         switch (server, current) {
         case (_, .revoked): nil
         case ("REVOKED", _), ("DELETED", _): .revoked
