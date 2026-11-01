@@ -225,3 +225,16 @@ func (e *Enrollment) applyCardZones(names []string, bitmap uint64) {
 		}
 	}
 }
+
+// SiteZoneNames mengembalikan nama zona gedung dari sites.policy; indeks = nomor bit zona.
+func (s *Store) SiteZoneNames(ctx context.Context, siteID string) ([]string, error) {
+	if !looksLikeUUID(siteID) {
+		return nil, ErrNotFound
+	}
+	var names []string
+	err := s.pool.QueryRow(ctx, `SELECT COALESCE(ARRAY(SELECT jsonb_array_elements_text(policy -> 'zones')), '{}') FROM sites WHERE id = $1`, siteID).Scan(&names)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return names, err
+}

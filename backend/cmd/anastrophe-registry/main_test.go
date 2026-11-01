@@ -1,0 +1,233 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/imransetiadi/anastrophe/backend/internal/registry"
+	"github.com/imransetiadi/anastrophe/backend/internal/store"
+	"github.com/imransetiadi/anastrophe/backend/internal/testpg"
+)
+
+var adminDSN, skipReason string
+
+func TestMain(m *testing.M) {
+	dsn, stop, err := testpg.Start()
+	if err != nil && !errors.Is(err, testpg.ErrUnavailable) {
+		fmt.Println("test database gagal:", err)
+		os.Exit(1)
+	}
+	if err != nil {
+		skipReason = err.Error()
+	}
+	adminDSN = dsn
+	code := m.Run()
+	stop()
+	os.Exit(code)
+}
+
+func freshStore(t *testing.T) (*store.Store, string) {
+	t.Helper()
+	if adminDSN == "" {
+		testpg.Skip(t, skipReason)
+	}
+	ctx := context.Background()
+	dsn, err := testpg.NewDatabase(ctx, adminDSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.Open(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(s.Close)
+	if err := s.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	return s, dsn
+}
+
+const testKey = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+
+func env(dsn string) func(string) string {
+	return func(k string) string {
+		switch k {
+		case "ANASTROPHE_DATABASE_URL":
+			return dsn
+		case "ANASTROPHE_DEV_REGISTRY_KEY":
+			return testKey
+		}
+		return ""
+	}
+}
+
+func siteWithZones(t *testing.T, db *store.Store) string {
+	t.Helper()
+	ctx := context.Background()
+	org, err := db.CreateOrganization(ctx, "Org", "ID")
+	if err != nil {
+		t.Fatal(err)
+	}
+	site, err := db.CreateSite(ctx, org, "Menara", "ID", "Asia/Jakarta", []byte{1, 2, 3, 4, 5, 6, 7, 8})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SetSitePolicy(ctx, site, []byte(`{"zones": ["Lobi", "Lift A", "Parkir"]}`)); err != nil {
+		t.Fatal(err)
+	}
+	return site
+}
+
+func writeCSV(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "kartu.csv")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+const registryCSV = `tech,card_id,holder_contact,zones
+iso14443a,04a1b2c3d4e5f6,+62 812-3456-7890,Lobi;Parkir
+felica,0123456789abcdef,,Lift A
+iso14443a,04a1b2c3d4,,Lobi
+iso15693,e004010203040506,,Gudang
+iso14443a,04a1b2c3d4e5f6,,Lobi
+iso14443a,04b1b2c3d4e5f6,bukan-kontak,Lobi
+`
+
+func cardHMAC(t *testing.T, site, tech, id string) []byte {
+	t.Helper()
+	mac, _ := registry.NewDevMAC(testKey)
+	identity, err := registry.ParseCardIdentity(tech, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum, err := mac.MAC(context.Background(), site, identity.MACInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sum
+}
+
+func TestImportCSV(t *testing.T) {
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	path := writeCSV(t, registryCSV)
+	var out, errOut bytes.Buffer
+	if code := run(ctx, []string{"import", "--site", site, "--file", path, "--operator", "budi"}, &out, &errOut, env(dsn)); code != 1 {
+		t.Fatalf("kode keluar %d (ingin 1: ada baris ditolak): %s %s", code, out.String(), errOut.String())
+	}
+	for _, want := range []string{"ditambah: 2, diperbarui: 0, ditolak: 4", "baris 4:", "baris 5:", "baris 6: kartu sama dengan baris 2", "baris 7:"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("laporan tanpa %q: %s", want, out.String())
+		}
+	}
+	// Zona dipetakan lewat kebijakan gedung: Lobi (bit 0) + Parkir (bit 2) = 5.
+	device, _ := db.CreateDevice(ctx)
+	id, status, err := db.StartCardEnrollment(ctx, device, site, cardHMAC(t, site, "iso14443a", "04a1b2c3d4e5f6"), time.Now())
+	if err != nil || status != "PROVISIONING" {
+		t.Fatalf("kartu impor tidak bisa didaftarkan: %q %v", status, err)
+	}
+	_, _, err = db.Idempotent(ctx, "zona", []byte("h"), func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
+		e, err := tx.EnrollmentForUpdate(ctx, id)
+		if err == nil && e.ZonesBitmap != 5 {
+			t.Errorf("bitmap zona = %d, ingin 5", e.ZonesBitmap)
+		}
+		return 200, []byte("{}"), err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if code := run(ctx, []string{"import", "--site", site, "--file", path, "--operator", "budi"}, &out, &errOut, env(dsn)); code != 1 || !strings.Contains(out.String(), "ditambah: 0, diperbarui: 2, ditolak: 4") {
+		t.Fatalf("impor ulang: %d %s", code, out.String())
+	}
+}
+
+func TestImportTanpaNilaiMentah(t *testing.T) {
+	// CLAUDE.md aturan 6: identitas kartu dan kontak tidak tercetak, tercatat, atau masuk audit.
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	var out, errOut bytes.Buffer
+	run(ctx, []string{"import", "--site", site, "--file", writeCSV(t, registryCSV), "--operator", "budi"}, &out, &errOut, env(dsn))
+	events, err := db.AuditEvents(ctx, store.AuditChain(site))
+	if err != nil || len(events) != 1 {
+		t.Fatalf("audit: %d %v", len(events), err)
+	}
+	text := strings.ToLower(out.String() + errOut.String() + fmt.Sprint(events))
+	for _, raw := range []string{"04a1b2c3d4e5f6", "0123456789abcdef", "04a1b2c3d4", "e004010203040506", "04b1b2c3d4e5f6", "6281234567890", "812-3456", "bukan-kontak"} {
+		if strings.Contains(text, raw) {
+			t.Fatalf("nilai mentah %q bocor: %s", raw, text)
+		}
+	}
+}
+
+func TestPersetujuanLewatCLI(t *testing.T) {
+	db, dsn := freshStore(t)
+	ctx := context.Background()
+	site := siteWithZones(t, db)
+	var out, errOut bytes.Buffer
+	run(ctx, []string{"import", "--site", site, "--file", writeCSV(t, "tech,card_id,holder_contact,zones\niso14443a,04a1b2c3d4e5f6,,Lobi\n"), "--operator", "budi"}, &out, &errOut, env(dsn))
+	sum := cardHMAC(t, site, "iso14443a", "04a1b2c3d4e5f6")
+	devices := make([]string, 3)
+	for i := range devices {
+		devices[i], _ = db.CreateDevice(ctx)
+	}
+	_, _, _ = db.StartCardEnrollment(ctx, devices[0], site, sum, time.Now())
+	approveMe, _, _ := db.StartCardEnrollment(ctx, devices[1], site, sum, time.Now())
+	rejectMe, _, _ := db.StartCardEnrollment(ctx, devices[2], site, sum, time.Now())
+	if code := run(ctx, []string{"approve", "--card-instance", approveMe, "--operator", "budi"}, &out, &errOut, env(dsn)); code != 0 {
+		t.Fatalf("approve: %d %s", code, errOut.String())
+	}
+	if code := run(ctx, []string{"reject", "--card-instance", rejectMe, "--operator", "budi"}, &out, &errOut, env(dsn)); code != 0 {
+		t.Fatalf("reject: %d %s", code, errOut.String())
+	}
+	errOut.Reset()
+	if code := run(ctx, []string{"approve", "--card-instance", approveMe, "--operator", "budi"}, &out, &errOut, env(dsn)); code != 2 || !strings.Contains(errOut.String(), "tidak menunggu persetujuan") {
+		t.Fatalf("approve ulang: %d %s", code, errOut.String())
+	}
+	if code := run(ctx, []string{"approve", "--card-instance", rejectMe}, &out, &errOut, env(dsn)); code != 2 {
+		t.Fatalf("tanpa operator: %d", code)
+	}
+	events, _ := db.AuditEvents(ctx, store.AuditChain(site))
+	var decided []string
+	for _, e := range events {
+		if e.Action == "enrollment.approved" || e.Action == "enrollment.rejected" {
+			decided = append(decided, e.Action+" "+e.Actor)
+		}
+	}
+	if strings.Join(decided, ",") != "enrollment.approved operator:budi,enrollment.rejected operator:budi" {
+		t.Fatalf("audit keputusan: %v", decided)
+	}
+}
+
+func TestArgumenSalah(t *testing.T) {
+	ctx := context.Background()
+	var out, errOut bytes.Buffer
+	noDB := func(string) string { return "" }
+	for _, args := range [][]string{nil, {"hapus"}, {"import", "--site", "x"}} {
+		if code := run(ctx, args, &out, &errOut, noDB); code != 2 {
+			t.Errorf("%v: kode %d", args, code)
+		}
+	}
+	withDB := func(k string) string {
+		if k == "ANASTROPHE_DATABASE_URL" {
+			return "postgres://127.0.0.1:1/x"
+		}
+		return ""
+	}
+	errOut.Reset()
+	if code := run(ctx, []string{"import", "--site", "x", "--file", "y", "--operator", "budi"}, &out, &errOut, withDB); code != 2 || !strings.Contains(errOut.String(), "ANASTROPHE_DEV_REGISTRY_KEY") {
+		t.Fatalf("tanpa kunci registri: %d %s", code, errOut.String())
+	}
+}

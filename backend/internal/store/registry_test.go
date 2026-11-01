@@ -292,3 +292,21 @@ func TestZonaEnrolmentDariKartu(t *testing.T) {
 		}
 	}
 }
+
+func TestNamaZonaGedung(t *testing.T) {
+	s := freshStore(t)
+	ctx := context.Background()
+	siteID, _ := seed(t, s)
+	if names, err := s.SiteZoneNames(ctx, siteID); err != nil || len(names) != 0 {
+		t.Fatalf("tanpa kebijakan: %v %v", names, err)
+	}
+	if err := s.SetSitePolicy(ctx, siteID, []byte(`{"zones": ["Lobi", "Parkir"]}`)); err != nil {
+		t.Fatal(err)
+	}
+	if names, err := s.SiteZoneNames(ctx, siteID); err != nil || strings.Join(names, ",") != "Lobi,Parkir" {
+		t.Fatalf("zona: %v %v", names, err)
+	}
+	if _, err := s.SiteZoneNames(ctx, "00000000-0000-0000-0000-000000000000"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("gedung tak dikenal: %v", err)
+	}
+}

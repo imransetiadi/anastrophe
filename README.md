@@ -79,6 +79,7 @@ Backend (Go, ADR-0020; butuh PostgreSQL 16 lokal untuk test integrasi):
 (cd backend && go test ./... && go vet ./...)
 ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_SOFTWARE_CA=1 ANASTROPHE_DEV_REGISTRY_KEY=<32 byte hex> go -C backend run ./cmd/anastrophe-api   # dev/lab saja; kunci registri dev (ADR-0031), bukan untuk produksi
 ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-audit   # verifikasi rantai audit (FR-54); keluar 1 bila ada yang rusak
+ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_REGISTRY_KEY=<32 byte hex> go -C backend run ./cmd/anastrophe-registry import --site <uuid> --file kartu.csv --operator <nama>   # registri kartu fisik (FR-52); approve|reject --card-instance <uuid> untuk perangkat tambahan (ADR-0032)
 ```
 
 Lab end-to-end (build DEBUG; kartu diterbitkan backend dev, tanpa `lab_ca.py issue`):
@@ -87,6 +88,7 @@ Lab end-to-end (build DEBUG; kartu diterbitkan backend dev, tanpa `lab_ca.py iss
 export ANASTROPHE_DATABASE_URL=postgres://…
 export ANASTROPHE_DEV_REGISTRY_KEY=$(openssl rand -hex 32)   # kunci registri dev, sama untuk devseed dan API
 go -C backend run ./cmd/anastrophe-devseed -lab-dir ../scripts/anp1/.lab   # mencetak {"site_id","device_id"}
+# devseed juga mendaftarkan kartu lab ke registri (-lab-card, default iso14443a:04a1b2c3d4e5f6)
 ANASTROPHE_DEV_SOFTWARE_CA=1 go -C backend run ./cmd/anastrophe-api
 xcrun simctl launch booted app.anastrophe -ANLabBackend http://127.0.0.1:8080 \
   -ANLabDevice <device_id> -ANLabSite <site_id>

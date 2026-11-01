@@ -25,7 +25,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/imransetiadi/anastrophe/backend/internal/registry"
 	"github.com/imransetiadi/anastrophe/backend/internal/store"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -44,6 +46,7 @@ func run() error {
 	labDir := flag.String("lab-dir", "", "direktori site.json lab_ca.py (opsional)")
 	newDevice := flag.Bool("new-device", false, "hanya buat perangkat baru untuk -site-code yang sudah ada (mis. slot kartu perangkat lama habis)")
 	allowRemote := flag.Bool("allow-remote", false, "izinkan database bukan lokal (hati-hati: devseed menulis data lab)")
+	labCard := flag.String("lab-card", "iso14443a:04a1b2c3d4e5f6", "kartu lab <tech>:<hex> yang didaftarkan ke registri (app memakai -ANLabCard yang sama)")
 	flag.Parse()
 
 	dsn := os.Getenv("ANASTROPHE_DATABASE_URL")
@@ -56,6 +59,14 @@ func run() error {
 	code, err := hex.DecodeString(*siteCode)
 	if err != nil || len(code) != 8 {
 		return errors.New("-site-code harus 8 byte hex")
+	}
+	labIdentity, err := parseLabCard(*labCard)
+	if err != nil {
+		return err
+	}
+	mac, err := registry.NewDevMAC(os.Getenv("ANASTROPHE_DEV_REGISTRY_KEY"))
+	if err != nil {
+		return errors.New("ANASTROPHE_DEV_REGISTRY_KEY wajib diisi (32 byte hex, sama dengan API)")
 	}
 	ctx := context.Background()
 	db, err := store.Open(ctx, dsn)
@@ -87,7 +98,29 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	// Enrolment lab lewat jalur kartu (ADR-0031): kartu lab terdaftar dengan zona lab (bit 0).
+	sum, err := mac.MAC(ctx, out.SiteID, labIdentity.MACInput())
+	if err != nil {
+		return err
+	}
+	if _, _, err := db.UpsertPhysicalCards(ctx, out.SiteID, "devseed", []store.PhysicalCard{{CardHMAC: sum, ZonesBitmap: 1}}, 0, time.Now()); err != nil {
+		return err
+	}
+	fmt.Fprintln(os.Stderr, "devseed: kartu lab terdaftar di registri (pakai -ANLabCard yang sama di app)")
 	return json.NewEncoder(os.Stdout).Encode(out)
+}
+
+// parseLabCard membaca "<tech>:<hex>" menjadi identitas kartu lab.
+func parseLabCard(s string) (registry.CardIdentity, error) {
+	tech, id, ok := strings.Cut(s, ":")
+	if !ok {
+		return registry.CardIdentity{}, errors.New("-lab-card harus <tech>:<hex>, mis. iso14443a:04a1b2c3d4e5f6")
+	}
+	identity, err := registry.ParseCardIdentity(tech, id)
+	if err != nil {
+		return registry.CardIdentity{}, errors.New("-lab-card: teknologi atau panjang identitas tidak valid")
+	}
+	return identity, nil
 }
 
 // readerGroup membaca group_id + kunci publik dari site.json lab_ca.py, atau membuat baru.
