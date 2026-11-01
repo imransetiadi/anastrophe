@@ -375,8 +375,9 @@ func (s *Store) PurgeRenewalChallenges(ctx context.Context, before time.Time) (i
 
 // RevokedCredential adalah kredensial yang baru dicabut bersama kartunya.
 type RevokedCredential struct {
-	CredID   []byte
-	Channel  string
+	CredID  []byte
+	Channel string
+	// NotAfter: masa berlaku terpanjang yang pernah diterbitkan (batas denylist, review M3).
 	NotAfter time.Time
 }
 
@@ -461,7 +462,7 @@ func (t *Tx) CompleteRenewal(ctx context.Context, credentialID string, nonce, ce
 	if tag.RowsAffected() != 1 {
 		return ErrNotRenewable
 	}
-	_, err = t.tx.Exec(ctx, `UPDATE credentials SET cert = $2, not_after = $3 WHERE id = $1`, credentialID, cert, notAfter)
+	_, err = t.tx.Exec(ctx, `UPDATE credentials SET cert = $2, not_after = $3, max_not_after = GREATEST(COALESCE(max_not_after, not_after), $3) WHERE id = $1`, credentialID, cert, notAfter)
 	return err
 }
 
@@ -504,7 +505,7 @@ func (t *Tx) SaveCredential(ctx context.Context, c Credential) error {
 	if tag.RowsAffected() != 1 {
 		return ErrNotProvisionable
 	}
-	_, err = t.tx.Exec(ctx, `INSERT INTO credentials (id, card_instance_id, channel, cred_id, pubkey, cert, not_after) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+	_, err = t.tx.Exec(ctx, `INSERT INTO credentials (id, card_instance_id, channel, cred_id, pubkey, cert, not_after, max_not_after) VALUES ($1, $2, $3, $4, $5, $6, $7, $7)`,
 		newUUID(), c.CardInstanceID, c.Channel, c.CredID, c.PubKey, c.Cert, c.NotAfter)
 	return err
 }

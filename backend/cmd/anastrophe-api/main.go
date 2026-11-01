@@ -96,6 +96,11 @@ func run() error {
 			} else if n > 0 {
 				slog.Info("purged renewal challenges", "count", n)
 			}
+			if n, err := db.PurgeDenylist(ctx, time.Now()); err != nil {
+				slog.Error("purge denylist failed")
+			} else if n > 0 {
+				slog.Info("purged denylist", "count", n) // sertifikatnya sudah habis
+			}
 			logAuditHeads(ctx, db)
 		}
 	}()

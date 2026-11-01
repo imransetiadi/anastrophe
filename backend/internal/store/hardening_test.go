@@ -120,3 +120,57 @@ func TestRevokeOperatorMenulisAuditKredensial(t *testing.T) {
 		t.Fatalf("audit kredensial = %+v", events)
 	}
 }
+
+func TestDenylistMemakaiMasaBerlakuTerpanjang(t *testing.T) {
+	// Review akhir siklus hidup M3: bila perpanjangan memendekkan masa berlaku, sertifikat lama yang lebih
+	// panjang masih ada di tangan pemegang; denylist harus bertahan sampai sertifikat terpanjang itu habis.
+	s := freshStore(t)
+	ctx := context.Background()
+	now := time.Now().Truncate(time.Second)
+	_, _, id, creds := activeCard(t, s, "ble")
+	var credentialID string
+	var longest time.Time
+	if err := s.pool.QueryRow(ctx, `SELECT id::text, not_after FROM credentials WHERE cred_id = $1`, creds[0]).Scan(&credentialID, &longest); err != nil {
+		t.Fatal(err)
+	}
+	nonce := make([]byte, 32)
+	nonce[0] = 7
+	if _, err := s.CreateRenewalChallenge(ctx, creds[0], nonce, now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	shorter := now.Add(24 * time.Hour)
+	if err := s.InTx(ctx, func(tx *Tx) error { return tx.CompleteRenewal(ctx, credentialID, nonce, []byte{2}, shorter, now) }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RevokeCardInstance(ctx, id, "hilang", "staf-01", now); err != nil {
+		t.Fatal(err)
+	}
+	var expires time.Time
+	if err := s.pool.QueryRow(ctx, `SELECT expires_at FROM denylist_entries WHERE cred_id = $1`, creds[0]).Scan(&expires); err != nil {
+		t.Fatal(err)
+	}
+	if !expires.Equal(longest) {
+		t.Fatalf("expires_at = %v, ingin %v (sertifikat terpanjang)", expires, longest)
+	}
+}
+
+func TestPurgeDenylistKedaluwarsa(t *testing.T) {
+	// Review akhir siklus hidup M3: baris yang sertifikatnya sudah habis dibuang agar denylist terbatas.
+	s := freshStore(t)
+	ctx := context.Background()
+	now := time.Now()
+	siteID, _ := registrySite(t, s)
+	for i, expires := range []time.Time{now.Add(-time.Hour), now.Add(time.Hour)} {
+		if _, err := s.pool.Exec(ctx, `INSERT INTO denylist_entries (site_id, cred_id, revoked_at, expires_at) VALUES ($1, $2, $3, $4)`, siteID, []byte{byte(i), 1, 2, 3}, now, expires); err != nil {
+			t.Fatal(err)
+		}
+	}
+	n, err := s.PurgeDenylist(ctx, now)
+	if err != nil || n != 1 {
+		t.Fatalf("purge = %d (%v), ingin 1", n, err)
+	}
+	var left int
+	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM denylist_entries`).Scan(&left); err != nil || left != 1 {
+		t.Fatalf("tersisa %d (%v), ingin 1", left, err)
+	}
+}

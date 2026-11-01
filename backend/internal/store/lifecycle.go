@@ -126,7 +126,7 @@ func (t *Tx) revokeInstance(ctx context.Context, cardID, reason string, now time
 	rows, err := t.tx.Query(ctx, `
 		UPDATE credentials SET status = 'REVOKED', revoked_at = $2, revoke_reason = $3
 		WHERE card_instance_id = $1 AND status IN ('ACTIVE', 'SUSPENDED')
-		RETURNING cred_id, channel, not_after`, cardID, now, reason)
+		RETURNING cred_id, channel, COALESCE(max_not_after, not_after)`, cardID, now, reason)
 	if err != nil {
 		return nil, err
 	}
@@ -239,6 +239,13 @@ func (t *Tx) SetProvisioningKeyHash(ctx context.Context, cardInstanceID string, 
 		return err
 	}
 	return ErrDuplicateEnrollment
+}
+
+// PurgeDenylist membuang baris denylist yang sertifikatnya sudah habis sebelum batas waktu, sehingga
+// denylist tetap terbatas (SDD §8.1).
+func (s *Store) PurgeDenylist(ctx context.Context, before time.Time) (int64, error) {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM denylist_entries WHERE expires_at < $1`, before)
+	return tag.RowsAffected(), err
 }
 
 // LockInstanceOfCredential mengunci card instance milik kredensial sebelum baris kredensial dikunci,
