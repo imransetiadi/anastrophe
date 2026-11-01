@@ -29,6 +29,7 @@
 | 2.13 | 2026-11-01 | Catatan implementasi enrolment sebelum akun (§8.4.1), `ENR-NOT-REGISTERED` di diagram, struktur modul `CardIdentity`. |
 | 2.14 | 2026-11-01 | Undangan sekali pakai (ADR-0033): tabel `invitations`, `card_instances.invitation_id`, aturan terpakai dan zona (§8.1). |
 | 2.15 | 2026-11-01 | `POST /enrollments` menerima `invitation` sebagai alternatif `card`; galat `ENR-INVITATION-INVALID` (§8.5, §15). |
+| 2.17 | 2026-11-02 | Siklus hidup kartu oleh operator (suspend/resume/revoke, ADR-0036), denylist dari pencabutan, token baca status dan `GET /cards/{id}/status` (ADR-0037) (§8.1, §8.4.3, §8.5, §15). |
 | 2.16 | 2026-11-01 | Undangan berkartu menyetujui instance perangkat itu yang belum selesai (ADR-0035); kartu yang tidak lagi `ACTIVE` membuat undangannya tidak berlaku; kolom `invitations` dan `card_instances.invitation_id` di model data (§8.1). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
@@ -563,7 +564,7 @@ devices(id uuid pk, user_id fk, app_attest_key_id text, apns_token text, model t
 physical_cards(id uuid pk, site_id fk, card_id_hmac bytea, holder_contact_hmac bytea, zones_bitmap bigint, acs_card_number text, status text, unique(site_id, card_id_hmac))
 card_ownerships(id uuid pk, physical_card_id fk unique, primary_user_id fk, security_code_hash text, failed_attempts int, locked_until timestamptz, max_members smallint)
 memberships(id uuid pk, ownership_id fk, user_id fk, role text check (role in ('PRIMARY','MEMBER')), removed_at timestamptz)
-card_instances(id uuid pk, membership_id fk, device_id fk, physical_card_id fk null, invitation_id fk null, status text, status_changed_at timestamptz, created_at timestamptz)        -- "Kartu (digital)", maks 8 aktif per device; physical_card_id = kartu registri yang dicocokkan saat enrolment (ADR-0031); invitation_id = undangan yang dipakai (ADR-0033)
+card_instances(id uuid pk, membership_id fk, device_id fk, physical_card_id fk null, invitation_id fk null, status text, status_changed_at timestamptz, status_token_hash bytea null, created_at timestamptz)        -- "Kartu (digital)", maks 8 aktif per device; physical_card_id = kartu registri yang dicocokkan saat enrolment (ADR-0031); invitation_id = undangan yang dipakai (ADR-0033); status_token_hash = SHA-256 token baca status (ADR-0037)
 credentials(id uuid pk, card_instance_id fk, channel text, cred_id bytea unique, pubkey bytea, cert bytea, not_after timestamptz, last_counter bigint, status text, revoked_at timestamptz, revoke_reason text)
 wallet_passes(id uuid pk, card_instance_id fk, apple_pass_ref text, device_kind text /*iphone|watch*/, status text)   -- R2
 invitations(id uuid pk, site_id fk, physical_card_id fk null, contact_hmac bytea null, token_hash bytea unique, zones_bitmap bigint, expires_at timestamptz, used_at timestamptz null, created_at timestamptz)
@@ -580,6 +581,8 @@ audit_events(id bigserial pk, chain text /* site:<uuid> | platform (ADR-0024) */
 - Sebelum ada akun (ADR-0032, provisional): perangkat pertama untuk sebuah kartu mendapat `PROVISIONING`, perangkat lain `PENDING_APPROVAL` yang disetujui (`PROVISIONING`) atau ditolak (`REJECTED`) operator; kunci diambil berurutan (perangkat, lalu baris kartu).
 - Undangan (ADR-0033): `invitations` menyimpan hash SHA-256 token (32 byte acak, base64url), gedung, kartu terdaftar opsional, zona, masa berlaku 1–30 hari, dan waktu dipakai; `card_instances.invitation_id`. Undangan dianggap terpakai selama punya card instance yang tidak `ABANDONED`. Enrolment lewat undangan selalu `PROVISIONING` (niat eksplisit pengelola) dengan zona dari kartu terdaftar bila diikat, selain itu dari undangan (0 bila tidak diisi). Undangan berkartu menyetujui instance `PENDING_APPROVAL`/`PROVISIONING` milik perangkat itu untuk kartu yang sama, tanpa instance baru, dengan audit `enrollment.approved` yang memuat id undangan (ADR-0035); kartu yang tidak lagi `ACTIVE` membuat undangannya tidak berlaku. Kunci diambil berurutan: perangkat, undangan, lalu baris kartu.
 - Enrolment yang belum selesai (ADR-0034): perangkat yang sama dengan instance `PROVISIONING`/`PENDING_APPROVAL` untuk kartu itu melanjutkan instance tersebut (200, `enrollment_id` sama); `ENR-DUPLICATE` hanya untuk `ACTIVE`/`SUSPENDED`. `PROVISIONING` tanpa kredensial yang melewati 15 menit sejak masuk `PROVISIONING` atau terakhir dilanjutkan menjadi `ABANDONED` (tidak aktif; audit `enrollment.abandoned`), lewat pemeriksaan di transaksi enrolment dan sapuan per jam. Perangkat penuh (8 kartu) mendapat `ENR-LIMIT` untuk kartu terdaftar maupun tidak dikenal.
+- Siklus hidup oleh operator (ADR-0036): `suspend` ACTIVE → SUSPENDED, `resume` SUSPENDED → ACTIVE, `revoke` {ACTIVE, SUSPENDED, PROVISIONING} → REVOKED; kredensial mengikuti status instance; status lain ditolak tanpa perubahan dan tanpa audit. Audit `card.suspended`, `card.resumed`, `card.revoked {reason, credentials}` dengan alasan berupa kode `[a-z_]{1,32}`. Kunci diambil berurutan: instance, lalu kredensial (sama dengan hapus kartu).
+- Token baca status (ADR-0037): server hanya menyimpan `status_token_hash` (32 byte) yang dikirim app saat provisioning atau perpanjangan bertanda tangan; token mentah tidak pernah disimpan atau di-log.
 - `credentials.not_after ≤ issued_at + policy.cert_validity_days`.
 - `denylist_entries.expires_at = not_after` sertifikat terakhir, sehingga denylist tidak tumbuh tanpa batas.
 - `sites.policy` (JSON) memuat `zones` (nama zona), `zones_bitmap` (bilangan 64-bit) dan `cert_validity_days` (1–30, default 7 sesuai ADR-0010). Tanpa `zones_bitmap`, sertifikat diterbitkan dengan bitmap 0 (*fail-closed*: tidak membuka zona mana pun).
@@ -666,6 +669,8 @@ Kapan app memicu alur ini diatur ADR-0023 (§5.5).
 
 Event `credential.revoked` → Site Sync menambah denylist + push MQTT ke reader/gateway online (target ≤ 60 dtk). Reader offline mendapatkannya pada sinkron berikutnya (default 15 menit). Reader yang terputus total tetap menolak saat sertifikat kedaluwarsa (≤ 7 hari).
 
+Implementasi saat ini: pencabutan oleh operator (`anastrophe-registry revoke`) dan hapus kartu oleh pengguna (ADR-0026) menulis `denylist_entries` dalam transaksi pencabutan, dengan `expires_at` = `not_after` sertifikat. Sinkron ke reader dan gateway belum ada (menunggu ADR-0022). Kartu yang ditangguhkan tidak masuk denylist: kredensialnya tidak bisa diperpanjang sehingga kedaluwarsa dalam ≤ 7 hari, dan app menampilkan Ditangguhkan lewat token baca status.
+
 #### 8.4.4 Transfer perangkat (FR-41)
 
 iPhone baru: SIWA + OTP + App Attest → `POST /v1/devices/transfer` → server membuat `card_instances` baru (tanpa security code ulang, karena identitas & peran sama) → provisioning kredensial baru → kredensial di perangkat lama dicabut (REVOKED, alasan `transferred`). Untuk kanal W, pengguna memakai Easy Provisioning dan server menerima notifikasi Apple.
@@ -688,11 +693,12 @@ Semua POST mutasi menerima header `Idempotency-Key`. Error memakai RFC 9457 (`ty
 | `GET /config` | Wilayah, kanal aktif, kebijakan, versi minimum | FR-01, FR-04, FR-05 |
 | `POST /enrollments` | Mulai enrolment (kartu fisik/undangan). Body `device_id`, `site_id`, `card` `{tech, id}` (ADR-0031): identitas hanya dipakai untuk HMAC per gedung lalu dibuang; hash idempotency memakai HMAC itu. Respons 201 `{enrollment_id, status}` dengan status `PROVISIONING` atau `PENDING_APPROVAL` (ADR-0032). Alternatif: body `device_id` + `invitation` (token 43 karakter base64url; ADR-0033), tepat satu dari `card`/`invitation`; hash idempotency memakai hash token | FR-11, FR-12, FR-13 |
 | `POST /enrollments/{id}/security-code` · `/verify-code` | Buat/verifikasi code | FR-14, FR-32 |
-| `POST /enrollments/{id}/credentials` | Kirim pubkey per kanal → sertifikat | FR-16 |
+| `POST /enrollments/{id}/credentials` | Kirim pubkey per kanal → sertifikat; field opsional `status_token_hash` (base64 SHA-256 token baca status, ADR-0037) | FR-16, FR-38 |
+| `GET /cards/{id}/status` | Status card instance dengan header `Authorization: Bearer <token baca status base64url>` (ADR-0037); id tak dikenal, token salah, atau tanpa token → 404 `CARD-NOT-FOUND` identik; `Cache-Control: no-store` | FR-38 |
 | `POST /enrollments/{id}/se-personalization` | Sesi personalisasi applet (N-SE) | FR-16 |
 | `GET /cards` · `GET /cards/{id}` | Daftar & detail kartu | FR-30, FR-38 |
 | `DELETE /cards/{id}` | Hapus kartu dengan bukti kepemilikan kunci (`Idempotency-Key` wajib): body `credential_id`, `nonce` (dari `:challenge`), `signature` atas `"ANP1-REVOKE"` ‖ `cred_id` ‖ `nonce` ‖ ID kartu huruf kecil. Kartu ACTIVE atau SUSPENDED beserta kredensialnya menjadi REVOKED, audit `credential.revoked`, 204; kartu yang sudah dicabut/tidak dikenal → 410 `CARD-GONE` (ADR-0026/0027) | FR-31 |
-| `POST /credentials/{cred}:challenge` · `POST /credentials/{cred}:renew` | Nonce perpanjangan; perpanjang sertifikat (§8.4.2) | FR-45 |
+| `POST /credentials/{cred}:challenge` · `POST /credentials/{cred}:renew` | Nonce perpanjangan; perpanjang sertifikat (§8.4.2); `:renew` menerima `status_token_hash` opsional untuk kartu yang belum punya token (ADR-0037) | FR-45 |
 | `GET /ownerships/{id}/members` · `DELETE /ownerships/{id}/members/{uid}` | Kelola anggota | FR-33 |
 | `PUT /ownerships/{id}/security-code` | Ganti code | FR-34 |
 | `POST /claims` | Laporkan sengketa | FR-18 |
@@ -831,6 +837,7 @@ Tidak ada GPS, tidak ada tracking lintas app (ATT tidak dipakai). Privacy Manife
 | `CRED-NOT-RENEWABLE` | Kredensial atau kartu ditangguhkan/dicabut | "Kartu sedang ditangguhkan. Hubungi pengelola gedung." | Hubungi admin |
 | `CRED-CHALLENGE-INVALID` | Nonce tidak dikenal, terpakai, kedaluwarsa, atau milik kredensial lain | — (diulang otomatis pada tap berikutnya) | Minta nonce baru |
 | `CRED-PROOF-INVALID` | Tanda tangan bukti kepemilikan tidak valid | "Kartu perlu didaftarkan ulang." | Enrolment ulang |
+| `CARD-NOT-FOUND` (404) | Token baca status tidak cocok, tidak ada, atau card id tak dikenal; semuanya dijawab identik (ADR-0037) | — (app mempertahankan status terakhir) | Tidak ada |
 | `CARD-GONE` (410) | Kartu atau kredensial sudah dicabut/dihapus, atau kartu tidak dikenal | — (app menghapus kartu lokal; ADR-0027) | Tidak ada |
 | `CARD-NOT-REMOVABLE` | Kartu belum aktif (mis. masih diprovisikan) saat hapus kartu | "Kartu belum bisa dihapus. Coba lagi nanti." | Coba lagi |
 | `DEV-KEY-MISSING` | Restore/passcode dimatikan | "Kartu perlu dipindahkan ke iPhone ini." | Alur transfer |

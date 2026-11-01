@@ -60,6 +60,8 @@ public struct KeysView: View {
         }
         .task {
             await model.load()
+            // FR-38 (ADR-0037): status dari server tanpa prompt; daftar dimuat ulang hanya bila berubah.
+            if await services.refreshCardStatuses() { await model.load() }
             #if DEBUG
             // Daftar tampil dulu; alur lab berjalan sesudahnya agar host lambat tidak menahan layar.
             if let message = await services.runPendingLabBackendProvisioning() {
@@ -84,7 +86,12 @@ public struct KeysView: View {
             Task { await model.load() }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await model.load() } }
+            if phase == .active {
+                Task {
+                    await model.load()
+                    if await services.refreshCardStatuses() { await model.load() }
+                }
+            }
         }
         .sheet(item: $presentation.request, onDismiss: {
             Task {

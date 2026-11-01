@@ -44,9 +44,10 @@ Bahasa domain bersama (*ubiquitous language*) untuk PRD, SDD, QA Suite, kode, da
 | **Security code** | Kode 6 digit buatan pemegang utama; diverifikasi server dan dibatasi percobaannya (ADR-0005). | `SecurityCode` |
 | **Undangan** | Token sekali pakai dari admin untuk enrolment tanpa kartu fisik (ADR-0033). Bisa diikat ke kartu terdaftar; undangan berkartu sekaligus menyetujui enrolment perangkat itu yang masih menunggu untuk kartu tersebut (ADR-0035). | `Invitation` |
 | **Sengketa klaim** | Laporan pemegang sah bahwa kartunya diklaim orang lain; diputuskan admin (FR-59). | `ClaimDispute` |
-| **Suspend / Resume** | Penangguhan sementara kredensial/pass (pengguna, admin, atau Lost Mode). | `suspend()` / `resume()` |
+| **Suspend / Resume** | Penangguhan sementara kredensial/pass (pengguna, admin, atau Lost Mode). Sebelum portal ada, operator memakai CLI `anastrophe-registry suspend\|resume` (ADR-0036). | `suspend()` / `resume()` |
 | **Revoke (cabut)** | Penonaktifan permanen kredensial; masuk denylist reader. | `revoke()` |
-| **Denylist** | Daftar `cred_id` yang dicabut, disinkronkan ke reader/gateway. | `Denylist` |
+| **Denylist** | Daftar `cred_id` yang dicabut, disinkronkan ke reader/gateway. Ditulis saat pencabutan oleh operator maupun hapus kartu, sampai sertifikatnya kedaluwarsa (ADR-0036). | `Denylist` |
+| **Token baca status** | Token 32 byte per kartu digital yang dibuat app untuk membaca status kartu dari server tanpa Face ID atau passcode; server hanya menyimpan hash-nya (ADR-0037). | `StatusToken` |
 | **Transfer perangkat** | Re-provisioning ke iPhone baru dan pencabutan kredensial lama (ADR-0007). | `DeviceTransfer` |
 | **Perpanjangan** | Penerbitan ulang sertifikat untuk kunci yang sama (FR-45). Hanya setelah autentikasi tap: sertifikat kedaluwarsa diperpanjang sebelum presentasi, sisa < 50% setelah tap (ADR-0023). | `CredentialRenewer`, `RenewalScheduler`, `RenewalPolicy` |
 | **Nonce perpanjangan** | 32 B acak dari server, berlaku 120 dtk, sekali pakai, terikat ke satu kredensial (SDD §8.4.2). | `RenewalChallenge` |

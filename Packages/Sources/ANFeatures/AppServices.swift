@@ -2,6 +2,7 @@ import ANChannelBLE
 import ANChannelNFC
 import ANCore
 import ANCrypto
+import ANNetworking
 import ANProtocol
 import ANStorage
 import ANWallet
@@ -57,6 +58,7 @@ public final class AppServices {
     let tapHistory: any TapHistoryStore
     /// Token baca status kartu (ADR-0037), di Keychain yang sama dengan record kredensial.
     let statusTokens: any StatusTokenStore
+    private let statusRefresher: CardStatusRefresher
     /// Store kartu tidak bisa dibuka; UI memberi tahu alih-alih menampilkan daftar kosong.
     public let storageFailed: Bool
     #if DEBUG
@@ -95,6 +97,7 @@ public final class AppServices {
         self.authenticator = authenticator
         self.tapHistory = tapHistory
         self.statusTokens = statusTokens
+        self.statusRefresher = CardStatusRefresher(cards: cards, records: records, tokens: statusTokens)
         self.storageFailed = storageFailed
     }
 
@@ -112,6 +115,13 @@ public final class AppServices {
             tapHistory: InMemoryTapHistoryStore(),
             storageFailed: true
         )
+    }
+
+    /// Status kartu dari server saat app masuk foreground (FR-38, ADR-0037); true bila ada kartu yang
+    /// berubah sehingga daftar perlu dimuat ulang.
+    public func refreshCardStatuses(now: Date = .now, transport: any HTTPTransport = URLSession.shared) async -> Bool {
+        guard !storageFailed else { return false }
+        return await statusRefresher.refresh(now: now, transport: transport)
     }
 
     /// Membatalkan presentasi yang sedang berjalan (Review Focus 2).
