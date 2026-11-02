@@ -12,15 +12,16 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 ## Status terkini
 
 - Branch kerja: `feat/r1-scaffold`, di-push ke GitHub private `imransetiadi/anastrophe` (origin) atas permintaan pengguna; belum di-merge.
-- Suite terakhir: Swift host 354 test (1 dilewati, tanpa gagal), simulator 352 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 11 paket lulus dengan PostgreSQL.
+- Suite terakhir: Swift host 364 test (1 dilewati, tanpa gagal), simulator 362 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 11 paket lulus dengan PostgreSQL.
 - Menunggu keputusan pengguna:
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
   - ADR-0038: cara mencegah pemegang kartu membatalkan suspend/revoke operator; rekomendasi `hold_pending_approval`, JEV 0,45.
   - ADR-0041: pengambilalihan enrolment yang belum selesai lewat id perangkat + identitas kartu; rekomendasi `first_writer_wins`, JEV 0,44.
   - ADR-0046: kontrol enumerasi identitas kartu lewat enrolment, yang menjadi **gerbang pra-pilot** bersama App Attest; rekomendasi deteksi per gedung + pembatas per perangkat yang di-attest, JEV 0,49.
   - ADR-0047: kedaluwarsa permintaan `PENDING_APPROVAL` (batas 4 per kartu sudah diterapkan), JEV 0,51.
+  - Penyambungan App Attest (ADR-0053, seri JEV 0,47): pengikatan kunci attested ke `device_id` (terkait ADR-0041/0046), endpoint yang wajib attestation, bypass dev, dan kategori produksi.
 
-  - Tinjauan 17 gate JEV (15 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan, verifier App Attest (`docs/adr/jev-log/*-gate.json`).
+  - Tinjauan 18 gate JEV (16 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan, verifier App Attest, sisa Keychain instal ulang (`docs/adr/jev-log/*-gate.json`).
   - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
 
@@ -39,11 +40,36 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Undangan | Token sekali pakai (32 byte acak, hanya hash yang disimpan), CLI `invite` dengan identitas kartu dari berkas atau stdin, enrolment `{device_id, invitation}`, dan undangan berkartu yang menyetujui enrolment perangkat yang masih menunggu; app mengurai tautan `/i/<token>` | FR-12, FR-53, ADR-0033, ADR-0035 |
 | Siklus hidup kartu | Operator: `list` (filter status, kanal, awalan id), `suspend`, `resume`, `revoke` (audit, denylist); app membaca status kartu dengan token baca status tanpa Face ID/passcode. Keterbatasan terbuka: pendaftaran ulang kartu fisik bisa membatalkan suspend/revoke (ADR-0038) | FR-38, FR-50 (sebagian), FR-51, ADR-0036, ADR-0037, ADR-0038 |
 | Provisioning aman | Rahasia enrolment dari app (hanya hash di server) wajib untuk kredensial pertama; tambah kanal ke kartu aktif ditolak. Risiko sisa: id perangkat + identitas kartu bisa mengambil alih enrolment yang belum selesai (ADR-0041) | FR-16, ADR-0039, ADR-0040, ADR-0041 |
-| Ketahanan | Update dijaga status, urutan kunci instance → kredensial, denylist dari sertifikat terpanjang + purge, pembaruan kartu atomik, jam monotonik yang ikut berjalan saat tidur; audit enrolment dan sapuan ditulis sesudah semua kunci baris, berurutan per rantai, dengan baris gedung `KEY SHARE` sebelum kunci rantai (tanpa deadlock 40P01) | ADR-0042, ADR-0051 |
+| Ketahanan | Update dijaga status, urutan kunci instance → kredensial, denylist dari sertifikat terpanjang + purge, pembaruan kartu atomik, jam monotonik yang ikut berjalan saat tidur; audit enrolment dan sapuan ditulis sesudah semua kunci baris, berurutan per rantai, dengan baris gedung `KEY SHARE` sebelum kunci rantai (tanpa deadlock 40P01); sisa Keychain instalasi lama dibersihkan saat instal ulang | ADR-0042, ADR-0051, ADR-0053 |
 | Tambah Kartu | Alur produksi di semua build: kode gedung + tempel kartu (pembaca identifier saja) atau tautan undangan, kanal otomatis, perangkat dibuat saat enrolment, batas 4 permintaan menunggu per kartu. Gerbang pra-pilot terbuka: App Attest + kontrol enumerasi kartu (ADR-0046) | FR-05, FR-10–FR-13, ADR-0043–ADR-0047 |
 | Bantuan | Tombol Bantuan di tab Kunci: FAQ sepuluh topik (ID/EN), status cara akses di iPhone ini, iPhone yang didukung, laporan diagnostik tanpa rahasia | FR-60, FR-02, FR-27, FR-63, ADR-0048 |
 | Kebijakan gedung | CLI `policy` untuk masa berlaku sertifikat dan kanal per gedung; kanal efektif gedung di lookup/enrolment dan ditegakkan saat provisioning; app memilih kanal yang diizinkan | FR-55 (sebagian), FR-05, ADR-0049 |
 | App Attest (verifier) | Paket backend `internal/appattest` memverifikasi attestation dan assertion menurut langkah Apple; teruji dengan contoh resmi Apple dan data iOS 27 nyata (scratch). Belum disambungkan ke endpoint, database, atau app; gerbang pra-pilot NFR-S03 masih terbuka | NFR-S03 (sebagian), ADR-0052 |
+
+## APP-2026-11-02-0930 - Pembersihan sisa Keychain saat instal ulang (Selesai, commit lokal; gate eskalasi)
+
+Fokus dari ADR-0053. JEV memberi 0,39 (eskalasi) dengan dua kandidat seri. Unit ini diterapkan karena berisiko rendah dan tanpa semantik keamanan baru; dasarnya persetujuan umum pengguna, dengan pola ADR-0042. Penyambungan App Attest, yaitu kandidat seri, masuk daftar keputusan pengguna.
+
+Masalahnya: sesudah instal ulang, item Keychain service `app.anastrophe` tertinggal (blob kunci, record, token status, counter), padahal kartu SwiftData sudah hilang.
+
+Perubahan:
+- **`SecretStore.deleteAll()`:** satu `SecItemDelete` dengan kelas + service; Keychain kosong bukan galat (O-K01, I-18).
+- **`KeychainDeviceIdentityStore.purgeLeftoversIfFreshInstall(hasCards:)`:** menghapus sisa bila penanda tidak ada dan tidak ada kartu. Penanda hanya dibuat sesudah penghapusan berhasil.
+- **`AppServices.prepareInstall()`:** dipanggil di `makeServices()` sebelum UI menerima layanan. Store yang gagal dibaca dianggap berisi kartu.
+
+Bukti:
+- Host 364 test (1 dilewati) dan simulator 362 test lulus; build Debug sukses.
+- Mutasi 11/11 bermakna tertangkap. Mutasi literal "a" yang ekuivalen dengan nama service test diganti.
+
+Review akhir (opus): siap merge dengan perbaikan; tidak ada jalur yang menghapus kunci kartu yang masih ada.
+- **Diperbaiki:** `FakeKeychain` yang mengabaikan kelas item dinaikkan menjadi Important lalu diperbaiki (RED→GREEN).
+- **Bukti platform:** klaim di SDD kini merujuk E42/E43 dan diverifikasi `jev_verify` 5/5.
+- **Kata-kata:** "dicoba lagi" dikoreksi.
+- **Ditunda di backlog:** sisa minor.
+
+`jev_gate`: eskalasi (safe_to_apply 0,65, komposit 0,72, pembatas `test_gap`; 9 klaim verified, 2 perlu tinjauan). Tidak diajukan ulang.
+
+Commit unit ini: `f5f8301`, `cb47ed0`, `9afd822`, `118ad21`, `e4fa6bb`, `0103e2a`, dan commit ini. Obsidian: `sessions/2026-11-02-sisa-instal-ulang.md`, `decisions/ADR-0053…`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
 
 ## API-2026-11-02-0857 - Verifier App Attest di backend (Selesai, commit lokal; gate eskalasi)
 

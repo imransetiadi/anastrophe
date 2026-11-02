@@ -108,5 +108,18 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
   - **`Verifier` nilai nol:** panic di `v.now`. Wajibkan `NewVerifier` atau jaga nilai nol.
   - **Uji H (U14):** capture attestation + assertion dari build bertanda tangan dengan App ID Anastrophe, termasuk iOS 26.x.
   - **Catatan kecil:** `p256PublicKey` memakai field `X`/`Y` ecdsa yang ditandai deprecated di toolchain baru (alternatif: SPKI tetap + `x509.ParsePKIXPublicKey`).
+- **Pembersihan instal ulang (minor review akhir, ADR-0053):**
+  - **Gagal-hapus + enrolment:** bila penghapusan gagal lalu pengguna melakukan enrolment di sesi yang sama, `deviceID()` membuat penanda dan sisa tidak lagi dicoba. Bisa ditutup dengan memanggil pembersihan di awal enrolment, sebelum `deviceID()`.
+  - **Store bersama:** pembersihan bergantung pada satu `SecretStore` yang dipakai semua store di `live()`, dan bawaan protokol `false` membuat pembungkus bisa diam-diam tidak ikut. Tambahkan komentar aturan store bersama, atau hapus bawaan itu.
+  - **Rekomendasi:**
+    - factory `live()` + `prepareInstall()` dengan test paket;
+    - komentar migrasi bila path store kartu berubah;
+    - `isProtectedDataAvailable` bila kelak ada peluncuran latar;
+    - hitungan item Keychain (tanpa nilai) di layar Lab DEBUG untuk TC-DEV-06/13;
+    - `SecItemDelete` jangan di main actor (O-K01; saat ini satu kali saat instal ulang).
+  - **Pra-ada (ditemukan reviewer):**
+    - `.task` bisa membuat `AppServices` kedua sesudah scene tersambung ulang;
+    - proteksi SQLite bawaan Core Data mungkin menimpa klaim `.complete` di SDD §5.3;
+    - deteksi restore di SDD tidak cocok dengan store kartu yang dikecualikan dari backup.
 - **Test flaky:** `BLETapTests.autentikasiBatalMembatalkanPemindaian` sesekali gagal (pembatalan pemindaian bergantung waktu); lulus 6/6 saat diulang.
 - **Riwayat tap:** judul baris "Ditolak · alasan" dirakit di kode (M8; dikerjakan saat bahasa ketiga ditambahkan); VoiceOver baris Status belum diperiksa dengan Accessibility Inspector.

@@ -1,0 +1,111 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "action": "escalate",
+  "label": "sisa-instal-ulang-plan-close-gate",
+  "request": "Close plan 2026-11-02-sisa-instal-ulang (ADR-0053, FR-43 partial): on the first launch after a reinstall (no install marker, no local cards), delete all Keychain items of the app's service before the UI gets the services, never touching keys of cards that still exist; including the final-review fix pass.",
+  "evidence_ids": [
+    "storage-tests",
+    "keychain-tests",
+    "app-tests",
+    "startup-code",
+    "suites",
+    "mutations",
+    "verify-log",
+    "review-ledger"
+  ],
+  "reason_codes": [
+    "confidence_below_review",
+    "review_escalated",
+    "claim_confidence_low"
+  ],
+  "review": {
+    "action": "escalate",
+    "safe_to_apply": 0.65,
+    "composite": 0.722,
+    "limiting_rubrics": [
+      "test_gap"
+    ],
+    "scores": {
+      "correctness": 1.58,
+      "spec_match": 1.85,
+      "test_gap": 0.5,
+      "blast_radius": 1.79
+    },
+    "confidence": {
+      "correctness": 0.36,
+      "spec_match": 0.79,
+      "test_gap": 0.25,
+      "blast_radius": 0.68
+    }
+  },
+  "verification": {
+    "action": "escalate",
+    "verified": 9,
+    "contradicted": 0,
+    "unsupported": 0,
+    "needs_review": 2,
+    "results": [
+      {
+        "claim": "Pada peluncuran pertama tanpa penanda instalasi dan tanpa kartu lokal, semua item Keychain service app terhapus, penanda dibuat dan dikecualikan dari backup, dan device id baru yang dibuat sesudahnya tetap stabil.",
+        "verdict": "verified",
+        "confidence": 0.89,
+        "action": "auto"
+      },
+      {
+        "claim": "Kartu yang masih ada, penanda yang sudah ada, atau store kartu yang gagal dibaca mencegah penghapusan apa pun.",
+        "verdict": "verified",
+        "confidence": 0.88,
+        "action": "auto"
+      },
+      {
+        "claim": "Bila penghapusan gagal, penanda instalasi tidak dibuat.",
+        "verdict": "verified",
+        "confidence": 0.91,
+        "action": "auto"
+      },
+      {
+        "claim": "deleteAll memakai query kelas generic password + service tanpa account; item service lain tetap utuh, Keychain kosong bukan galat, dan kelas item yang salah tertangkap test.",
+        "verdict": "verified",
+        "confidence": 0.96,
+        "action": "auto"
+      },
+      {
+        "claim": "Pembersihan dijalankan di makeServices sesudah live() berhasil dan sebelum layanan diberikan ke UI.",
+        "verdict": "verified",
+        "confidence": 0.96,
+        "action": "auto"
+      },
+      {
+        "claim": "Suite host 364 test lulus dengan 1 test khusus perangkat dilewati, suite simulator 362 test lulus, build app Debug sukses, dan check_docs melaporkan 0 masalah.",
+        "verdict": "verified",
+        "confidence": 1.0,
+        "action": "auto"
+      },
+      {
+        "claim": "Mutasi bermakna 11/11 tertangkap.",
+        "verdict": "verified",
+        "confidence": 0.97,
+        "action": "auto"
+      },
+      {
+        "claim": "Klaim platform baru di SDD merujuk bukti E42/E43 dan diverifikasi jev_verify 5/5.",
+        "verdict": "verified",
+        "confidence": 0.4,
+        "action": "escalate"
+      },
+      {
+        "claim": "Review akhir independen menyatakan siap merge dengan perbaikan, 0 Critical dan 0 Important; Minor kelas item dinaikkan menjadi Important dan diperbaiki dengan test RED→GREEN.",
+        "verdict": "verified",
+        "confidence": 0.33,
+        "action": "escalate"
+      }
+    ]
+  },
+  "note": "Tidak diajukan ulang (ADR-0018); masuk daftar gate yang menunggu tinjauan pengguna. Eskalasi dari confidence rubrik rendah (correctness 0,36, test_gap 0,25); dua klaim proses (bukti jev_verify, ringkasan review) confidence rendah walau verdict verified.",
+  "usage": {
+    "input_tokens": 5170,
+    "output_tokens": 438
+  }
+}
