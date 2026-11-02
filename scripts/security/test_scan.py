@@ -3,6 +3,7 @@
 Token palsu dirakit saat runtime, jadi repo sendiri tidak memuat secret literal.
 Jalankan: python3 -m unittest discover -s scripts/security -v
 """
+import http.client
 import io
 import os
 import pathlib
@@ -142,12 +143,15 @@ class PemindaianSecret(unittest.TestCase):
     def test_build_biner_terdeteksi_tanpa_nilai(self):
         token = token_palsu()
         bundle = self.repo.dir / "App.app"
-        self.repo.tulis("App.app/App", os.urandom(256) + b"\x00" + token.encode() + b"\x00" + os.urandom(256))
+        # Header Mach-O 64-bit: gitleaks dir melewati biner Mach-O, jadi token ini hanya terlihat lewat cermin string.
+        macho = b"\xcf\xfa\xed\xfe" + bytes(28)
+        self.repo.tulis("App.app/App", macho + os.urandom(256) + b"\x00" + token.encode() + b"\x00" + os.urandom(256))
         self.repo.tulis("App.app/Info.plist", "<plist version=\"1.0\"><dict/></plist>\n")
         self.assertEqual(self.pasangan(scan.scan_build(bundle, CONFIG)), [("github-pat", "App")])
         out, err = io.StringIO(), io.StringIO()
         self.assertEqual(scan.main(["build", str(bundle)], out=out, err=err), 1)
         self.assertNotIn(token, out.getvalue() + err.getvalue())
+        self.assertIn("App (string cetak)", out.getvalue())
 
     def test_laporan_tanpa_nilai_secret(self):
         token = token_palsu()
@@ -159,6 +163,80 @@ class PemindaianSecret(unittest.TestCase):
         self.assertIn("a.txt", teks)
         self.assertNotIn(token, teks)
         self.assertNotIn(token[4:20], teks)
+
+    def test_bukan_repo_git_exit_2(self):
+        # Review akhir ADR-0056 (Critical): gitleaks menulis [] dan exit 0 saat git gagal; itu tidak boleh lulus.
+        kosong = pathlib.Path(tempfile.mkdtemp(prefix="bukan-repo-"))
+        self.addCleanup(shutil.rmtree, kosong, True)
+        err = io.StringIO()
+        self.assertEqual(scan.main(["secrets", "--repo", str(kosong)], out=io.StringIO(), err=err), 2)
+        self.assertIn("repo git", err.getvalue())
+
+    def test_git_menolak_repo_exit_2(self):
+        # Kepemilikan berbeda (umum di kontainer CI): git menolak repo, gitleaks diam-diam memindai nol commit.
+        self.repo.commit("a.txt", token_palsu() + "\n")
+        with mock.patch.dict(os.environ, {"GIT_TEST_ASSUME_DIFFERENT_OWNER": "1"}):
+            self.assertEqual(scan.main(["secrets", "--repo", str(self.repo.dir)], out=io.StringIO(), err=io.StringIO()), 2)
+
+    def test_clone_dangkal_exit_2(self):
+        # Review akhir (Important): clone --depth 1 hanya memuat commit terakhir; token di commit lama tak terlihat.
+        self.repo.commit("README", "awal\n")
+        self.repo.commit("a.txt", token_palsu() + "\n")
+        self.repo.commit("a.txt", "token sudah dihapus\n")
+        dangkal = pathlib.Path(tempfile.mkdtemp(prefix="dangkal-")) / "repo"
+        self.addCleanup(shutil.rmtree, dangkal.parent, True)
+        subprocess.run(["git", "clone", "-q", "--depth", "1", f"file://{self.repo.dir}", str(dangkal)], check=True, capture_output=True)
+        err = io.StringIO()
+        self.assertEqual(scan.main(["secrets", "--repo", str(dangkal)], out=io.StringIO(), err=err), 2)
+        self.assertIn("dangkal", err.getvalue())
+
+    def test_komentar_gitleaks_allow_tidak_menutupi(self):
+        # Review akhir (Important): penekanan hanya lewat allowlist beralasan di .gitleaks.toml.
+        self.repo.commit("a.txt", token_palsu() + "  # gitleaks" + ":allow\n")
+        self.assertIn(("github-pat", "a.txt"), self.pasangan(scan.scan_secrets(self.repo.dir, CONFIG)))
+
+    def test_gitleaksignore_ditolak(self):
+        self.repo.commit("a.txt", token_palsu() + "\n")
+        self.repo.tulis(".gitleaksignore", "apa pun\n")
+        err = io.StringIO()
+        self.assertEqual(scan.main(["secrets", "--repo", str(self.repo.dir)], out=io.StringIO(), err=err), 2)
+        self.assertIn(".gitleaksignore", err.getvalue())
+
+    def test_build_p12_terdeteksi(self):
+        # Review akhir (Important): aturan berbasis path (pkcs12-file) hilang bila hanya cermin .txt yang dipindai.
+        self.repo.tulis("App.app/App", b"\x00" * 64)
+        self.repo.tulis("App.app/kunci.p12", os.urandom(512))
+        self.assertIn(("pkcs12-file", "kunci.p12"), self.pasangan(scan.scan_build(self.repo.dir / "App.app", CONFIG)))
+
+    def test_build_json_bertab_terdeteksi(self):
+        self.repo.tulis("App.app/config.json", '{"key":\t"' + acak(32) + '"}\n')
+        temuan = scan.scan_build(self.repo.dir / "App.app", CONFIG)
+        self.assertIn("config.json", [f.file for f in temuan])
+
+    def test_build_biner_bertab_terdeteksi(self):
+        # Biner Mach-O hanya terlihat lewat cermin; tab di antara kunci dan nilai tidak boleh memutus string cetak.
+        isi = b'{"key":\t"' + acak(32).encode() + b'"}'
+        self.repo.tulis("App.app/App", b"\xcf\xfa\xed\xfe" + bytes(28) + b"\x00" + isi + b"\x00")
+        self.assertIn("App", [f.file for f in scan.scan_build(self.repo.dir / "App.app", CONFIG)])
+
+    def test_build_tanpa_duplikat(self):
+        # Berkas teks ditemukan pemindaian langsung dan cermin string; laporan memuatnya sekali.
+        self.repo.tulis("App.app/catatan.txt", token_palsu() + "\n")
+        self.assertEqual(self.pasangan(scan.scan_build(self.repo.dir / "App.app", CONFIG)), [("github-pat", "catatan.txt")])
+
+    def test_gitleaksignore_di_bundle_ditolak(self):
+        self.repo.tulis("App.app/App", b"\x00" * 64)
+        self.repo.tulis("App.app/.gitleaksignore", "apa pun\n")
+        with self.assertRaises(scan.ToolError):
+            scan.scan_build(self.repo.dir / "App.app", CONFIG)
+
+    @unittest.skipIf(os.geteuid() == 0, "root bisa membaca berkas chmod 000")
+    def test_build_berkas_tak_terbaca_exit_2(self):
+        self.repo.tulis("App.app/App", b"\x00" * 64)
+        rahasia = self.repo.tulis("App.app/terkunci.bin", b"isi")
+        rahasia.chmod(0)
+        self.addCleanup(rahasia.chmod, 0o644)
+        self.assertEqual(scan.main(["build", str(self.repo.dir / "App.app")], out=io.StringIO(), err=io.StringIO()), 2)
 
     def test_repo_bersih_exit_0(self):
         self.repo.commit("README", "tanpa rahasia\n")
@@ -183,9 +261,24 @@ class AlatGitleaks(unittest.TestCase):
             self.assertEqual(scan.main(["secrets", "--repo", str(ROOT)], out=io.StringIO(), err=err), 2)
         self.assertIn("kode 2", err.getvalue())
 
+    def test_gitleaks_stderr_dianggap_gagal(self):
+        # Perilaku nyata gitleaks 8.30 saat git gagal: galat di stderr, laporan [], exit 0.
+        skrip = ('while [ $# -gt 0 ]; do if [ "$1" = --report-path ]; then echo "[]" > "$2"; fi; shift; done\n'
+                 'echo "ERR [git] fatal: detected dubious ownership" >&2\nexit 0\n')
+        with gitleaks_palsu(self, skrip):
+            self.assertEqual(scan.main(["secrets", "--repo", str(ROOT)], out=io.StringIO(), err=io.StringIO()), 2)
+
+    def test_laporan_kosong_atau_tidak_konsisten_exit_2(self):
+        kasus = {"laporan kosong": (": > \"$2\"", 0), "exit temuan tanpa temuan": ('echo "[]" > "$2"', 99)}
+        for nama, (tulis, kode) in kasus.items():
+            with self.subTest(nama):
+                skrip = f'while [ $# -gt 0 ]; do if [ "$1" = --report-path ]; then {tulis}; fi; shift; done\nexit {kode}\n'
+                with gitleaks_palsu(self, skrip):
+                    self.assertEqual(scan.main(["secrets", "--repo", str(ROOT)], out=io.StringIO(), err=io.StringIO()), 2)
+
     def test_laporan_gitleaks_rusak_exit_2(self):
-        # Exit 1 (ada temuan) tetapi laporan bukan JSON: tidak boleh dianggap bersih.
-        skrip = 'while [ $# -gt 0 ]; do if [ "$1" = --report-path ]; then echo rusak > "$2"; fi; shift; done\nexit 1\n'
+        # Exit temuan (--exit-code 99) tetapi laporan bukan JSON: tidak boleh dianggap bersih.
+        skrip = 'while [ $# -gt 0 ]; do if [ "$1" = --report-path ]; then echo rusak > "$2"; fi; shift; done\nexit 99\n'
         err = io.StringIO()
         with gitleaks_palsu(self, skrip):
             self.assertEqual(scan.main(["secrets", "--repo", str(ROOT)], out=io.StringIO(), err=err), 2)
@@ -256,10 +349,12 @@ class PemindaianDependensi(unittest.TestCase):
         # Review Focus 4: aliran beberapa objek JSON; temuan yang jejaknya sampai fungsi menggagalkan run.
         stream = aliran_govulncheck(MODUL_SAJA | {"osv": "GO-2099-0001"}, TERPANGGIL)
         self.assertEqual(scan.parse_govulncheck(stream), [
-            scan.GoVuln(osv="GO-2099-0001", module="golang.org/x/contoh", fixed="v0.99.0", called=True)])
-        # Urutan sebaliknya: temuan tingkat modul untuk OSV yang sama tidak menurunkan status terpanggil.
+            scan.GoVuln(osv="GO-2099-0001", module="golang.org/x/contoh", fixed="v0.99.0", level="fungsi")])
+        # Urutan sebaliknya: temuan tingkat modul untuk OSV yang sama tidak menurunkan status terpanggil, dan modul
+        # serta versi perbaikan yang dilaporkan tetap milik temuan terpanggil (review akhir ADR-0056).
         terbalik = aliran_govulncheck(TERPANGGIL, MODUL_SAJA | {"osv": "GO-2099-0001"})
-        self.assertTrue(scan.parse_govulncheck(terbalik)[0].called)
+        hasil = scan.parse_govulncheck(terbalik)[0]
+        self.assertEqual((hasil.called, hasil.module, hasil.fixed), (True, "golang.org/x/contoh", "v0.99.0"))
         kode, out, _ = self.jalankan(RepoDependensi(self), stream=stream)
         self.assertEqual(kode, 1)
         self.assertIn("GO-2099-0001", out)
@@ -267,11 +362,17 @@ class PemindaianDependensi(unittest.TestCase):
     def test_govulncheck_modul_saja_info(self):
         stream = aliran_govulncheck(MODUL_SAJA)
         self.assertEqual(scan.parse_govulncheck(stream), [
-            scan.GoVuln(osv="GO-2099-0002", module="golang.org/x/lain", fixed="v1.2.3", called=False)])
+            scan.GoVuln(osv="GO-2099-0002", module="golang.org/x/lain", fixed="v1.2.3", level="modul")])
         kode, out, _ = self.jalankan(RepoDependensi(self), stream=stream)
         self.assertEqual(kode, 0)
         self.assertIn("informasi", out)
         self.assertIn("GO-2099-0002", out)
+        # Tingkat modul berarti modul ada di graf tetapi paketnya tidak diimpor; tingkat paket berarti diimpor.
+        self.assertIn("di graf modul, paket tidak diimpor", out)
+        paket = {"osv": "GO-2099-0003", "fixed_version": "v2.0.0", "trace": [
+            {"module": "golang.org/x/paket", "version": "v1.0.0", "package": "golang.org/x/paket/p"}]}
+        _, out_paket, _ = self.jalankan(RepoDependensi(self), stream=aliran_govulncheck(paket))
+        self.assertIn("diimpor, fungsi rentan tidak terpanggil", out_paket)
 
     def test_govulncheck_json_rusak_exit_2(self):
         for stream in ("{rusak", "", '{"progress": {"message": "tanpa config"}}'):
@@ -302,6 +403,38 @@ class PemindaianDependensi(unittest.TestCase):
         kiriman = []
         self.jalankan(RepoDependensi(self), query=lambda payload: kiriman.append(payload) or {})
         self.assertEqual(kiriman, [{"package": {"name": "contoh", "ecosystem": "PyPI"}, "version": "1.0.0"}])
+
+    def test_osv_halaman_berikutnya_diikuti(self):
+        # Review akhir (Important): OSV bisa mengembalikan hanya next_page_token; itu bukan "tanpa advisori".
+        kiriman = []
+
+        def query(payload):
+            kiriman.append(payload)
+            return {"next_page_token": "hal-2"} if len(kiriman) == 1 else {"vulns": [{"id": "GHSA-uji-0002"}]}
+        kode, out, _ = self.jalankan(RepoDependensi(self), query=query)
+        self.assertEqual(kode, 1)
+        self.assertIn("GHSA-uji-0002", out)
+        self.assertEqual(kiriman[1], {"package": {"name": "contoh", "ecosystem": "PyPI"}, "version": "1.0.0", "page_token": "hal-2"})
+
+    def test_osv_halaman_tanpa_akhir_exit_2(self):
+        kode, _, err = self.jalankan(RepoDependensi(self), query=lambda payload: {"next_page_token": "lagi"})
+        self.assertEqual(kode, 2)
+        self.assertIn("OSV", err)
+
+    def test_osv_respons_terpotong_exit_2(self):
+        def terpotong(payload):
+            raise http.client.IncompleteRead(b"")
+        kode, _, err = self.jalankan(RepoDependensi(self), query=terpotong)
+        self.assertEqual(kode, 2)
+        self.assertIn("OSV", err)
+
+    @unittest.skipIf(os.geteuid() == 0, "root bisa membaca berkas chmod 000")
+    def test_requirements_tak_terbaca_exit_2(self):
+        repo = RepoDependensi(self)
+        req = repo.dir / "scripts/alat/requirements.txt"
+        req.chmod(0)
+        self.addCleanup(req.chmod, 0o644)
+        self.assertEqual(self.jalankan(repo)[0], 2)
 
     def test_osv_jaringan_gagal_exit_2(self):
         def gagal(payload):

@@ -145,7 +145,13 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
     - koreksi coordinated omission: ukur latensi dari jadwal token (open-loop), agar latensi dekat titik jenuh tidak terlalu optimistis.
 - **Pemindaian keamanan (ADR-0056):**
   - **Lingkungan lokal:** perbarui `cryptography` ke 50.* di interpreter pyenv (`python3 -m pip install -r scripts/anp1/requirements.txt`). Pemindai dengan interpreter bawaan tetap exit 1 sampai itu dilakukan.
-  - **CI dan hook:** jalankan `scripts/security/scan.py` sebagai langkah CI begitu CI ada. Hook pre-commit (`gitleaks git --staged --redact .`) bersifat opsional dan tidak dipasang otomatis.
+  - **CI dan hook:** jalankan `scripts/security/scan.py` sebagai langkah CI begitu CI ada, dengan checkout riwayat penuh (`fetch-depth: 0`) dan `pip install -r scripts/*/requirements.txt` lebih dulu. Hook pre-commit (`gitleaks git --staged --redact .`) bersifat opsional dan tidak dipasang otomatis.
+  - **Minor review akhir:**
+    - include `-r` di berkas requirements belum diikuti;
+    - cabang `.package(` belum punya test, dan hanya `Packages/Package.swift` yang dibaca (paket lokal lain dengan dependensi remote akan lolos);
+    - satu pemeriksaan yang gagal menghentikan pemeriksaan sisanya, dan exit 2 menutupi temuan nyata;
+    - `scan_level` govulncheck tidak dicek (versi terpin memakai `symbol`).
+  - **Cakupan yang belum ada:** blob biner di riwayat (mis. `.p12` yang ter-commit), isi commit merge, pesan commit, dan arsip terkompresi di dalam produk build.
   - **Alias OSV:** satu CVE bisa tercetak dua kali (GHSA dan PYSEC). Kelompokkan menurut `aliases` agar jumlah advisori tidak berlipat.
   - **Keparahan Go:** govulncheck tidak memberi skor, jadi kebijakannya "terpanggil = gagal". Tinjau ulang bila ada sumber keparahan yang andal.
   - **Masih terbuka:** audit `.ipa` bertanda tangan (TC-SEC-07), MASVS (TC-SEC-06), SAST, dan pentest eksternal (TC-SEC-12).

@@ -38,3 +38,15 @@ Desain dan rencananya ada di `docs/superpowers/specs/2026-11-02-pemindaian-secre
 
 - Aturan 9 kini bisa diperiksa ulang kapan saja dengan satu perintah, dan siap dijadikan langkah CI begitu CI tersedia.
 - TC-SEC-06 (MASVS), TC-SEC-07 (audit `.ipa`), dan TC-SEC-12 (pentest eksternal) tetap terbuka.
+
+## Catatan sesudah review akhir
+
+- **Versi Go:** run nyata pertama menemukan kerentanan yang terpanggil di pgx v5.7.5, `golang.org/x/text` v0.24.0, dan stdlib go1.27.1.
+  - pgx dinaikkan ke v5.9.2 dan x/text ke v0.41.0. Keduanya menuntut direktif `go 1.25.0`.
+  - `toolchain go1.27.3` menutup 10 kerentanan stdlib. Direktif ini hanya berlaku dengan `GOTOOLCHAIN=auto` (bawaan). Dengan `GOTOOLCHAIN=local`, Go lokal harus ≥ 1.27.3, karena hasil govulncheck untuk stdlib mengikuti Go yang benar-benar dipakai.
+- **Pemindai diperketat:**
+  - git yang gagal atau menolak repo, clone dangkal, dan `.gitleaksignore` memberi exit 2 (gitleaks 8.30 sendiri tetap exit 0 dengan laporan kosong saat git gagal);
+  - komentar `gitleaks:allow` diabaikan;
+  - produk build dipindai langsung (aturan berbasis path seperti `.p12`) dan lewat string cetak (biner);
+  - halaman OSV yang hanya berisi `next_page_token` diikuti.
+- **Batas yang diketahui:** gitleaks tidak membaca blob biner di riwayat git, isi yang hanya ada di commit merge, maupun pesan commit. Saat ini riwayat tidak memuat berkas biner dan tidak ada commit merge.

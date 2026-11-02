@@ -849,7 +849,12 @@ SAST, pemindaian dependensi & secret, review kode wajib, pentest eksternal sebel
   - app iOS harus tetap tanpa paket remote;
   - dependensi alat Python yang terpasang diperiksa ke OSV.
 - **Exit code:** 0 bersih, 1 ada temuan, 2 alat, jaringan, atau keluaran alat gagal.
-- **Toolchain:** backend menuntut Go ≥ 1.25 dengan toolchain go1.27.3, agar stdlib yang dipakai sudah ditambal.
+- **Toolchain:** backend menuntut Go ≥ 1.25 dan menyarankan toolchain go1.27.3 lewat `go.mod`, agar stdlib yang dipakai sudah ditambal. Saran itu hanya berlaku dengan `GOTOOLCHAIN=auto` (bawaan); dengan `GOTOOLCHAIN=local`, Go lokal harus ≥ 1.27.3.
+- **Kebijakan dan batas:**
+  - repo harus clone penuh dan bisa dibaca git; git yang gagal, clone dangkal, dan `.gitleaksignore` memberi exit 2;
+  - komentar `gitleaks:allow` diabaikan;
+  - produk build dipindai langsung dan lewat string cetak;
+  - blob biner di riwayat, isi yang hanya ada di commit merge, dan pesan commit tidak dipindai gitleaks.
 - **Tindak lanjut:** CI dan hook pre-commit menunggu (backlog). Hasil pertama ada di QA §11.1.
 
 

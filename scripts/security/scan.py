@@ -8,9 +8,13 @@
 Exit 0 bersih, 1 ada temuan, 2 alat tidak ada atau gagal, jaringan gagal, atau keluaran tidak bisa diurai.
 Nilai secret tidak pernah dicetak: gitleaks selalu dijalankan dengan --redact, dan laporan hanya memuat
 aturan, berkas, baris, serta commit. Ke OSV hanya dikirim nama paket dan versi.
+
+Repo harus repo git yang bisa dibaca dan bukan clone dangkal. Penekanan hanya lewat allowlist beralasan di
+.gitleaks.toml: komentar gitleaks:allow diabaikan dan .gitleaksignore ditolak.
 """
 import argparse
 import dataclasses
+import http.client
 import importlib.metadata
 import json
 import pathlib
@@ -26,6 +30,9 @@ CONFIG = ROOT / ".gitleaks.toml"
 MIN_GITLEAKS = (8, 30)
 GOVULNCHECK = "golang.org/x/vuln/cmd/govulncheck@v1.9.0"
 OSV_URL = "https://api.osv.dev/v1/query"
+OSV_MAX_PAGES = 20
+# gitleaks memakai exit 1 untuk temuan dan juga untuk galat fatal, jadi temuan diberi kode sendiri.
+LEAKS_EXIT = 99
 
 
 class ToolError(Exception):
@@ -55,50 +62,100 @@ def _gitleaks():
 
 
 def run_gitleaks(args, cwd):
-    """Menjalankan gitleaks dengan --redact dan laporan JSON; exit selain 0/1 atau laporan rusak → ToolError."""
+    """Menjalankan gitleaks dengan --redact dan laporan JSON. Hasilnya hanya dipercaya bila stderr kosong, laporan
+    berisi JSON yang sah, dan exit code sesuai isi laporan; selain itu ToolError."""
     exe = _gitleaks()
     with tempfile.TemporaryDirectory() as tmp:
         report = pathlib.Path(tmp) / "laporan.json"
-        cmd = [exe, *args, "--redact", "--no-banner", "--log-level", "error",
-               "--report-format", "json", "--report-path", str(report)]
+        cmd = [exe, *args, "--redact", "--no-banner", "--log-level", "error", "--ignore-gitleaks-allow",
+               "--exit-code", str(LEAKS_EXIT), "--report-format", "json", "--report-path", str(report)]
         try:
             proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=900)
         except (OSError, subprocess.SubprocessError) as e:
             raise ToolError(f"gitleaks gagal dijalankan: {e}") from None
-        if proc.returncode not in (0, 1):
-            # Keluaran gitleaks tidak diteruskan: pesan galatnya bisa memuat potongan isi berkas.
+        # Keluaran gitleaks tidak diteruskan: pesan galatnya bisa memuat potongan isi berkas.
+        if proc.returncode not in (0, LEAKS_EXIT):
             raise ToolError(f"gitleaks keluar dengan kode {proc.returncode}")
+        if proc.stderr.strip():
+            # Run yang bersih tidak menulis apa pun ke stderr pada --log-level error. Saat git gagal (repo ditolak,
+            # objek hilang) gitleaks 8.30 tetap exit 0 dengan laporan [], jadi galat apa pun berarti hasil tak lengkap.
+            raise ToolError("gitleaks melaporkan galat (konfigurasi, git, atau berkas tak terbaca); hasil tidak lengkap")
         try:
-            data = json.loads(report.read_text() or "[]")
-            return [Finding(d["RuleID"], d["File"], int(d["StartLine"]), (d.get("Commit") or "")[:7]) for d in data]
+            data = json.loads(report.read_text())
+            findings = [Finding(d["RuleID"], d["File"], int(d["StartLine"]), (d.get("Commit") or "")[:7]) for d in data]
         except (OSError, ValueError, KeyError, TypeError):
             raise ToolError("laporan gitleaks tidak bisa diurai") from None
+    if (proc.returncode == LEAKS_EXIT) != bool(findings):
+        raise ToolError("exit code gitleaks tidak sesuai dengan isi laporannya")
+    return findings
+
+
+def _git(repo, *args):
+    git = shutil.which("git")
+    if git is None:
+        raise ToolError("git tidak ditemukan di PATH")
+    try:
+        return subprocess.run([git, "-C", str(repo), *args], capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError) as e:
+        raise ToolError(f"git gagal dijalankan: {e}") from None
+
+
+def _check_repo(repo):
+    """gitleaks tidak gagal saat git menolak atau tidak menemukan repo, jadi syarat riwayat diperiksa lebih dulu."""
+    inside = _git(repo, "rev-parse", "--is-inside-work-tree")
+    if inside.returncode != 0 or inside.stdout.strip() != "true":
+        raise ToolError(f"{repo} bukan repo git yang bisa dibaca (git menolak atau tidak menemukan repo)")
+    if _git(repo, "rev-parse", "--is-shallow-repository").stdout.strip() == "true":
+        raise ToolError("repo adalah clone dangkal sehingga riwayatnya tidak lengkap; jalankan git fetch --unshallow")
+    top = _git(repo, "rev-parse", "--show-toplevel").stdout.strip()
+    for root in {pathlib.Path(repo), *([pathlib.Path(top)] if top else [])}:
+        if (root / ".gitleaksignore").exists():
+            raise ToolError(f"{root / '.gitleaksignore'} tidak diizinkan; pakai allowlist beralasan di .gitleaks.toml")
 
 
 def scan_secrets(repo, config=CONFIG):
     """Seluruh riwayat git ditambah perubahan yang di-stage."""
     repo = pathlib.Path(repo)
+    _gitleaks()  # alat diperiksa lebih dulu agar pesan galatnya jelas
+    _check_repo(repo)
     history = run_gitleaks(["git", "--config", str(config), "."], cwd=repo)
     staged = run_gitleaks(["git", "--staged", "--config", str(config), "."], cwd=repo)
     return history + staged
 
 
 def scan_build(bundle, config=CONFIG, min_len=8):
-    """Produk build: string cetak dari setiap berkas (termasuk biner) ditulis ke cermin sementara lalu dipindai."""
+    """Produk build dipindai dua cara: gitleaks dir langsung (berkas teks dan aturan berbasis path, mis. .p12) dan
+    cermin string cetak setiap berkas (biner Mach-O dilewati gitleaks dir). Temuan dari cermin diberi baris 0."""
     bundle = pathlib.Path(bundle)
     if not bundle.is_dir():
         raise ToolError(f"produk build tidak ditemukan: {bundle}")
-    printable = re.compile(rb"[\x20-\x7e]{%d,}" % min_len)
+    if (bundle / ".gitleaksignore").exists():
+        raise ToolError(f"{bundle / '.gitleaksignore'} tidak diizinkan di produk build")
+    direct = [dataclasses.replace(f, file=f.file.removeprefix("./"))
+              for f in run_gitleaks(["dir", "--config", str(config), "."], cwd=bundle)]
+    printable = re.compile(rb"[\t\x20-\x7e]{%d,}" % min_len)
     with tempfile.TemporaryDirectory() as tmp:
         mirror = pathlib.Path(tmp)
         for path in sorted(p for p in bundle.rglob("*") if p.is_file() and not p.is_symlink()):
-            runs = printable.findall(path.read_bytes())
+            try:
+                runs = printable.findall(path.read_bytes())
+            except OSError as e:
+                raise ToolError(f"berkas produk build tidak terbaca: {path.relative_to(bundle)} ({e.strerror})") from None
             if runs:
                 target = mirror / (str(path.relative_to(bundle)) + ".txt")
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(b"\n".join(runs) + b"\n")
-        found = run_gitleaks(["dir", "--config", str(config), "."], cwd=mirror)
-    return [dataclasses.replace(f, file=f.file.removeprefix("./").removesuffix(".txt")) for f in found]
+        mirrored = run_gitleaks(["dir", "--config", str(config), "."], cwd=mirror)
+    seen, extra = {(f.rule, f.file) for f in direct}, []
+    for f in mirrored:
+        f = dataclasses.replace(f, file=f.file.removeprefix("./").removesuffix(".txt"), line=0)
+        if (f.rule, f.file) not in seen:
+            seen.add((f.rule, f.file))
+            extra.append(f)
+    return direct + extra
+
+
+GO_LEVELS = {"modul": 0, "paket": 1, "fungsi": 2}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -106,7 +163,11 @@ class GoVuln:
     osv: str
     module: str
     fixed: str
-    called: bool  # ada frame jejak yang sampai ke fungsi: kode rentan benar-benar terpanggil
+    level: str  # "fungsi" (kode rentan terpanggil), "paket" (diimpor), atau "modul" (hanya ada di graf modul)
+
+    @property
+    def called(self):
+        return self.level == "fungsi"
 
 
 def parse_govulncheck(stream):
@@ -124,10 +185,13 @@ def parse_govulncheck(stream):
             if not finding:
                 continue
             trace = finding.get("trace") or []
-            called = any(frame.get("function") for frame in trace)
-            prev = vulns.get(finding["osv"])
-            vulns[finding["osv"]] = GoVuln(finding["osv"], trace[0]["module"] if trace else "?",
-                                           finding.get("fixed_version") or "", called or bool(prev and prev.called))
+            level = ("fungsi" if any(f.get("function") for f in trace) else
+                     "paket" if any(f.get("package") for f in trace) else "modul")
+            vuln = GoVuln(finding["osv"], trace[0]["module"] if trace else "?", finding.get("fixed_version") or "", level)
+            # Satu OSV bisa muncul di beberapa tingkat; modul dan versi perbaikan diambil dari tingkat tertinggi.
+            prev = vulns.get(vuln.osv)
+            if prev is None or GO_LEVELS[vuln.level] > GO_LEVELS[prev.level]:
+                vulns[vuln.osv] = vuln
     except (ValueError, KeyError, TypeError, AttributeError, IndexError):
         raise ToolError("keluaran govulncheck tidak bisa diurai") from None
     if not seen_config:
@@ -182,19 +246,30 @@ def python_advisories(requirements, query=osv_query, version_of=importlib.metada
     """Advisori OSV untuk versi yang terpasang; paket yang tidak terpasang dilewati sebagai informasi."""
     vulnerable, skipped = [], []
     for req in requirements:
-        for name in _requirement_names(req):
+        try:
+            names = _requirement_names(req)
+        except OSError as e:
+            raise ToolError(f"{req} tidak terbaca ({e.strerror})") from None
+        for name in names:
             try:
                 version = version_of(name)
             except importlib.metadata.PackageNotFoundError:
                 skipped.append(f"{name} (tidak terpasang)")
                 continue
-            try:
-                resp = query({"package": {"name": name, "ecosystem": "PyPI"}, "version": version})
-                ids = [v["id"] for v in resp.get("vulns") or []]
-            except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
-                raise ToolError(f"kueri OSV untuk {name} gagal: {e}") from None
-            # Halaman berikutnya tidak diambil: halaman pertama yang berisi advisori sudah cukup untuk gagal.
-            vulnerable += [f"{name} {version}: {i}" for i in ids]
+            payload = {"package": {"name": name, "ecosystem": "PyPI"}, "version": version}
+            # OSV bisa mengembalikan hanya next_page_token tanpa hasil; halaman diikuti sampai token habis.
+            for _ in range(OSV_MAX_PAGES):
+                try:
+                    resp = query(payload)
+                    vulnerable += [f"{name} {version}: {v['id']}" for v in resp.get("vulns") or []]
+                    token = resp.get("next_page_token")
+                except (OSError, ValueError, KeyError, TypeError, AttributeError, http.client.HTTPException) as e:
+                    raise ToolError(f"kueri OSV untuk {name} gagal: {e}") from None
+                if not token:
+                    break
+                payload = {**payload, "page_token": token}
+            else:
+                raise ToolError(f"kueri OSV untuk {name} tidak selesai sesudah {OSV_MAX_PAGES} halaman")
     return vulnerable, skipped
 
 
@@ -203,10 +278,11 @@ def scan_deps(repo, out, govulncheck=run_govulncheck, query=osv_query, version_o
     vulns = parse_govulncheck(govulncheck(repo / "backend"))
     called = [v for v in vulns if v.called]
     print(f"dependensi Go (govulncheck): {len(called)} kerentanan terpanggil", file=out)
+    status = {"fungsi": "terpanggil", "paket": "diimpor, fungsi rentan tidak terpanggil",
+              "modul": "di graf modul, paket tidak diimpor"}
     for v in vulns:
         prefix = "  " if v.called else "  informasi: "
-        status = "terpanggil" if v.called else "diimpor tetapi tidak terpanggil"
-        print(f"{prefix}{v.osv}  {v.module}  {status}; perbaikan: {v.fixed or 'belum ada'}", file=out)
+        print(f"{prefix}{v.osv}  {v.module}  {status[v.level]}; perbaikan: {v.fixed or 'belum ada'}", file=out)
     remote = swift_remote_packages(repo / "Packages/Package.swift", repo / "Anastrophe.xcodeproj/project.pbxproj")
     print(f"paket Swift remote: {len(remote)}", file=out)
     for r in remote:
@@ -223,8 +299,9 @@ def scan_deps(repo, out, govulncheck=run_govulncheck, query=osv_query, version_o
 def _report(title, findings, out):
     print(f"{title}: {len(findings)} temuan", file=out)
     for f in findings:
-        where = f"commit {f.commit}" if f.commit else "di luar commit"
-        print(f"  {f.rule}  {f.file}:{f.line}  ({where})", file=out)
+        location = f"{f.file} (string cetak)" if f.line == 0 else f"{f.file}:{f.line}"
+        where = f"  (commit {f.commit})" if f.commit else ""
+        print(f"  {f.rule}  {location}{where}", file=out)
 
 
 def main(argv=None, out=sys.stdout, err=sys.stderr, *, govulncheck=run_govulncheck, osv_query=osv_query,

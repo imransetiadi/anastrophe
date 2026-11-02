@@ -137,7 +137,7 @@ python3 scripts/docs/check_mermaid.py . /tmp/mmd <path-mmdc> <puppeteer.json>   
 
 ## Pemindaian keamanan
 
-Pemeriksaan secret dan dependensi (TC-SEC-11, ADR-0056). Butuh gitleaks ≥ 8.30 serta akses ke proxy Go dan `api.osv.dev`; ke OSV hanya dikirim nama dan versi paket.
+Pemeriksaan secret dan dependensi (TC-SEC-11, ADR-0056). Butuh gitleaks ≥ 8.30, `go` di PATH, clone penuh (bukan `--depth`), serta akses ke `proxy.golang.org`, `vuln.go.dev`, dan `api.osv.dev`. Ke OSV hanya dikirim nama dan versi paket.
 
 ```bash
 python3 scripts/security/scan.py                 # secret (seluruh riwayat git + staged) dan dependensi
@@ -146,7 +146,7 @@ python3 -m unittest discover -s scripts/security  # test pemindai
 python3 -m pip install -r scripts/anp1/requirements.txt   # advisori Python diperiksa pada versi yang terpasang
 ```
 
-Exit 0 berarti bersih, 1 ada temuan, dan 2 berarti alat, jaringan, atau keluaran alat gagal (tidak pernah dianggap lulus). Nilai secret tidak pernah dicetak. Allowlist di `.gitleaks.toml` harus sempit dan beralasan. Hook pre-commit tidak dipasang otomatis; bila mau, jalankan `gitleaks git --staged --redact .` sebelum commit.
+Exit 0 berarti bersih, 1 ada temuan, dan 2 berarti alat, git, jaringan, atau keluaran alat gagal (tidak pernah dianggap lulus). Nilai secret tidak pernah dicetak. Penekanan hanya lewat allowlist sempit beralasan di `.gitleaks.toml`: komentar `gitleaks:allow` diabaikan dan `.gitleaksignore` ditolak. Hook pre-commit tidak dipasang otomatis; bila mau, jalankan `gitleaks git --staged --redact .` sebelum commit.
 
 ## Langkah berikutnya
 
