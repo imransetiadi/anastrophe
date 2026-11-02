@@ -1,0 +1,19 @@
+{
+  "tool": "jev_decide",
+  "decision": "Pilih fokus unit berikutnya untuk iterasi otomatis Anastrophe sesudah observabilitas backend (ADR-0054) ditutup.",
+  "candidates": [
+    "uji_beban_api",
+    "privacy_manifest_teknis",
+    "audit_aksesibilitas",
+    "laporan_fr58",
+    "akses_cepat_fr24"
+  ],
+  "requirements": [
+    "Dapat diselesaikan dan diverifikasi di lingkungan ini (host, simulator, PostgreSQL) tanpa iPhone fisik, reader, atau DEVELOPMENT_TEAM.",
+    "Tidak bergantung pada keputusan yang masih menunggu pengguna dan tidak menuntut keputusan semantik keamanan atau legal baru yang wajib dieskalasi.",
+    "Memajukan requirement atau NFR berprioritas P0."
+  ],
+  "escalate_on_contradiction": true,
+  "priorities": "Tujuan pengguna: terus membangun app secara bertahap dan otomatis; JEV memutuskan, eskalasi bila < 0,60. Requirement/NFR P0 didahulukan dari P1/P2. Unit tidak boleh bergantung pada keputusan yang menunggu pengguna atau sumber daya yang tidak tersedia, harus bisa diverifikasi di lingkungan ini, kecil-menengah dan terbatas. Aturan keamanan/privasi CLAUDE.md tidak bisa ditawar. Keputusan semantik keamanan atau legal yang tereskalasi tetap milik pengguna.",
+  "evidence_summary": "TC-PERF-05 (P0, NFR-P05/R02) belum pernah dijalankan; backend punya histogram durasi per rute (ADR-0054); generator beban stdlib bisa ditulis; hasil laptop = baseline lab. NFR-PR04 separuh teknis. NFR-A01 audit menyeluruh belum ada. FR-58/FR-24 P1."
+}
