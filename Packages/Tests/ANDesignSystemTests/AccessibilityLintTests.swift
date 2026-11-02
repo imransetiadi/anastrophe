@@ -24,16 +24,33 @@ struct AccessibilityLintTests {
         return result
     }
 
+    /// Pola ukuran font yang tidak ikut Dynamic Type (anti-pola §8). `Font.custom(_:size:)` dan `relativeTo:`
+    /// ikut skala sehingga boleh (design system §2).
+    func fixedFontViolations(_ text: String) -> [String] {
+        [".system(size:", "fixedSize:"].filter(text.contains)
+    }
+
     @Test func lintMenemukanBerkas() throws {
         // Path root yang salah tidak boleh membuat lint di bawah lulus tanpa memeriksa apa pun.
         #expect(try Self.sources().count >= 50)
     }
 
+    @Test func fontTetapTerdeteksi() {
+        #expect(fixedFontViolations("Text(\"A\").font(.system(size: 17))") == [".system(size:"])
+        #expect(fixedFontViolations("Text(\"A\").font(.custom(\"Brand\", fixedSize: 12))") == ["fixedSize:"])
+        #expect(fixedFontViolations("let f = Font.system(size: 20, weight: .bold)") == [".system(size:"])
+    }
+
+    @Test func fontYangIkutDynamicTypeBoleh() {
+        // Design system §2: wordmark merek dengan relativeTo; Font.custom(_:size:) ikut skala body.
+        #expect(fixedFontViolations("Text(\"A\").font(.custom(\"Brand\", size: 28, relativeTo: .title))").isEmpty)
+        #expect(fixedFontViolations("Text(\"A\").font(Font.custom(\"Brand\", size: 17))").isEmpty)
+        #expect(fixedFontViolations("Text(\"A\").font(.title2.weight(.semibold))").isEmpty)
+    }
+
     @Test func tanpaUkuranFontTetap() throws {
         for (path, text) in try Self.sources() {
-            for pattern in [".system(size:", "Font.custom(", ".font(.custom("] {
-                #expect(!text.contains(pattern), "\(path): \(pattern) — pakai text style Dynamic Type")
-            }
+            #expect(fixedFontViolations(text).isEmpty, "\(path): \(fixedFontViolations(text)) — pakai text style Dynamic Type")
         }
     }
 
