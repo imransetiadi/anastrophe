@@ -1,0 +1,16 @@
+# Konfigurasi gitleaks Anastrophe (TC-SEC-11, ADR-0056). Aturan bawaan tetap berlaku.
+# Allowlist sengaja sempit (satu nilai persis, satu path persis), masing-masing beralasan.
+# Jangan menambah allowlist per aturan, per ekstensi, atau per direktori.
+title = "Anastrophe"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Anotasi tipe Swift P256.Signing.PrivateKey (CryptoKit) yang tertangkap generic-api-key; bukan nilai rahasia."
+regexTarget = "secret"
+regexes = ['''^P256\.Signing\.PrivateKey$''']
+
+[[allowlists]]
+description = "Vektor uji ANP/1 deterministik (SDD §7) dari scripts/anp1/gen_vectors.py; kunci uji saja, tidak dipakai di produksi."
+paths = ['''^Packages/Tests/ANCryptoTests/Resources/anp1-v1\.json$''']
