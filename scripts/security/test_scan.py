@@ -209,5 +209,125 @@ class AlatGitleaks(unittest.TestCase):
         self.assertIn("8.30", err.getvalue())
 
 
+def aliran_govulncheck(*findings):
+    """Aliran objek JSON seperti keluaran govulncheck -format json (beberapa objek berurutan, terformat)."""
+    import json
+    objek = [{"config": {"protocol_version": "v1.0.0", "scanner_name": "govulncheck", "scan_level": "symbol"}}]
+    objek += [{"finding": f} for f in findings]
+    return "\n".join(json.dumps(o, indent=2) for o in objek) + "\n"
+
+
+TERPANGGIL = {"osv": "GO-2099-0001", "fixed_version": "v0.99.0", "trace": [
+    {"module": "golang.org/x/contoh", "version": "v0.1.0", "package": "golang.org/x/contoh/p", "function": "Rentan"},
+    {"module": "github.com/imransetiadi/anastrophe/backend", "package": "x", "function": "Pemanggil"}]}
+MODUL_SAJA = {"osv": "GO-2099-0002", "fixed_version": "v1.2.3", "trace": [{"module": "golang.org/x/lain", "version": "v1.0.0"}]}
+
+
+class RepoDependensi:
+    """Repo palsu dengan berkas yang dibaca pemeriksaan dependensi."""
+
+    def __init__(self, test, pbxproj="// tanpa paket remote\n", requirements="contoh==1.*\n"):
+        self.dir = pathlib.Path(tempfile.mkdtemp(prefix="deps-uji-"))
+        test.addCleanup(shutil.rmtree, self.dir, True)
+        (self.dir / "backend").mkdir()
+        (self.dir / "Packages").mkdir()
+        (self.dir / "Packages/Package.swift").write_text("let package = Package(name: \"AnastropheKit\")\n")
+        (self.dir / "Anastrophe.xcodeproj").mkdir()
+        (self.dir / "Anastrophe.xcodeproj/project.pbxproj").write_text(pbxproj)
+        (self.dir / "scripts/alat").mkdir(parents=True)
+        (self.dir / "scripts/alat/requirements.txt").write_text(requirements)
+
+
+def versi_contoh(nama):
+    if nama == "contoh":
+        return "1.0.0"
+    raise scan.importlib.metadata.PackageNotFoundError(nama)
+
+
+class PemindaianDependensi(unittest.TestCase):
+    def jalankan(self, repo, stream=None, query=None, versi=versi_contoh):
+        out, err = io.StringIO(), io.StringIO()
+        kode = scan.main(["deps", "--repo", str(repo.dir)], out=out, err=err,
+                         govulncheck=lambda backend: aliran_govulncheck() if stream is None else stream,
+                         osv_query=query or (lambda payload: {}), pip_version=versi)
+        return kode, out.getvalue(), err.getvalue()
+
+    def test_govulncheck_terpanggil_gagal(self):
+        # Review Focus 4: aliran beberapa objek JSON; temuan yang jejaknya sampai fungsi menggagalkan run.
+        stream = aliran_govulncheck(MODUL_SAJA | {"osv": "GO-2099-0001"}, TERPANGGIL)
+        self.assertEqual(scan.parse_govulncheck(stream), [
+            scan.GoVuln(osv="GO-2099-0001", module="golang.org/x/contoh", fixed="v0.99.0", called=True)])
+        # Urutan sebaliknya: temuan tingkat modul untuk OSV yang sama tidak menurunkan status terpanggil.
+        terbalik = aliran_govulncheck(TERPANGGIL, MODUL_SAJA | {"osv": "GO-2099-0001"})
+        self.assertTrue(scan.parse_govulncheck(terbalik)[0].called)
+        kode, out, _ = self.jalankan(RepoDependensi(self), stream=stream)
+        self.assertEqual(kode, 1)
+        self.assertIn("GO-2099-0001", out)
+
+    def test_govulncheck_modul_saja_info(self):
+        stream = aliran_govulncheck(MODUL_SAJA)
+        self.assertEqual(scan.parse_govulncheck(stream), [
+            scan.GoVuln(osv="GO-2099-0002", module="golang.org/x/lain", fixed="v1.2.3", called=False)])
+        kode, out, _ = self.jalankan(RepoDependensi(self), stream=stream)
+        self.assertEqual(kode, 0)
+        self.assertIn("informasi", out)
+        self.assertIn("GO-2099-0002", out)
+
+    def test_govulncheck_json_rusak_exit_2(self):
+        for stream in ("{rusak", "", '{"progress": {"message": "tanpa config"}}'):
+            with self.subTest(stream=stream):
+                kode, _, err = self.jalankan(RepoDependensi(self), stream=stream)
+                self.assertEqual(kode, 2)
+                self.assertIn("govulncheck", err)
+
+    def test_paket_swift_remote_gagal(self):
+        repo = RepoDependensi(self, pbxproj="/* XCRemoteSwiftPackageReference \"contoh\" */\n")
+        self.assertTrue(scan.swift_remote_packages(repo.dir / "Packages/Package.swift",
+                                                   repo.dir / "Anastrophe.xcodeproj/project.pbxproj"))
+        kode, out, _ = self.jalankan(repo)
+        self.assertEqual(kode, 1)
+        self.assertIn("XCRemoteSwiftPackageReference", out)
+
+    def test_tanpa_temuan_lulus(self):
+        kode, out, err = self.jalankan(RepoDependensi(self))
+        self.assertEqual((kode, err), (0, ""))
+        self.assertIn("govulncheck", out)
+
+    def test_osv_vuln_gagal(self):
+        kode, out, _ = self.jalankan(RepoDependensi(self), query=lambda payload: {"vulns": [{"id": "GHSA-uji-0001"}]})
+        self.assertEqual(kode, 1)
+        self.assertIn("GHSA-uji-0001", out)
+
+    def test_osv_hanya_menerima_nama_dan_versi(self):
+        kiriman = []
+        self.jalankan(RepoDependensi(self), query=lambda payload: kiriman.append(payload) or {})
+        self.assertEqual(kiriman, [{"package": {"name": "contoh", "ecosystem": "PyPI"}, "version": "1.0.0"}])
+
+    def test_osv_jaringan_gagal_exit_2(self):
+        def gagal(payload):
+            raise OSError("jaringan putus")
+        kode, _, err = self.jalankan(RepoDependensi(self), query=gagal)
+        self.assertEqual(kode, 2)
+        self.assertIn("OSV", err)
+
+    def test_tanpa_perintah_menjalankan_deps(self):
+        out = io.StringIO()
+        with mock.patch.object(scan, "scan_secrets", return_value=[]):
+            kode = scan.main(["--repo", str(RepoDependensi(self).dir)], out=out, err=io.StringIO(),
+                             govulncheck=lambda backend: aliran_govulncheck(), osv_query=lambda payload: {},
+                             pip_version=versi_contoh)
+        self.assertEqual(kode, 0)
+        self.assertIn("secret (riwayat + staged): 0 temuan", out.getvalue())
+        self.assertIn("dependensi Go (govulncheck)", out.getvalue())
+
+    def test_paket_tidak_terpasang_info(self):
+        repo = RepoDependensi(self, requirements="# alat lab\ntidakada>=2\ncontoh==1.*\n")
+        kiriman = []
+        kode, out, _ = self.jalankan(repo, query=lambda payload: kiriman.append(payload["package"]["name"]) or {})
+        self.assertEqual(kode, 0)
+        self.assertEqual(kiriman, ["contoh"])
+        self.assertIn("informasi: tidakada", out)
+
+
 if __name__ == "__main__":
     unittest.main()
