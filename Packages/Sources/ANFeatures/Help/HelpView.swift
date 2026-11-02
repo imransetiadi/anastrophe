@@ -60,6 +60,7 @@ struct HelpView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(localized("present.done")) { dismiss() }
+                        .accessibilityIdentifier("help.done")
                 }
             }
             .task {

@@ -49,6 +49,7 @@ public struct KeysView: View {
                                             await model.load()
                                         }
                                     }
+                                    .accessibilityIdentifier("detail.lab_renew")
                                 }
                             }
                             #endif
@@ -60,15 +61,18 @@ public struct KeysView: View {
                             Label(localized("keys.add"), systemImage: "plus")
                         }
                         .disabled(!model.canAddCard || services.storageFailed)
+                        .accessibilityIdentifier("keys.add")
                     }
                     ToolbarItem(placement: Self.leadingPlacement) {
                         Button { showsHelp = true } label: {
                             Label(localized("keys.help"), systemImage: "questionmark.circle")
                         }
+                        .accessibilityIdentifier("keys.help")
                     }
                     #if DEBUG
                     ToolbarItem(placement: Self.leadingPlacement) {
                         Button(localized("keys.lab")) { showsLab = true }
+                            .accessibilityIdentifier("keys.lab")
                     }
                     #endif
                 }

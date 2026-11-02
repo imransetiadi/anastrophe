@@ -59,6 +59,7 @@ struct PresentationSheet: View {
             .padding(.horizontal, 24)
             .padding(.top, 32)
         }
+        .accessibilityIdentifier("present.scroll")
         .safeAreaInset(edge: .bottom) {
             actions
                 .padding(.horizontal, 24)

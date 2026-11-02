@@ -54,6 +54,7 @@ struct AddCardView: View {
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .accessibilityIdentifier("add.scroll")
             .background(ANColor.background)
             .navigationTitle(localized("add.title"))
             #if os(iOS)
@@ -64,9 +65,11 @@ struct AddCardView: View {
                     if showsBack {
                         Button(localized("add.back")) { model.back() }
                             .disabled(model.isBusy)
+                            .accessibilityIdentifier("add.back")
                     } else {
                         Button(localized("add.close")) { dismiss() }
                             .disabled(model.isBusy)
+                            .accessibilityIdentifier("add.close")
                     }
                 }
             }
