@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 func metricsHandler(t *testing.T, m *Metrics) http.Handler {
@@ -109,5 +110,45 @@ func TestMetrikBersamaan(t *testing.T) {
 	wg.Wait()
 	if text, _ := scrape(t, m); !strings.Contains(text, `anastrophe_http_requests_total{route="POST /v1/uji/{id}",status="201"} 1000`+"\n") {
 		t.Fatalf("hitungan bersamaan salah:\n%s", text)
+	}
+}
+
+// blockingWriter meniru scraper yang berhenti membaca: Write memblok sampai dilepas.
+type blockingWriter struct {
+	header  http.Header
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (b *blockingWriter) Header() http.Header { return b.header }
+func (b *blockingWriter) WriteHeader(int)     {}
+func (b *blockingWriter) Write(p []byte) (int, error) {
+	b.once.Do(func() { close(b.started) })
+	<-b.release
+	return len(p), nil
+}
+
+func TestScrapeMacetTidakMemblokirPermintaan(t *testing.T) {
+	// Review akhir ADR-0054 (Important): kunci metrik tidak boleh dipegang selama menulis ke jaringan, karena
+	// setiap permintaan publik mengambil kunci yang sama di akhir log akses.
+	m := NewMetrics()
+	for i := 0; i < 50; i++ { // > 4 KiB teks agar penulisan terjadi selama render
+		m.end("GET /v1/r"+strconv.Itoa(i), http.StatusOK, time.Millisecond)
+	}
+	bw := &blockingWriter{header: http.Header{}, started: make(chan struct{}), release: make(chan struct{})}
+	defer close(bw.release)
+	go m.ServeHTTP(bw, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	<-bw.started
+	done := make(chan struct{})
+	go func() {
+		m.begin()
+		m.end("GET /v1/r0", http.StatusOK, time.Millisecond)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("permintaan terblokir oleh scrape yang macet")
 	}
 }

@@ -1,7 +1,7 @@
 package httpapi
 
 import (
-	"bufio"
+	"bytes"
 	"io"
 	"net/http"
 	"sort"
@@ -72,12 +72,14 @@ func (m *Metrics) end(route string, status int, elapsed time.Duration) {
 	h.count++
 }
 
-// ServeHTTP menulis semua metrik, terurut agar deterministik.
+// ServeHTTP menulis semua metrik, terurut agar deterministik. Teks dirender ke buffer di bawah kunci lalu
+// ditulis ke jaringan sesudah kunci dilepas: scraper yang lambat atau macet tidak boleh menahan kunci yang
+// diambil setiap permintaan di akhir log akses (review akhir ADR-0054).
 func (m *Metrics) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
+	var buf bytes.Buffer
+	m.write(&buf)
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-	out := bufio.NewWriter(w)
-	m.write(out)
-	_ = out.Flush()
+	_, _ = w.Write(buf.Bytes())
 }
 
 func (m *Metrics) write(w io.Writer) {

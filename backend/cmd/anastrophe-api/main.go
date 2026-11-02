@@ -145,10 +145,15 @@ func run() error {
 	case <-stop:
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), httpapi.RequestTimeout+5*time.Second)
 		defer cancel()
+		// Server publik dulu dengan seluruh anggaran, agar transaksi berjalan tidak terputus dan drain tetap
+		// teramati di /metrics; listener metrik menyusul dengan anggarannya sendiri (review akhir ADR-0054).
+		err := server.Shutdown(shutdownCtx)
 		if metricsServer != nil {
-			_ = metricsServer.Shutdown(shutdownCtx)
+			metricsCtx, cancelMetrics := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancelMetrics()
+			_ = metricsServer.Shutdown(metricsCtx)
 		}
-		return server.Shutdown(shutdownCtx)
+		return err
 	}
 }
 
@@ -169,7 +174,8 @@ func newMetricsServer(addr string, metrics *httpapi.Metrics) *http.Server {
 	}
 	mux := http.NewServeMux()
 	mux.Handle("GET /metrics", metrics)
-	return &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	// Timeout membatasi scraper yang lambat atau macet (review akhir ADR-0054).
+	return &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: time.Minute}
 }
 
 // logAuditHeads memverifikasi setiap rantai audit dan mencatat head-nya ke log terpusat sebagai

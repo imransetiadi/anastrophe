@@ -33,6 +33,10 @@ func TestListenerMetrikOpsional(t *testing.T) {
 	if s == nil {
 		t.Fatal("listener metrik tidak dibuat")
 	}
+	// Review akhir ADR-0054: scraper yang macet tidak boleh menahan koneksi tanpa batas.
+	if s.WriteTimeout <= 0 || s.IdleTimeout <= 0 || s.ReadHeaderTimeout <= 0 {
+		t.Fatalf("timeout listener metrik: write %v idle %v header %v", s.WriteTimeout, s.IdleTimeout, s.ReadHeaderTimeout)
+	}
 	rec := httptest.NewRecorder()
 	s.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "anastrophe_http_requests_in_flight") {

@@ -890,9 +890,9 @@ Tidak ada GPS, tidak ada tracking lintas app (ATT tidak dipakai). Privacy Manife
 
 - **App:** MetricKit + crash reporting tanpa PII; event analitik opt-in (PRD §10).
 - **Backend:**
-  - **Implementasi R1 (ADR-0054, stdlib tanpa dependensi):** setiap permintaan mendapat request id (header `X-Request-ID`; header klien diabaikan) dan satu baris log akses `http request`. Isinya pola rute ServeMux, status, `duration_ms`, dan `bytes`, tanpa path mentah, query, body, header, atau alamat IP (aturan 6). Log galat handler dan panic membawa `request_id` yang sama.
+  - **Implementasi R1 (ADR-0054, stdlib tanpa dependensi):** setiap permintaan yang sampai ke handler aplikasi mendapat request id (header `X-Request-ID`; header klien diabaikan) dan satu baris log akses `http request`. Permintaan yang ditolak net/http sebelum routing tidak tercatat, misalnya `OPTIONS *`, baris permintaan rusak (400), atau header terlalu besar (431). Isinya pola rute ServeMux, status, `duration_ms`, dan `bytes`, tanpa path mentah, query, body, header, atau alamat IP (aturan 6). Log galat handler dan panic membawa `request_id` yang sama.
   - **Metrik R1:** `/metrics` (format teks Prometheus 0.0.4) hanya di listener internal `ANASTROPHE_METRICS_ADDR`. Isinya `anastrophe_http_requests_total{route,status}`, histogram `anastrophe_http_request_duration_seconds{route}` (bucket 0,005–10 dtk, termasuk 0,3 dtk), dan `anastrophe_http_requests_in_flight`. `ANASTROPHE_LOG_FORMAT=json` memilih log JSON untuk pengumpul log terpusat.
-  - **Target lanjutan:** OpenTelemetry untuk trace; metrik teks Prometheus bisa dibaca kolektor OpenTelemetry.
+  - **Target lanjutan:** OpenTelemetry untuk trace; cara pengiriman metrik ke infrastruktur diputuskan bersama penyiapan infrastruktur. Render metrik selesai di memori sebelum ditulis ke jaringan, dan listener metrik punya timeout, sehingga scraper yang macet tidak menahan permintaan publik.
   - **SLO:** API app p95 ≤ 300 ms; endpoint Apple p90 < 2,2 dtk (O-W15); propagasi revoke ≤ 60 dtk.
 - **Reader/gateway:** heartbeat, `last_sync_at`, alarm tamper; alert bila > 2× interval sinkron.
 - **Alert:** P1 ≤ 15 menit, on-call terjadwal.
