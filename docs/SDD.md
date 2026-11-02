@@ -43,6 +43,7 @@
 | 2.27 | 2026-11-02 | Urutan kunci audit (ADR-0051): enrolment kartu/undangan dan sapuan per jam menulis audit di akhir pemanggilan store sesudah semua kunci baris, berurutan stabil per rantai; lanjutan `PENDING_APPROVAL` dikunci di dalam enrolment; menghilangkan deadlock 40P01 enrolment–sapuan (§8.1, §8.4.1). |
 | 2.28 | 2026-11-02 | Review akhir deadlock: `AppendAudit` mengunci baris gedung (`FOR KEY SHARE`) sebelum kunci rantai, sehingga `policy`/`site-code` yang memegang `sites FOR UPDATE` tidak lagi bisa deadlock dengan enrolment; catatan sisa tabrakan `hashtext` (§8.1). |
 | 2.29 | 2026-11-02 | Verifier App Attest di server (ADR-0052): langkah attestation dan assertion Apple, konvensi `clientDataHash` dari pemanggil, digest assertion `SHA256(nonce)`, ekstensi kategori/versi; belum disambungkan ke endpoint (§10.4). |
+| 2.30 | 2026-11-02 | Instal ulang (ADR-0053): sisa Keychain service app dari instalasi lama dihapus pada peluncuran pertama tanpa penanda instalasi dan tanpa kartu lokal, sebelum layanan dipakai (§5.3). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -273,6 +274,8 @@ Target minimum: **iOS 26.0** (ADR-0006). Tidak meminta *default contactless app*
 **Pembersihan riwayat:** baris riwayat yang tak terbaca (mis. kanal dari build lain) dilewati, bukan menyembunyikan seluruh riwayat kartu. Entri kartu yang sudah tidak ada di perangkat, misalnya sisa penghapusan yang terputus, dibersihkan saat daftar kartu dimuat. Daftar kartu dibaca ulang tepat sebelum menghapus agar kartu yang baru ditambahkan tidak kehilangan riwayat, dan bila daftar gagal dibaca tidak ada yang dihapus. Kontrak `CardStore.all()`: semua kartu atau gagal, tidak pernah daftar sebagian.
 
 **Deteksi restore:** saat launch, app memastikan setiap kredensial lokal punya kunci yang dapat dimuat. Bila metadata ada tetapi kunci tidak ada (restore ke perangkat lain atau passcode dimatikan), kartu ditandai "Perlu dipindahkan" (FR-40, FR-44). Hanya kartu berstatus Aktif atau Perlu diperbarui yang ditandai; status pemblokir dari server (Ditangguhkan, Menunggu persetujuan, Dicabut) tetap tampil karena memindahkan kartu tidak menyelesaikannya. Kanal yang diperiksa hanya N-HCE dan B (kunci N-SE ada di applet, W di Wallet).
+
+**Instal ulang (FR-43, ADR-0053):** item Keychain tetap ada sesudah app dihapus, sedangkan metadata kartu dan penanda instalasi di Application Support ikut hilang. Pada peluncuran pertama tanpa penanda instalasi dan tanpa kartu lokal, app menghapus semua item Keychain service app dengan satu `SecItemDelete` (kelas + service, tanpa account): blob kunci, record kredensial, token baca status, counter, dan device id. Penanda baru dibuat hanya sesudah penghapusan berhasil. Pembersihan berjalan di `makeServices()` sebelum UI menerima layanan. Bila kartu masih ada, misalnya pembaruan dari build tanpa penanda, atau store kartu gagal dibaca, tidak ada yang dihapus.
 
 ### 5.4 Gating kelayakan (FR-01, FR-04)
 

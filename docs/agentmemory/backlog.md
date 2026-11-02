@@ -28,6 +28,7 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
 | Penerbitan kredensial lewat id instance dari `:challenge` (prioritas tinggi, review akhir siklus hidup) | ADR-0040: provisioning wajib rahasia enrolment dan hanya untuk instance `PROVISIONING` (`TestProvisioningTanpaRahasiaIdentik`; lab: 404 tanpa rahasia) |
 | Minor siklus hidup M1/M3/M4/M5b/M6/M8, provisioning M1/M2/M4/M5/M6, undangan M4/M6/M7(id)/M9 | Rencana perbaikan minor (ADR-0042): update dijaga status, urutan kunci perpanjangan, denylist dari sertifikat terpanjang + purge, pembaruan kartu terarah, jam `ContinuousClock`, parameter rahasia wajib, CLI id undangan dan `--link-base` `/i/` |
 | Deadlock 40P01 enrolment–sapuan per jam (pra-ada, review perbaikan minor), termasuk audit `abandonStale` lintas gedung | ADR-0051: audit enrolment dan sapuan ditahan lalu ditulis di akhir transaksi, berurutan per rantai; lanjutan `PENDING_APPROVAL` dikunci di dalam enrolment (`TestEnrolmentKartuTidakMemegangKunciAuditSaatMenunggu`, `TestSapuanMenulisAuditBerurutanPerRantai`, TC-DR-05). siklus dengan `DecideEnrollment` diputus kunci lanjutan `PENDING_APPROVAL`; siklus dengan `policy`/`site-code` (`sites FOR UPDATE`) diputus `FOR KEY SHARE` baris gedung sebelum kunci rantai (`TestEnrolmentTidakMemegangKunciRantaiSaatMenungguBarisGedung`) |
+| Sisa instal ulang: item Keychain dari instalasi lama tidak dibersihkan (alur Tambah Kartu, ADR-0043) | ADR-0053: semua item service app dihapus pada peluncuran pertama tanpa penanda dan tanpa kartu lokal, sebelum layanan dipakai (`instalUlangMembersihkanSisa`, TC-DEV-13) |
 
 ## Terbuka
 
@@ -62,7 +63,6 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
   - **Urutan byte ISO 15693:** urutan `identifier` dari Core NFC perlu dicocokkan dengan format registri (`e004…`) lewat uji H.
   - **Universal Link:** entitlement Associated Domains dan berkas AASA menunggu domain produksi. Sampai itu, tautan undangan ditempel ke field.
   - **Pembatasan laju:** `GET /v1/sites/lookup` belum dibatasi laju (diserahkan ke infrastruktur). Kode 40 bit tidak praktis ditebak.
-  - **Sisa instal ulang:** item Keychain dari instalasi lama (kunci kredensial, token status) tidak dibersihkan.
   - **Minor review akhir** (pengguna memutuskan apakah dikerjakan):
     - **#4 pembacaan kartu:** cabang ISO 7816 belum terjangkau tanpa `select-identifiers` (Unknown, uji H). App belum punya batas waktu baca sendiri (±20 dtk) maupun petunjuk undangan setelah Batal; kartu yang tidak pernah dilaporkan Core NFC menunggu batas waktu sistem ±60 dtk.
     - **#5 siklus hidup pembaca:** batal sebelum sesi dimulai masih memulai sesi, dan panggilan kedua bersamaan dijawab `cardReaderUnavailable`. Penjaga identitas sesi sudah diperbaiki.
