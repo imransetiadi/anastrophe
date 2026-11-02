@@ -12,7 +12,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 ## Status terkini
 
 - Branch kerja: `feat/r1-scaffold`, yang juga branch bawaan (dan satu-satunya branch) di GitHub private `imransetiadi/anastrophe`. Pengguna meminta commit sesudah `1f87775` digabung lewat PR ke branch itu (2026-11-02).
-- Suite terakhir: Swift host 364 test (1 dilewati, tanpa gagal), simulator 362 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 13 paket lulus dengan PostgreSQL dan `-race` (go1.27.3), pemindai keamanan 42 test. Swift host diulang 2026-11-02: 364 test, 1 dilewati.
+- Suite terakhir: Swift host 391 test (1 dilewati, tanpa gagal; 2026-11-02, audit aksesibilitas), sebelumnya 364 test (1 dilewati, tanpa gagal), simulator 362 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 13 paket lulus dengan PostgreSQL dan `-race` (go1.27.3), pemindai keamanan 42 test. Swift host diulang 2026-11-02: 364 test, 1 dilewati.
 - Menunggu keputusan pengguna:
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
   - ADR-0038: cara mencegah pemegang kartu membatalkan suspend/revoke operator; rekomendasi `hold_pending_approval`, JEV 0,45.
@@ -48,6 +48,44 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Uji beban | Alat `anastrophe-loadtest`: skenario config, lookup, enrol, dan renew dengan kartu sintetis, hanya ke loopback, porsi ≤ 0,3 dtk dari `/metrics`, serta exit code untuk galat, laju tak tercapai, dan run terpotong. Baseline lab di QA §11.1; uji 1.000 rps menunggu lingkungan Load | TC-PERF-05 (baseline lab), ADR-0055 |
 | App Attest (verifier) | Paket backend `internal/appattest` memverifikasi attestation dan assertion menurut langkah Apple; teruji dengan contoh resmi Apple dan data iOS 27 nyata (scratch). Belum disambungkan ke endpoint, database, atau app; gerbang pra-pilot NFR-S03 masih terbuka | NFR-S03 (sebagian), ADR-0052 |
 | Pemindaian keamanan | `scripts/security/scan.py`: gitleaks atas riwayat, staged, dan produk build; govulncheck; paket Swift remote; OSV untuk alat Python. Exit 0/1/2; git gagal, clone dangkal, dan `.gitleaksignore` memberi exit 2. Backend Go ≥ 1.25 dengan toolchain go1.27.3 | TC-SEC-11, NFR-S09, ADR-0056 |
+
+## APP-2026-11-02-2058 - Audit aksesibilitas app (Sebagian; PR ke GitHub atas permintaan pengguna)
+
+Fokus dari ADR-0057 (JEV 0,70, Provisional). NFR-A01 belum pernah diaudit secara sistematis: design system §3 mengklaim semua pasangan token ≥ 4,5:1, checklist §9 belum dicentang, dan proyek belum punya target UI test.
+
+Perubahan:
+- **Task 1–3:**
+  - token warna sebagai data dengan `ContrastTests` (TC-UX-03, tabel §3 = kode);
+  - lint font tetap dan animasi tanpa Reduce Motion;
+  - 16 layar demo DEBUG (`-ANDemoScreen`) dengan identifier penanda.
+- **Task 4 (sebagian):**
+  - **Target UI test `AnastropheUITests`:** audit Apple terang/gelap dan AX5 ID/EN atas 16 keadaan, ditambah cek target sentuh sendiri. Harness dari agen A: kontainer gulir per layar, aturan halaman tergulir dan bilah sistem, `AUDIT-ISSUE`/`AUDIT-EXEMPT`/`AUDIT-SKIP`.
+  - **Perbaikan target sentuh (agen B):** `ANSecondaryButtonStyle`, `ANCompactAccentButtonStyle`, `ANTouchTarget` 44/50 pt, `StatusBadge` bertumpuk di AX5, `ANTextField` UIKit ≥ 44 pt, latar baris `card`.
+- **Keputusan JEV:**
+  - round 43 → ADR-0058 (`token_semua_tint_secondary`, 0,95): semua teks app bertoken (`ANMutedText`, `ANValueRow`, placeholder `mutedForeground`, "Hapus kartu" `destructive`), tint app `secondary` ditambah aset AccentColor, lint `tanpaWarnaTeksSistem`, `AccentColorAssetTests`;
+  - round 44 → ADR-0059 (`pengecualian_per_elemen_bukti`, 0,93): tanpa aturan kategori "nearly passed"; pengecualian kontras hanya per elemen bertoken, dengan bukti test host dan piksel.
+- **Dokumen:** design system §3 (tint app), §5 (komponen baru), §8 (anti-pola); spesifikasi mencatat kedua keputusan.
+
+Bukti:
+- **Swift host:** 391 test di 10 run, 1 dilewati, 0 gagal. Flaky BLE `autentikasiBatalMembatalkanPemindaian` gagal sekali saat mesin sibuk, lalu lulus 6/6.
+- **Simulator:** test paket `ANDesignSystemTests` 7/7, dengan mutasi placeholder tertangkap. Build Debug dan `build-for-testing` lulus.
+- **RED agen A** (sebelum perbaikan; 33 test, 23 gagal): kontras 19/6/2/4, target sentuh 25/24/9/9 untuk terang/gelap/AX5 ID/AX5 EN.
+- **Agen B:** 102 kegagalan → tanpa kegagalan target sentuh selain grabber; `hitRegion` 0.
+- **Smoke terintegrasi (iPhone 17 Pro):** `testDaftarKartu` lulus. `testPresentasiMenunggu` tersisa `elementDetection` ×2 tanpa elemen dan `textClipped` "Mencari pembaca…".
+
+Belum selesai (backlog):
+- GREEN penuh di dua perangkat, mutasi UI, cek `strings` Release, screenshot;
+- pengecualian per elemen;
+- verifikasi mode gelap sebelum audit;
+- UI test "Gunakan";
+- QA §11.1, SDD §5.10, README;
+- review akhir dan `jev_gate`.
+
+`jev_gate` belum dijalankan karena unit belum dinyatakan selesai.
+
+Commit unit ini: `972239c`, `057cb89`, `19da723`, `586512c`, `99a72c3`, `fd5590c`, `ee09123`, `4fcd93f`, `6b4969b`, dan commit ini. Obsidian: `sessions/2026-11-02-audit-aksesibilitas.md`, `decisions/ADR-0057…`, `decisions/ADR-0058…`, `decisions/ADR-0059…`, `lessons/audit-aksesibilitas-otomatis.md`.
+
+Atas permintaan pengguna, unit dihentikan di titik ini, lalu di-commit, dibuatkan PR, dan di-merge ke `feat/r1-scaffold`. Sesudah itu semua proses dan task dihentikan.
 
 ## SEC-2026-11-02-1540 - Pemindaian secret dan dependensi (Selesai; PR ke GitHub atas permintaan pengguna; gate eskalasi)
 
