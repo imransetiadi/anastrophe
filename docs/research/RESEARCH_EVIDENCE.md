@@ -16,6 +16,7 @@
 | 1.0 | 2026-11-01 | Ledger awal: Samsung FAQ, HCE `CardSession`, NFC & SE Platform, Apple Wallet employee badge (E01–E10). |
 | 2.0 | 2026-11-01 | Menambahkan E11–E30: `CredentialSession` (SecureElementCredential), Apple Wallet Access Program Guide, Aliro 1.0, OSDP Transparent Mode, HID Mobile Access (BLE), Core Bluetooth background, daftar perangkat iOS 26/27, App Review 5.1.1(v), ketersediaan Apple Pay. Cek ulang live: Indonesia **masih** tidak eligible. Q9–Q14 baru; I-08–I-14; U07–U13. |
 | 2.1 | 2026-11-01 | E31 + O-A24 (artefak SDK iOS 27.2); E32 + O-B05–O-B06: batas iklan peripheral CoreBluetooth untuk reader uji BLE (ADR-0022); E33 + O-A25–O-A27 + I-15: autentikasi untuk perpanjangan sertifikat; E34 + O-B07: ATS dan alamat IP (lab di iPhone fisik). |
+| 2.2 | 2026-11-02 | E35–E41 + O-AA01–O-AA08 + I-16–I-17 + U14–U15: verifikasi App Attest di server (langkah Apple, contoh attestation resmi beserta inkonsistensinya, konvensi digest assertion dari assertion iOS 27 nyata, nilai kategori validasi) untuk ADR-0052. |
 
 ---
 
@@ -97,6 +98,13 @@ Skill REA dibuat untuk menjawab pertanyaan "fitur ini bekerja bagaimana?" dan me
 | E32 | Apple — Core Bluetooth: `CBPeripheralManager` (ketersediaan platform) dan `startAdvertising(_:)` | https://developer.apple.com/documentation/corebluetooth/cbperipheralmanager | 2026-11-01 (metadata JSON dokumentasi) | Resmi Apple / tinggi |
 | E33 | Apple — Security, LocalAuthentication, BackgroundTasks: `kSecUseAuthenticationContext`, `LAContext.interactionNotAllowed`, `LAError.Code.notInteractive`, `BGAppRefreshTask` | https://developer.apple.com/documentation/security/ksecuseauthenticationcontext | 2026-11-01 (metadata JSON dokumentasi) | Resmi Apple / tinggi |
 | E34 | Apple — Information Property List: `NSAllowsLocalNetworking` (App Transport Security) | https://developer.apple.com/documentation/bundleresources/information-property-list/nsapptransportsecurity/nsallowslocalnetworking | 2026-11-01 (metadata JSON dokumentasi) | Resmi Apple / tinggi |
+| E35 | Apple — Validating apps that connect to your server (DeviceCheck) | https://developer.apple.com/documentation/devicecheck/validating-apps-that-connect-to-your-server | 2026-11-02 (JSON dokumentasi) | Resmi Apple / tinggi |
+| E36 | Apple — Attestation Object Validation Guide (contoh attestation dan nilai antara) | https://developer.apple.com/documentation/devicecheck/attestation-object-validation-guide | 2026-11-02 (JSON dokumentasi) | Resmi Apple / tinggi |
+| E37 | Apple — Establishing your app’s integrity | https://developer.apple.com/documentation/devicecheck/establishing-your-app-s-integrity | 2026-11-02 (JSON dokumentasi) | Resmi Apple / tinggi |
+| E38 | Apple PKI — Apple App Attestation Root CA (PEM) | https://www.apple.com/certificateauthority/Apple_App_Attestation_Root_CA.pem | 2026-11-02 | Resmi Apple / tinggi |
+| E39 | Apple open source — XNU `osfmk/kern/cs_blobs.h` (`CS_VALIDATION_CATEGORY_*`) | https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/kern/cs_blobs.h | 2026-11-02 | Resmi Apple (open source) / tinggi |
+| E40 | `jewei/app-attest-php` (MIT): fixture attestation + dua assertion iOS 27.0.1 (termakan), assertion iOS 27 dari block/buzz (Apache-2.0), contoh Apple 2024 | https://github.com/jewei/app-attest-php/tree/main/spec | 2026-11-02 (SHA-256 berkas termakan `c65797c5…87d1ad`, block/buzz `b012352f…bef96`) | Komunitas, data perangkat nyata / sedang |
+| E41 | Apple Developer Forums — "App Attest Validation Guide sample appears internally inconsistent" | https://developer.apple.com/forums/thread/842509 | 2026-11-02 (hasil pencarian) | Komunitas / rendah |
 
 ---
 
@@ -215,6 +223,19 @@ Skill REA dibuat untuk menjawab pertanyaan "fitur ini bekerja bagaimana?" dan me
 | O-P01 | (E16) App yang mendukung pembuatan akun **wajib** menyediakan inisiasi **penghapusan akun di dalam app** (termasuk akun yang dibuat otomatis atau via web). |
 | O-P02 | (E27) Daftar negara Apple Pay (27 Okt 2026) **tidak memuat Indonesia**; Filipina diluncurkan Agustus 2026. |
 
+### 4.7 App Attest (verifikasi di server)
+
+| ID | Observation |
+|---|---|
+| O-AA01 | (E35) **Attestation:** objek CBOR `{fmt: "apple-appattest", attStmt: {x5c: [credCert, CA…], receipt}, authData}`. Langkah verifikasinya: rantai `x5c` ke Apple App Attestation Root CA; `nonce = SHA256(authData ‖ clientDataHash)` sama dengan satu-satunya octet string di ekstensi credCert OID `1.2.840.113635.100.8.2`; `SHA256(kunci publik credCert, titik X9.62 tak terkompresi)` = key identifier; `SHA256(App ID)` = RP ID; `counter` = 0; `aaguid` = `appattestdevelop` (development) atau `appattest` + tujuh `0x00` (production); `credentialId` = key identifier; nilai `apple_validation_category_01` (UInt32) dan `apple_bundle_version_01` (String) di ekstensi authData diverifikasi. Simpan kunci publik dan receipt. |
+| O-AA02 | (E35) **Assertion:** CBOR `{signature, authenticatorData}`. `clientDataHash = SHA256(clientData)`; `nonce = SHA256(authenticatorData ‖ clientDataHash)`; tanda tangan harus valid untuk `nonce` dengan kunci publik yang disimpan; RP ID dicocokkan; `counter` harus lebih besar dari assertion sebelumnya (> 0 untuk yang pertama); challenge di dalam `clientData` diverifikasi server; `counter` disimpan. |
+| O-AA03 | (E37) App meng-hash challenge dengan SHA-256 sebelum `attestKey` dan meng-hash `clientData` sebelum `generateAssertion`. App wajib memeriksa `isSupported`, dan hanya sebagian jenis ekstensi app yang didukung. Error `serverUnavailable` dicoba ulang dengan kunci yang sama; error lain berarti kunci dibuang. |
+| O-AA04 | (E36, E38; diuji di scratchpad) Contoh attestation resmi Apple (App ID `1234567890.com.example.myapp`; credCert berlaku 2026-04-20T18:13:12Z–2026-04-23T18:13:12Z) terverifikasi ke Apple App Attestation Root CA (SHA-256 DER `1cb9823b…6242c932`, berlaku sampai 2045-03-15). Rinciannya: key identifier = `SHA256(titik)` = `credentialId`; `counter` 0; `aaguid` production; ekstensi `{apple_bundle_version_01: "1", apple_validation_category_01: 01 00 00 00}` (UInt32 little-endian); flags `0x40`, jadi bit ED tidak diset walaupun ekstensi ada. |
+| O-AA05 | (E36, E41) Panduan Apple tidak konsisten dengan contohnya sendiri. (a) Nonce contoh hanya cocok bila `clientDataHash` = byte challenge mentah `example_server_challenge`, bukan SHA-256-nya seperti tertulis. (b) "Hash SHA-256 kunci publik" yang diharapkan panduan (`inGj…`) tidak sama dengan `SHA256(titik)` maupun `SHA256(SPKI)`, padahal key identifier = `SHA256(titik)`. (c) Panduan mengharapkan bundle version "1.0", sedangkan contoh memuat "1". |
+| O-AA06 | (E40; diuji di scratchpad) **Attestation iOS 27.0.1 nyata:** nonce cocok dengan `clientDataHash = SHA256(challenge)`, dan flags `0xC0`. **Tiga assertion iOS 27 nyata** (termakan ×2, block/buzz): tanda tangan ECDSA P-256 valid atas digest `SHA256(nonce)` (hash ganda), bukan atas `nonce` langsung. authenticatorData = header 37 byte + peta ekstensi (99 byte); flags `0xC0` tanpa data kredensial ter-attest; kategori validasi 3 (development) dan 2 (TestFlight); bundle version "1"/"2". |
+| O-AA07 | (E39) Nilai mentah kategori validasi: 0 invalid, 1 platform, 2 TestFlight, 3 development, 4 App Store, 5 enterprise, 6 Developer ID, 7 local signing, 8 Rosetta, 9 OOPJIT, 10 none. |
+| O-AA08 | (E40; diuji di scratchpad) Contoh attestation Apple versi 2024 (iOS 18.0) tidak punya ekstensi sesudah kunci COSE (authData 164 byte, flags `0x40`), dan juga memakai challenge mentah (`test_server_challenge`) sebagai `clientDataHash`. |
+
 ---
 
 ## 5. Inferences (kesimpulan turunan — dengan dasar)
@@ -236,6 +257,8 @@ Skill REA dibuat untuk menjawab pertanyaan "fitur ini bekerja bagaimana?" dan me
 | I-13 | **BLE adalah satu-satunya kanal in-app yang sudah terbukti untuk iPhone di wilayah non-eligible** (praktik HID). Keandalan background lebih rendah dan butuh reader ber-BLE. | O-B01, O-B04 | Tinggi |
 | I-14 | Ketiadaan Apple Pay di Indonesia (O-P02) **meningkatkan risiko** bahwa Apple Wallet Access juga belum tersedia di ID. Ini belum terbukti, karena Program Guide tidak mencantumkan batasan wilayah (U07). | O-P02, E21 | Rendah |
 | I-15 | `BGAppRefreshTask` berjalan tanpa UI foreground, sehingga operasi kunci `.userPresence` yang butuh UI autentikasi tidak bisa diselesaikan di sana. Jadi perpanjangan sertifikat di background **tidak dapat** membuat tanda tangan kunci kredensial (ADR-0009). Tanda tangan tetap bisa dibuat tanpa prompt kedua dengan memakai ulang `LAContext` yang baru diautentikasi untuk tap. | O-A25, O-A26, O-A27 | Sedang: belum diuji di perangkat |
+| I-16 | Byte flags authData tidak bisa dipakai untuk menemukan ekstensi. Urai berurutan: attestation = header 37 byte + `aaguid` + panjang `credentialId` + `credentialId` + kunci COSE + peta ekstensi opsional; assertion = header 37 byte + peta ekstensi opsional. | O-AA04, O-AA06, O-AA08 | Tinggi |
+| I-17 | iOS 26 (minimum, ADR-0006) mungkin belum menulis ekstensi kategori/versi. Verifier harus menerima ketiadaannya, dan kebijakan kategori hanya berlaku bila ekstensi ada. Ekstensi tidak bisa dihapus penyerang karena authData terikat ke nonce yang ditandatangani Apple (attestation) atau ke tanda tangan kunci (assertion). | O-AA01, O-AA06, O-AA08 | Sedang |
 
 ---
 
@@ -256,6 +279,8 @@ Skill REA dibuat untuk menjawab pertanyaan "fitur ini bekerja bagaimana?" dan me
 | U11 | Keandalan unlock BLE di background pada iOS 26/27 (latensi, efek mode hemat daya). | Uji lapangan. | Sedang | Terbuka |
 | U12 | Biaya/fee Apple Wallet Access Program dan sertifikasi IOT reader. | Apple. | Sedang | Terbuka |
 | U13 | Kebijakan Apple terhadap **dua jalur sekaligus** dalam satu app (pass Wallet + kredensial in-app untuk kartu yang sama). | Apple (App Review/ABR). | Sedang | Terbuka |
+| U14 | Perilaku App Attest di iOS 26.x (ada tidaknya ekstensi) dan validasi dengan App ID Anastrophe: perlu capture attestation + assertion dari build bertanda tangan (uji H) sebelum verifier disambungkan ke endpoint. | iPhone fisik + `DEVELOPMENT_TEAM` + capability App Attest. | **Tinggi** (gerbang pra-pilot NFR-S03) | Terbuka |
+| U15 | Validasi receipt App Attest dan metrik risiko penipuan (server-to-server ke Apple). | Apple (kredensial server) + jaringan. | Sedang | Terbuka (di luar ADR-0052) |
 
 ---
 

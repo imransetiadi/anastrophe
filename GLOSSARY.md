@@ -63,6 +63,9 @@ Bahasa domain bersama (*ubiquitous language*) untuk PRD, SDD, QA Suite, kode, da
 | **Head rantai** | Baris terakhir sebuah rantai `(chain, seq, hash)`, dicatat per jam ke log terpusat sebagai anchor parsial. | `AuditHeads` |
 | **Perlu diperbarui** | Status tampilan kartu aktif dengan sisa masa berlaku < 24 jam atau yang sudah lewat (FR-38, TC-DEV-10). | `CardStatus.needsRenewal`, `Card.displayStatus` |
 | **UNREACHABLE** | Status server untuk kredensial yang perangkatnya tidak lagi melapor (mis. app dihapus). | `.unreachable` |
+| **App Attest** | Layanan Apple (DeviceCheck) yang membuktikan ke server bahwa permintaan datang dari app Anastrophe asli di perangkat Apple asli (NFR-S03, ADR-0052). | `appattest` (backend) |
+| **Attestation (App Attest)** | Objek sekali per kunci App Attest yang ditandatangani rantai sertifikat Apple dan mengikat kunci publik, App ID, dan challenge server. | `appattest.Verifier.VerifyAttestation` |
+| **Assertion (App Attest)** | Tanda tangan kunci App Attest atas data permintaan (`clientData`) dengan penghitung yang terus naik, untuk permintaan sesudah attestation. | `appattest.Verifier.VerifyAssertion` |
 
 ## Protokol & platform
 

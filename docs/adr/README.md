@@ -46,3 +46,13 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0040](0040-rahasia-enrolment-kredensial-pertama.md) | Rahasia enrolment untuk kredensial pertama; tambah kanal ke kartu aktif ditolak | Diterima | `secret_first_block_add_channel` | 0.83 |
 | [ADR-0041](0041-pengambilalihan-enrolment-belum-selesai.md) | Pengambilalihan enrolment yang belum selesai lewat id perangkat (terbuka) | Diusulkan — butuh keputusan manusia (eskalasi) | — (escalate) | 0.44 |
 | [ADR-0042](0042-fokus-setelah-provisioning-aman.md) | Fokus berikutnya setelah provisioning aman | Diterapkan (rekomendasi penulis; persetujuan umum pengguna) | `hardening_minors` (escalate 0.41) | 0.41 |
+| [ADR-0043](0043-fokus-alur-tambah-kartu.md) | Fokus berikutnya: alur Tambah Kartu produksi | Diterima | `alur_tambah_kartu` | 0.98 |
+| [ADR-0044](0044-kode-gedung-untuk-enrolment-kartu.md) | Kode gedung untuk enrolment kartu fisik | Diterima | `kode_gedung_lookup` | 0.96 |
+| [ADR-0045](0045-perangkat-dibuat-saat-enrolment.md) | Perangkat dibuat di dalam transaksi enrolment | Provisional (ditinjau M2) | `otomatis_saat_enrolment` | 0.77 |
+| [ADR-0046](0046-oracle-tebak-kartu-gerbang-pra-pilot.md) | Oracle tebak kartu pada enrolment menjadi gerbang pra-pilot (terbuka) | Tereskalasi — inti bersama diterapkan, pilihan kontrol menunggu manusia | `deteksi_per_gedung` (escalate) | 0.49 |
+| [ADR-0047](0047-batas-permintaan-menunggu-per-kartu.md) | Batas permintaan perangkat tambahan yang menunggu per kartu (terbuka sebagian) | Tereskalasi — batas 4 diterapkan, kedaluwarsa menunggu manusia | `batas_pending_per_kartu` (escalate) | 0.51 |
+| [ADR-0048](0048-fokus-bantuan-faq.md) | Fokus berikutnya: layar Bantuan dan FAQ in-app | Diterima | `bantuan_faq` | 0.99 |
+| [ADR-0049](0049-fokus-kebijakan-gedung.md) | Fokus berikutnya: kebijakan gedung (FR-55 sebagian) | Provisional (ditinjau M2) | `kebijakan_gedung` | 0.63 |
+| [ADR-0050](0050-fokus-filter-daftar-kartu.md) | Fokus berikutnya: filter kanal dan pencarian daftar kartu (FR-50) | Diterima | `filter_cli_fr50` | 1.0 |
+| [ADR-0051](0051-fokus-deadlock-enrolment-sapuan.md) | Fokus berikutnya: deadlock enrolment–sapuan per jam | Diterima | `deadlock_sapuan` | 0.96 |
+| [ADR-0052](0052-fokus-verifier-app-attest.md) | Fokus berikutnya: verifier App Attest di backend (NFR-S03, langkah pertama) | Provisional (ditinjau M2) | `app_attest_verifier` | 0.60 |
