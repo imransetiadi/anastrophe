@@ -34,7 +34,7 @@ func (h *Handler) lookupSite(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, store.ErrNotFound):
 		httpapi.WriteProblem(w, problem("SITE-NOT-FOUND", http.StatusNotFound))
 	case err != nil:
-		slog.Error("site lookup failed", "err_type", errorType(err))
+		slog.ErrorContext(r.Context(), "site lookup failed", "err_type", errorType(err))
 		httpapi.WriteProblem(w, problem("INTERNAL", http.StatusInternalServerError))
 	default:
 		out, _ := json.Marshal(struct {

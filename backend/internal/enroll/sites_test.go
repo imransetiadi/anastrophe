@@ -1,14 +1,18 @@
 package enroll
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/imransetiadi/anastrophe/backend/internal/httpapi"
 )
 
 // get mengirim GET tanpa body (lookup kode gedung tidak membutuhkan header apa pun).
@@ -75,5 +79,34 @@ func TestLookupKodeGedungIdentik(t *testing.T) {
 		} else if string(rec.Body.Bytes()) != string(first) {
 			t.Fatalf("%s: body berbeda: %s vs %s", target, rec.Body, first)
 		}
+	}
+}
+
+func TestLogGalatHandlerMembawaRequestID(t *testing.T) {
+	// ADR-0054: log galat handler memakai context permintaan, sehingga request_id-nya sama dengan header
+	// X-Request-ID dan log akses.
+	f := newFixture(t)
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(httpapi.WithRequestID(slog.NewJSONHandler(&logs, nil))))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	f.store.Close() // galat database → 500 dengan log galat
+	rec := f.get(t, "/v1/sites/lookup?code=ABCD2345")
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("lookup dengan database tertutup: %d %s", rec.Code, rec.Body)
+	}
+	id := rec.Header().Get("X-Request-ID")
+	found := false
+	for _, line := range strings.Split(strings.TrimSpace(logs.String()), "\n") {
+		var m map[string]any
+		if json.Unmarshal([]byte(line), &m) == nil && m["msg"] == "site lookup failed" {
+			found = true
+			if id == "" || m["request_id"] != id {
+				t.Fatalf("request_id log %v, header %q", m["request_id"], id)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("log galat tidak ditemukan: %s", logs.String())
 	}
 }

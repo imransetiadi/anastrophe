@@ -145,7 +145,7 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 		// Dihitung di luar transaksi database: produksi memanggil KMS.
 		cardHMAC, err := h.Registry.MAC(r.Context(), siteID, identity.MACInput())
 		if err != nil {
-			h.writeResult(w, 0, nil, err, "registry mac failed")
+			h.writeResult(w, r, 0, nil, err, "registry mac failed")
 			return
 		}
 		requestKey = siteID + "\n" + hex.EncodeToString(cardHMAC)
@@ -225,17 +225,17 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 		})
 		status, resp, err = enroll(result, txErr)
 	}
-	h.writeResult(w, status, resp, err, "create enrollment failed")
+	h.writeResult(w, r, status, resp, err, "create enrollment failed")
 }
 
 // writeResult menulis hasil handler; error infrastruktur menjadi 500 tanpa detail.
-func (h *Handler) writeResult(w http.ResponseWriter, status int, resp []byte, err error, logMessage string) {
+func (h *Handler) writeResult(w http.ResponseWriter, r *http.Request, status int, resp []byte, err error, logMessage string) {
 	switch {
 	case errors.Is(err, store.ErrIdempotencyConflict):
 		httpapi.WriteProblem(w, problem("REQ-IDEMPOTENCY-CONFLICT", http.StatusUnprocessableEntity))
 		return
 	case err != nil:
-		slog.Error(logMessage, "err_type", errorType(err))
+		slog.ErrorContext(r.Context(), logMessage, "err_type", errorType(err)) // ADR-0054: membawa request_id
 		httpapi.WriteProblem(w, problem("INTERNAL", http.StatusInternalServerError))
 		return
 	}
@@ -288,7 +288,7 @@ func (h *Handler) issueCredential(w http.ResponseWriter, r *http.Request) {
 	status, resp, err := h.Store.Idempotent(r.Context(), key, hash[:], func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
 		return h.issue(ctx, tx, id, req)
 	})
-	h.writeResult(w, status, resp, err, "issue credential failed")
+	h.writeResult(w, r, status, resp, err, "issue credential failed")
 }
 
 type provisioned struct {

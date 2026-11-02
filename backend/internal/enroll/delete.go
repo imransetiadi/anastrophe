@@ -58,7 +58,7 @@ func (h *Handler) deleteCard(w http.ResponseWriter, r *http.Request) {
 	status, resp, err := h.Store.Idempotent(r.Context(), key, hash[:], func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
 		return h.revokeCard(ctx, tx, cardID, credID, nonce, sig)
 	})
-	h.writeResult(w, status, resp, err, "delete card failed")
+	h.writeResult(w, r, status, resp, err, "delete card failed")
 }
 
 // revokeCard memeriksa berurutan dalam satu transaksi; jalur gagal tidak menulis apa pun.

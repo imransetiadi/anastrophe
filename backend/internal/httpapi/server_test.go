@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -55,7 +56,7 @@ func TestRuteTakDikenalProblemJSON(t *testing.T) {
 
 func TestErrorTidakMembocorkanDetail(t *testing.T) {
 	// Review Focus 5: pesan error Go/SQL mentah tidak boleh sampai ke klien.
-	h := recoverer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+	h := recoverer(slog.Default(), http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		panic("pq: password authentication failed for user secret_admin")
 	}))
 	rec := serve(t, h, http.MethodGet, "/")

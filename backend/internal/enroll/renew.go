@@ -69,7 +69,7 @@ func (h *Handler) renewalChallenge(w http.ResponseWriter, r *http.Request, credI
 	case errors.Is(err, store.ErrNotRenewable):
 		httpapi.WriteProblem(w, problem("CRED-NOT-RENEWABLE", http.StatusConflict))
 	case err != nil:
-		slog.Error("renewal challenge failed", "err_type", errorType(err))
+		slog.ErrorContext(r.Context(), "renewal challenge failed", "err_type", errorType(err))
 		httpapi.WriteProblem(w, problem("INTERNAL", http.StatusInternalServerError))
 	default:
 		out, _ := json.Marshal(struct {
@@ -121,7 +121,7 @@ func (h *Handler) renewCredential(w http.ResponseWriter, r *http.Request, credID
 	status, resp, err := h.Store.Idempotent(r.Context(), key, hash[:], func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
 		return h.renew(ctx, tx, credID, nonce, sig, tokenHash)
 	})
-	h.writeResult(w, status, resp, err, "renew credential failed")
+	h.writeResult(w, r, status, resp, err, "renew credential failed")
 }
 
 // renew: urutan cek SDD §8.4.2 dalam satu transaksi. Jalur gagal tidak menulis apa pun,

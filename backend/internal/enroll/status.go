@@ -47,7 +47,7 @@ func (h *Handler) cardStatus(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, store.ErrNotFound):
 		notFound()
 	case err != nil:
-		slog.Error("card status failed", "err_type", errorType(err))
+		slog.ErrorContext(r.Context(), "card status failed", "err_type", errorType(err))
 		httpapi.WriteProblem(w, problem("INTERNAL", http.StatusInternalServerError))
 	default:
 		out, _ := json.Marshal(struct {
