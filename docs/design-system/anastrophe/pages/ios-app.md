@@ -41,6 +41,12 @@ Semua pasangan di bawah sudah dihitung dan lolos **WCAG AA ≥ 4,5:1**. Rasio di
 
 Status **tidak boleh** dibedakan oleh warna saja. Selalu sertakan ikon SF Symbol + teks, misalnya "Ditangguhkan".
 
+**Tint app adalah `secondary` (ADR-0058).**
+- `.tint(ANColor.secondary)` dipasang paling luar di `KeysView`, sehingga ikut ke setiap lembar.
+- Aset AccentColor bernilai sama dipakai alert, share sheet, dan menu. Kesamaan aset dan token dijaga `AccentColorAssetTests`.
+- Semua teks yang dikendalikan app memakai token. Abu-abu, biru, dan merah sistem tidak dipakai untuk teks; lint `tanpaWarnaTeksSistem` menjaganya.
+- Elemen sistem yang tidak bisa diwarnai app (tombol merah `confirmationDialog`, chevron `NavigationLink`) dicatat di QA §11.1.
+
 ## 4. Ikon & spasi
 
 - **SF Symbols** saja; tanpa emoji sebagai ikon. Contoh: `building.2`, `key.fill`, `lock.open.fill`, `person.2`, `exclamationmark.triangle`.
@@ -60,6 +66,11 @@ Status **tidak boleh** dibedakan oleh warna saja. Selalu sertakan ikon SF Symbol
 | **Pemuatan daftar** | Skeleton/`redacted(reason: .placeholder)`; jangan layar kosong. |
 | **Tombol Wallet (kanal W)** | Hanya aset resmi *Add to Apple Wallet* (`PKAddPassButton`) sesuai pedoman Apple. |
 | **Dialog destruktif** | Hapus kartu/akun memakai `confirmationDialog` dengan peran `.destructive` + autentikasi. |
+| **Tombol sekunder** | `ANSecondaryButtonStyle`: teks `secondary`, bingkai ≥ 44 pt dan `contentShape` di dalam gaya. Dipakai untuk "Batal", "Coba lagi", "Bukan gedung saya", dan tautan "Buka Pengaturan". |
+| **Tombol aksi di baris** | `ANCompactAccentButtonStyle` ("Gunakan"): teks `onAccent` di atas `accent`, kapsul, tinggi ≥ 44 pt. |
+| **Ukuran kontrol besar** | `.controlSize(.large)` memberi 50 pt pada ketiga gaya tombol. Dipakai di lembar setengah tinggi iOS 26 yang tampil ±96 %, agar area ketuk tetap ≥ 44 pt di layar. |
+| **Field teks** | `ANTextField`: `UITextField` ≥ 44 pt dengan padding di dalam field, latar `card`, garis tepi dan placeholder `mutedForeground`, ikut Dynamic Type. |
+| **Teks sekunder daftar** | `ANMutedText` untuk judul dan catatan seksi serta deskripsi `ContentUnavailableView`. `ANValueRow` untuk baris label–nilai, dengan nilai `mutedForeground`. |
 
 ## 6. Gerak & haptic
 
@@ -78,6 +89,7 @@ Status **tidak boleh** dibedakan oleh warna saja. Selalu sertakan ikon SF Symbol
 - Desain *playful*, UX keamanan yang buruk (pesan error samar, aksi destruktif tanpa konfirmasi), gradien ungu/pink ala "AI".
 - Meniru tampilan Apple Wallet/Apple Pay (O-A10).
 - Emoji sebagai ikon; ukuran font tetap; target sentuh < 44 pt; status hanya lewat warna.
+- Teks berwarna sistem (`secondaryLabel`, biru atau merah sistem), judul seksi berupa string tanpa token, dan gaya tombol terisi `.borderedProminent`/`.glassProminent` (ADR-0058).
 - Istilah teknis di UI presentasi: "NFC", "HCE", "APDU".
 
 ## 9. Checklist sebelum rilis UI

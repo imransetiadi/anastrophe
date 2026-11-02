@@ -58,6 +58,11 @@ Unit ini membuat audit itu, memperbaiki temuannya, dan mencatat hasilnya. Hasiln
 8. **Pengecualian audit:**
    - Satu-satunya pengecualian umum adalah kontras elemen nonaktif, yang dikecualikan WCAG 1.4.3.
    - Pengecualian lain hanya per elemen: jenis audit, elemen yang dikenali dengan pasti, dan alasan tertulis di test. Pengecualian per jenis audit dilarang.
+   - **Halaman tergulir** (*keputusan builder* sesudah kalibrasi): sesudah digulir, konten melintas di bawah bahan kaca bilah navigasi, sehingga audit membaca teks setengah tertutup.
+     - Isu kontras, teks terpotong, dan Dynamic Type pada elemen yang beririsan dengan bilah navigasi/toolbar dilewati. Elemen yang sama diaudit tanpa halangan di halaman sebelumnya.
+     - Isu tanpa elemen yang bisa ditunjuk di halaman tergulir tidak menggagalkan test, tetapi dicetak `AUDIT-SKIP` dan jumlahnya dicatat di QA.
+     - Di halaman yang belum digulir, semua isu tetap dihitung.
+   - **Elemen bilah sistem:** tombol toolbar milik app (dikenali lewat identifier) dikecualikan dari audit Dynamic Type, karena item bilah iOS tidak mengikuti Dynamic Type dan sistem menyediakan Large Content Viewer. Judul dan tombol kembali buatan sistem di bilah navigasi dikecualikan dari audit teks terpotong dan Dynamic Type dengan alasan yang sama. Kontras dan `hitRegion` atas elemen bilah tetap diaudit.
    - Setiap pengecualian dicatat di QA §11.1.
 9. **Lint sumber (host)** untuk anti-pola §8:
    - Tidak ada ukuran font tetap: `.system(size:` dan `fixedSize:`. `Font.custom(_:size:)` dan `relativeTo:` tetap boleh, karena keduanya ikut Dynamic Type, dan design system §2 mengizinkan wordmark merek dengan `relativeTo:` (*keputusan builder*, jawaban builder check).
@@ -82,6 +87,10 @@ Builder check menemukan dua pilihan yang bergantung pada temuan nyata. Keduanya 
    - pengecualian per elemen yang merujuk test host;
    - aturan umum kedua yang terbatas pada kategori itu;
    - atau token dianggap gagal dan dieskalasi.
+
+**Diputuskan** (2026-11-02, dengan bukti run RED, inventaris warna sistem iOS 26.5, dan kalibrasi audit):
+- **Butir 1:** [ADR-0058](../../adr/0058-cakupan-token-warna-tint-app.md), `token_semua_tint_secondary`, JEV 0,95. Semua teks dan warna interaktif app memakai token; tint app `secondary` ditambah aset AccentColor.
+- **Butir 2:** [ADR-0059](../../adr/0059-pengecualian-kontras-per-elemen.md), `pengecualian_per_elemen_bukti`, JEV 0,93. Tanpa aturan kategori; pengecualian kontras hanya per elemen bertoken, dengan bukti test host dan pengukuran piksel.
 
 ## Non-goal
 

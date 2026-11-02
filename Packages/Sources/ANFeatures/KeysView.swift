@@ -151,6 +151,9 @@ public struct KeysView: View {
             LabView(services: services) { Task { await model.load() } }
         }
         #endif
+        // Tint app = token `secondary` (tautan/info, ADR-0058), bukan biru sistem (3,5:1 di atas putih). Dipasang paling
+        // luar, sesudah semua `.sheet`, agar ikut ke setiap lembar; alert dan share sheet memakai aset AccentColor yang sama.
+        .tint(ANColor.secondary)
     }
 
     @ViewBuilder
@@ -159,7 +162,7 @@ public struct KeysView: View {
             ContentUnavailableView {
                 Label(localized("storage.unavailable.title"), systemImage: "externaldrive.badge.exclamationmark")
             } description: {
-                Text(localized("storage.unavailable.message"))
+                ANMutedText(localized("storage.unavailable.message"))
             }
         } else if model.isLoading {
             ProgressView()
@@ -168,7 +171,7 @@ public struct KeysView: View {
             ContentUnavailableView {
                 Label(localized("keys.empty.title"), systemImage: "key")
             } description: {
-                Text(localized("keys.empty.message"))
+                ANMutedText(localized("keys.empty.message"))
             } actions: {
                 Button(localized("keys.add")) { addCard = AddCardRequest(entry: .start) }
                     .buttonStyle(ANPrimaryButtonStyle())

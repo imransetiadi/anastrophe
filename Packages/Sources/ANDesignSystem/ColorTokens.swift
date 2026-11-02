@@ -24,12 +24,20 @@ public struct ANColorToken: Sendable, Equatable {
         background, foreground, card, mutedForeground, primary, secondary, accent, onAccent, success, warning, destructive,
     ]
 
+    #if canImport(UIKit)
+    /// Warna UIKit dinamis untuk kontrol UIKit design system, mis. placeholder `ANTextField`.
+    public var uiColor: UIColor {
+        let (light, dark) = (light, dark)
+        return UIColor { $0.userInterfaceStyle == .dark ? UIColor(rgb: dark) : UIColor(rgb: light) }
+    }
+    #endif
+
     /// Warna dinamis yang mengikuti mode terang/gelap.
     public var color: Color {
-        let (light, dark) = (light, dark)
         #if canImport(UIKit)
-        return Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(rgb: dark) : UIColor(rgb: light) })
+        return Color(uiColor)
         #else
+        let (light, dark) = (light, dark)
         return Color(NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(rgb: dark) : NSColor(rgb: light) })
         #endif
     }

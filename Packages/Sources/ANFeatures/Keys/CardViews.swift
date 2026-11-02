@@ -114,9 +114,9 @@ struct CardDetailView: View {
         // seksi kedua sengaja tanpa latar.
         List {
             Section {
-                LabeledContent(localized("detail.site"), value: card.siteName)
+                ANValueRow(localized("detail.site"), value: card.siteName)
                     .listRowBackground(ANColor.card)
-                LabeledContent(localized("detail.zones"), value: card.zones.joined(separator: ", "))
+                ANValueRow(localized("detail.zones"), value: card.zones.joined(separator: ", "))
                     .listRowBackground(ANColor.card)
                 // Di ukuran aksesibilitas label dan badge ditumpuk, seperti baris lain, agar teks badge tidak terpotong.
                 let statusLayout = dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout())
@@ -130,10 +130,10 @@ struct CardDetailView: View {
                 // Tanpa ini separator mengikuti teks badge, bukan tepi baris seperti baris lain.
                 .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
                 .listRowBackground(ANColor.card)
-                LabeledContent(localized("detail.channels"), value: channels)
+                ANValueRow(localized("detail.channels"), value: channels)
                     .listRowBackground(ANColor.card)
                 if let notAfter = card.notAfter {
-                    LabeledContent(localized("detail.expires"), value: notAfter.formatted(date: .abbreviated, time: .shortened))
+                    ANValueRow(localized("detail.expires"), value: notAfter.formatted(date: .abbreviated, time: .shortened))
                         .listRowBackground(ANColor.card)
                 }
             }
@@ -161,7 +161,7 @@ struct CardDetailView: View {
                 }
             }
             // FR-30: riwayat tap lokal 30 hari, hanya di perangkat; lima terbaru di sini (ADR-0030).
-            Section(localized("detail.history")) {
+            Section {
                 let preview = TapHistoryPreview(history)
                 if preview.inline.isEmpty {
                     Text(localized("detail.history.empty"))
@@ -177,16 +177,18 @@ struct CardDetailView: View {
                         NavigationLink {
                             TapHistoryList(entries: history)
                         } label: {
-                            LabeledContent(localized("detail.history.see_all"), value: preview.total.formatted())
+                            ANValueRow(localized("detail.history.see_all"), value: preview.total.formatted())
                         }
                         .accessibilityIdentifier("detail.history.see_all")
                         .listRowBackground(ANColor.card)
                     }
                 }
+            } header: {
+                ANMutedText(localized("detail.history"))
             }
             if onDelete != nil {
                 // FR-31: Detail → Pengaturan → Hapus, dengan konfirmasi + autentikasi.
-                Section(localized("detail.settings")) {
+                Section {
                     Button(role: .destructive) { confirmsDelete = true } label: {
                         HStack {
                             Text(localized("detail.delete"))
@@ -196,8 +198,12 @@ struct CardDetailView: View {
                             }
                         }
                     }
+                    // Token, bukan merah sistem dari peran destructive (3,6:1 di atas card; ADR-0058).
+                    .foregroundStyle(ANColor.destructive)
                     .disabled(isDeleting)  // aksi async: cegah ketukan ganda
                     .listRowBackground(ANColor.card)
+                } header: {
+                    ANMutedText(localized("detail.settings"))
                 }
             }
         }

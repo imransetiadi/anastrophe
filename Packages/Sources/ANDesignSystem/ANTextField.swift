@@ -6,8 +6,8 @@ import UIKit
 /// Field teks satu baris design system dengan area ketuk ≥ 44 pt (§4). `TextField` SwiftUI selalu setinggi teksnya
 /// (22–26 pt; `.roundedBorder` 34 pt, juga dengan `controlSize` besar), dan bingkai atau padding di luarnya tidak memperbesar
 /// field yang bisa diketuk maupun elemen aksesibilitasnya (terukur di audit ADR-0057). Karena itu di iOS field ini memakai
-/// `UITextField` yang tingginya sendiri ≥ 44 pt dengan padding di dalam field. Latar `card`, garis tepi `mutedForeground`
-/// (batas field ≥ 3:1, WCAG 1.4.11), dan huruf ikut Dynamic Type.
+/// `UITextField` yang tingginya sendiri ≥ 44 pt dengan padding di dalam field. Latar `card`, garis tepi dan placeholder
+/// `mutedForeground` (batas field ≥ 3:1, WCAG 1.4.11; placeholder ≥ 4,5:1, ADR-0058), dan huruf ikut Dynamic Type.
 public struct ANTextField: View {
     /// Jenis isian: menentukan huruf, keyboard, huruf kapital, dan tombol Return.
     public enum Kind: Sendable {
@@ -119,7 +119,6 @@ private struct PaddedTextField: UIViewRepresentable {
     func updateUIView(_ field: ANPaddedUITextField, context: Context) {
         context.coordinator.parent = self
         if field.text != text { field.text = text }
-        field.placeholder = prompt
         field.accessibilityLabel = title
         field.accessibilityIdentifier = identifier
         field.isEnabled = context.environment.isEnabled
@@ -129,6 +128,8 @@ private struct PaddedTextField: UIViewRepresentable {
             field.font = font
             field.invalidateIntrinsicContentSize()
         }
+        // Warna placeholder sistem hanya 1,7:1 di atas `card`; token `mutedForeground` dengan huruf field (ADR-0058).
+        field.attributedPlaceholder = NSAttributedString(string: prompt, attributes: [.foregroundColor: ANColorToken.mutedForeground.uiColor, .font: font])
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, uiView field: ANPaddedUITextField, context: Context) -> CGSize? {

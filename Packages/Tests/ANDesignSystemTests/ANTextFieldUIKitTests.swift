@@ -70,6 +70,22 @@ struct ANTextFieldUIKitTests {
         #expect(box.submitted == 1)
     }
 
+    @Test func placeholderMemakaiTokenMutedForeground() throws {
+        let (host, field) = try render(Box(), kind: .code)
+        defer { withExtendedLifetime(host) {} }
+        // Placeholder bawaan sistem 1,7:1 di atas card; token mutedForeground 7,6:1 / 7,0:1 (ADR-0058).
+        let placeholder = try #require(field.attributedPlaceholder)
+        #expect(placeholder.string == "XXXX-XXXX")
+        #expect(placeholder.attribute(.font, at: 0, effectiveRange: nil) as? UIFont == field.font)
+        let color = try #require(placeholder.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor)
+        for (style, expected) in [(UIUserInterfaceStyle.light, ANColorToken.mutedForeground.light), (.dark, ANColorToken.mutedForeground.dark)] {
+            var (red, green, blue, alpha): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+            #expect(color.resolvedColor(with: UITraitCollection(userInterfaceStyle: style)).getRed(&red, green: &green, blue: &blue, alpha: &alpha))
+            let rgb = UInt32((red * 255).rounded()) << 16 | UInt32((green * 255).rounded()) << 8 | UInt32((blue * 255).rounded())
+            #expect(rgb == expected, "mode \(style.rawValue)")
+        }
+    }
+
     @Test func jenisMenentukanKeyboardDanReturn() throws {
         let (codeHost, code) = try render(Box(), kind: .code)
         defer { withExtendedLifetime(codeHost) {} }

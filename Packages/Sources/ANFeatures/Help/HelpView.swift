@@ -12,13 +12,16 @@ struct HelpView: View {
 
     var body: some View {
         NavigationStack {
-            // Semua baris memakai permukaan token `card` (design system §3), juga di mode gelap.
+            // Semua baris memakai permukaan token `card` (design system §3), juga di mode gelap; judul dan catatan seksi
+            // memakai token `mutedForeground` (ADR-0058).
             List {
-                Section(localized("help.section.channels")) {
+                Section {
                     channelRow(localized("channel.tap"), systemImage: "iphone.radiowaves.left.and.right", availability: availability[.nfcHCE])
                     channelRow(localized("channel.ble"), systemImage: "antenna.radiowaves.left.and.right", availability: availability[.ble])
+                } header: {
+                    ANMutedText(localized("help.section.channels"))
                 }
-                Section(localized("help.section.faq")) {
+                Section {
                     ForEach(HelpTopic.allCases) { topic in
                         DisclosureGroup {
                             Text(topic.answer)
@@ -31,14 +34,16 @@ struct HelpView: View {
                         .accessibilityIdentifier("help.faq.\(topic.rawValue)")
                         .listRowBackground(ANColor.card)
                     }
+                } header: {
+                    ANMutedText(localized("help.section.faq"))
                 }
                 Section {
                     Label(localized("help.devices.list"), systemImage: "iphone")
                         .listRowBackground(ANColor.card)
                 } header: {
-                    Text(localized("help.section.devices"))
+                    ANMutedText(localized("help.section.devices"))
                 } footer: {
-                    Text(localized("help.devices.note"))
+                    ANMutedText(localized("help.devices.note"))
                 }
                 Section {
                     if let report {
@@ -51,13 +56,15 @@ struct HelpView: View {
                             .listRowBackground(ANColor.card)
                     }
                 } header: {
-                    Text(localized("help.section.diagnostics"))
+                    ANMutedText(localized("help.section.diagnostics"))
                 } footer: {
-                    Text(localized("help.diagnostics.note"))
+                    ANMutedText(localized("help.diagnostics.note"))
                 }
-                Section(localized("help.section.support")) {
+                Section {
                     Label(localized("help.support.text"), systemImage: "building.2")
                         .listRowBackground(ANColor.card)
+                } header: {
+                    ANMutedText(localized("help.section.support"))
                 }
             }
             .scrollContentBackground(.hidden)
