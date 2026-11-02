@@ -94,16 +94,60 @@ func TestRunnerBerhentiSaatErrStop(t *testing.T) {
 	// Baseline lab ADR-0055: pool kartu habis membuat pekerja berputar tanpa henti; ErrStop menghentikan run.
 	var n atomic.Int64
 	start := time.Now()
-	Runner{Concurrency: 4, Duration: 10 * time.Second}.Run(context.Background(), func(ctx context.Context, rec *Recorder) error {
+	res := Runner{Concurrency: 4, Duration: 10 * time.Second}.Run(context.Background(), func(ctx context.Context, rec *Recorder) error {
 		if n.Add(1) > 10 {
 			return ErrStop
 		}
 		return nil
 	})
+	if !errors.Is(res.EarlyStop, ErrStop) {
+		t.Fatalf("EarlyStop = %v, ingin ErrStop", res.EarlyStop)
+	}
 	if elapsed := time.Since(start); elapsed > time.Second {
 		t.Fatalf("runner berhenti sesudah %v", elapsed)
 	}
 	if got := n.Load(); got > 10+4 {
 		t.Fatalf("iterasi sesudah ErrStop = %d", got)
+	}
+}
+
+func TestRunnerBerhentiSaatContextDibatalkan(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(ms(100), cancel)
+	start := time.Now()
+	Runner{Concurrency: 4, Duration: 10 * time.Second, Rate: 1000}.Run(ctx, func(ctx context.Context, rec *Recorder) error { return nil })
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("runner berhenti sesudah %v walau context dibatalkan", elapsed)
+	}
+	start = time.Now()
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	time.AfterFunc(ms(100), cancel2)
+	Runner{Concurrency: 4, Duration: 10 * time.Second}.Run(ctx2, func(ctx context.Context, rec *Recorder) error { return nil })
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("runner tanpa laju berhenti sesudah %v walau context dibatalkan", elapsed)
+	}
+}
+
+func TestRunnerMelaporkanIterasi(t *testing.T) {
+	res := Runner{Concurrency: 2, Duration: ms(300), Rate: 100}.Run(context.Background(), func(ctx context.Context, rec *Recorder) error { return nil })
+	if res.Scheduled < 25 || res.Scheduled > 31 || res.Missed > res.Scheduled/10 || res.Iterations != res.Scheduled-res.Missed || res.Elapsed <= 0 || res.Recorder == nil {
+		t.Fatalf("hasil = %+v", res)
+	}
+	if res.EarlyStop != nil {
+		t.Fatalf("EarlyStop = %v pada run yang selesai karena durasi", res.EarlyStop)
+	}
+}
+
+func TestRunnerMenghitungTokenTerlewat(t *testing.T) {
+	// Review akhir ADR-0055 (Important 3): pekerja yang jenuh tidak boleh diam-diam menurunkan laju.
+	res := Runner{Concurrency: 1, Duration: ms(500), Rate: 100}.Run(context.Background(), func(ctx context.Context, rec *Recorder) error {
+		time.Sleep(ms(50))
+		return nil
+	})
+	if res.Scheduled < 40 || res.MissedRatio() < 0.5 || res.Iterations != res.Scheduled-res.Missed {
+		t.Fatalf("hasil = %+v, rasio terlewat %.2f", res, res.MissedRatio())
+	}
+	if rate := res.AchievedRate(); rate < 10 || rate > 30 {
+		t.Fatalf("laju tercapai = %.1f/dtk, ingin ±20", rate)
 	}
 }

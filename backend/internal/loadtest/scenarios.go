@@ -31,7 +31,7 @@ type Client struct {
 
 var (
 	errCardsExhausted = fmt.Errorf("pool kartu sintetis habis: %w", ErrStop)
-	errNoCredentials  = errors.New("pool kredensial kosong; jalankan enrol lebih dulu")
+	errNoCredentials  = fmt.Errorf("pool kredensial kosong; jalankan enrol lebih dulu: %w", ErrStop)
 )
 
 // Config: GET /v1/config.
@@ -51,7 +51,9 @@ func (c *Client) Lookup(ctx context.Context, rec *Recorder) error {
 }
 
 // Enrol: enrolment kartu sintetis berikutnya dengan device id baru dan rahasia enrolment (ADR-0040), lalu
-// provisioning kanal BLE dengan kunci P-256 baru. Kredensial yang terbit masuk pool untuk Renew.
+// provisioning kanal BLE dengan kunci P-256 baru. Kredensial yang terbit masuk pool untuk Renew. Seperti app
+// (ANNetworking.APIClient), enrolment membawa Idempotency-Key dan provisioning membawa status_token_hash
+// (ADR-0037), agar yang diukur adalah jalur server yang sama.
 func (c *Client) Enrol(ctx context.Context, rec *Recorder) error {
 	card, ok := c.Cards.Next()
 	if !ok {
@@ -71,7 +73,8 @@ func (c *Client) Enrol(ctx context.Context, rec *Recorder) error {
 		Status       string `json:"status"`
 	}
 	if _, err := rec.Measure(ctx, "enrol.enrolment", func(ctx context.Context) (int, error) {
-		status, err := c.do(ctx, http.MethodPost, "/v1/enrollments", body, nil, &enrolled, http.StatusCreated, http.StatusOK)
+		status, err := c.do(ctx, http.MethodPost, "/v1/enrollments", body, map[string]string{"Idempotency-Key": idempotencyKey()},
+			&enrolled, http.StatusCreated, http.StatusOK)
 		if err == nil && enrolled.Status != "PROVISIONING" {
 			// Kartu yang sudah dipakai perangkat lain menjadi PENDING_APPROVAL (ADR-0032): bukan enrolment yang
 			// bisa diprovisikan, jadi dihitung galat agar kartu terpakai tidak tertutupi.
@@ -93,12 +96,16 @@ func (c *Client) Enrol(ctx context.Context, rec *Recorder) error {
 		"Authorization":   "Bearer " + base64.RawURLEncoding.EncodeToString(secret),
 		"Idempotency-Key": idempotencyKey(),
 	}
+	// Token baca status hanya dibutuhkan app untuk membaca status kartu; uji beban cukup mengirim hash-nya.
+	tokenHash := sha256.Sum256(randomBytes(32))
 	var provisioned struct {
 		CredentialID []byte `json:"credential_id"`
 	}
 	if _, err := rec.Measure(ctx, "enrol.provisioning", func(ctx context.Context) (int, error) {
-		return c.do(ctx, http.MethodPost, "/v1/enrollments/"+url.PathEscape(enrolled.EnrollmentID)+"/credentials",
-			map[string]string{"channel": "ble", "public_key": base64.StdEncoding.EncodeToString(pub.Bytes())}, headers, &provisioned, http.StatusOK)
+		return c.do(ctx, http.MethodPost, "/v1/enrollments/"+url.PathEscape(enrolled.EnrollmentID)+"/credentials", map[string]string{
+			"channel": "ble", "public_key": base64.StdEncoding.EncodeToString(pub.Bytes()),
+			"status_token_hash": base64.StdEncoding.EncodeToString(tokenHash[:]),
+		}, headers, &provisioned, http.StatusOK)
 	}); err != nil {
 		return err
 	}

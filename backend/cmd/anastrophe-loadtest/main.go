@@ -7,8 +7,14 @@
 //	    -site <uuid> -cards kartu-beban.csv -duration 20s -concurrency 8 -metrics http://127.0.0.1:9090/metrics
 //
 // Skenario: config, lookup (-code), enrol (-site -cards), renew (-site -cards; -prepare kredensial
-// disiapkan lebih dulu tanpa diukur). Hanya host loopback kecuali -allow-remote. Exit 1 bila tingkat galat
-// melebihi -max-galat (bawaan 0,001 sesuai TC-PERF-05).
+// disiapkan lebih dulu tanpa diukur). Hanya host loopback kecuali -allow-remote; redirect tidak diikuti.
+//
+// Pekerja closed-loop: tanpa -rate setiap pekerja langsung memulai iterasi berikutnya. Dengan -rate, token yang
+// jatuh tempo saat semua pekerja sibuk dihitung terlewat.
+//
+// Exit 1 bila tingkat galat mencapai -max-galat (bawaan 0,001: TC-PERF-05 menuntut < 0,1%) atau lebih dari 5%
+// token laju terlewat; exit 3 bila run berhenti lebih awal (pool kartu atau kredensial habis); exit 2 untuk
+// galat pemakaian.
 package main
 
 import (
@@ -23,6 +29,7 @@ import (
 	"os"
 	"os/signal"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/imransetiadi/anastrophe/backend/internal/loadtest"
@@ -72,7 +79,7 @@ func runLoad(args []string, stdout, stderr io.Writer) int {
 	cardsFile := fs.String("cards", "", "CSV gen-cards yang sudah diimpor ke registri")
 	prepare := fs.Int("prepare", 100, "jumlah kredensial yang disiapkan untuk skenario renew")
 	metricsURL := fs.String("metrics", "", "URL /metrics listener internal (opsional)")
-	maxErrors := fs.Float64("max-galat", 0.001, "batas tingkat galat; dilewati = exit 1")
+	maxErrors := fs.Float64("max-galat", 0.001, "tingkat galat harus di bawah batas ini (0 = tanpa galat); dicapai = exit 1")
 	allowRemote := fs.Bool("allow-remote", false, "izinkan host bukan loopback (hati-hati: membebani server sungguhan)")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -91,8 +98,11 @@ func runLoad(args []string, stdout, stderr io.Writer) int {
 	}
 	httpClient := &http.Client{Timeout: 30 * time.Second, Transport: &http.Transport{
 		MaxIdleConns: 2 * max(*concurrency, 1), MaxIdleConnsPerHost: 2 * max(*concurrency, 1), IdleConnTimeout: 90 * time.Second,
-	}}
-	client := &loadtest.Client{Base: *base, HTTP: httpClient, SiteID: *site, JoinCode: *code, Creds: &loadtest.CredPool{}}
+	},
+		// Tujuan redirect bisa melewati penjaga loopback, dan satu sampel menjadi dua permintaan; 3xx dihitung galat.
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	client := &loadtest.Client{Base: strings.TrimRight(*base, "/"), HTTP: httpClient, SiteID: *site, JoinCode: *code, Creds: &loadtest.CredPool{}}
 	if *cardsFile != "" {
 		f, err := os.Open(*cardsFile)
 		if err != nil {
@@ -132,15 +142,26 @@ func runLoad(args []string, stdout, stderr io.Writer) int {
 	default:
 		return fail(errors.New("skenario tak dikenal: " + *scenario))
 	}
-	before := ""
+	var before string
+	var metricsErr error
 	if *metricsURL != "" {
-		before = fetch(ctx, httpClient, *metricsURL)
+		before, metricsErr = fetch(ctx, httpClient, *metricsURL)
 	}
-	rec, elapsed := loadtest.Runner{Concurrency: *concurrency, Duration: *duration, Rate: *rate}.Run(ctx, iteration)
-	summaries := rec.Summary()
-	loadtest.Report(stdout, summaries, elapsed)
-	if *metricsURL != "" {
-		shares := loadtest.ParseDurationShares(before, fetch(ctx, httpClient, *metricsURL), "0.3")
+	res := loadtest.Runner{Concurrency: *concurrency, Duration: *duration, Rate: *rate}.Run(ctx, iteration)
+	summaries := res.Recorder.Summary()
+	loadtest.Report(stdout, summaries, res.Elapsed)
+	if *rate > 0 {
+		fmt.Fprintf(stdout, "laju: target %.1f/dtk, tercapai %.1f/dtk; %d dari %d token terlewat karena semua pekerja sibuk\n",
+			*rate, res.AchievedRate(), res.Missed, res.Scheduled)
+	}
+	var after string
+	if *metricsURL != "" && metricsErr == nil {
+		after, metricsErr = fetch(ctx, httpClient, *metricsURL)
+	}
+	if metricsErr != nil {
+		fmt.Fprintf(stdout, "metrik server tidak tersedia (%v); porsi ≤ 0,3 dtk dari server tidak dihitung\n", metricsErr)
+	} else if *metricsURL != "" {
+		shares := loadtest.ParseDurationShares(before, after, "0.3")
 		routes := make([]string, 0, len(shares))
 		for r := range shares {
 			routes = append(routes, r)
@@ -158,11 +179,30 @@ func runLoad(args []string, stdout, stderr io.Writer) int {
 		total += s.Count
 		failed += s.Errors
 	}
-	if total > 0 && float64(failed)/float64(total) > *maxErrors {
-		fmt.Fprintf(stderr, "tingkat galat %.3f%% melebihi batas %.3f%%\n", 100*float64(failed)/float64(total), 100**maxErrors)
-		return 1
+	exitCode := 0
+	if errorRateExceeded(failed, total, *maxErrors) {
+		fmt.Fprintf(stderr, "tingkat galat %.3f%% tidak di bawah batas %.3f%%\n", 100*float64(failed)/float64(total), 100**maxErrors)
+		exitCode = 1
 	}
-	return 0
+	if res.MissedRatio() > maxMissedRatio {
+		fmt.Fprintf(stderr, "laju target tidak tercapai: %.1f%% token terlewat (batas %.0f%%); naikkan -concurrency atau turunkan -rate\n",
+			100*res.MissedRatio(), 100*maxMissedRatio)
+		exitCode = 1
+	}
+	if res.EarlyStop != nil {
+		fmt.Fprintf(stderr, "run berhenti lebih awal sesudah %.1f dari %.1f dtk: %v\n", res.Elapsed.Seconds(), duration.Seconds(), res.EarlyStop)
+		exitCode = 3
+	}
+	return exitCode
+}
+
+// maxMissedRatio: lebih dari 5% token terlewat berarti laju target tidak diuji.
+const maxMissedRatio = 0.05
+
+// errorRateExceeded: TC-PERF-05 menuntut galat < 0,1%, jadi tepat di batas sudah gagal. Batas 0 berarti tanpa
+// galat sama sekali.
+func errorRateExceeded(failed, total int, limit float64) bool {
+	return failed > 0 && float64(failed)/float64(total) >= limit
 }
 
 // checkTarget menolak host bukan loopback kecuali diizinkan eksplisit, agar server sungguhan tidak dibebani
@@ -185,16 +225,19 @@ func checkTarget(raw string, allowRemote bool) error {
 	return fmt.Errorf("host %q bukan loopback; pakai -allow-remote bila memang disengaja", host)
 }
 
-func fetch(ctx context.Context, c *http.Client, target string) string {
+func fetch(ctx context.Context, c *http.Client, target string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
-		return ""
+		return "", err
 	}
 	resp, err := c.Do(req)
 	if err != nil {
-		return ""
+		return "", err
 	}
 	defer resp.Body.Close()
-	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
-	return string(raw)
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("status %d", resp.StatusCode)
+	}
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+	return string(raw), err
 }

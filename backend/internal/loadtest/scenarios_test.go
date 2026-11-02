@@ -20,6 +20,7 @@ import (
 	"github.com/imransetiadi/anastrophe/backend/internal/registry"
 	"github.com/imransetiadi/anastrophe/backend/internal/store"
 	"github.com/imransetiadi/anastrophe/backend/internal/testpg"
+	"github.com/jackc/pgx/v5"
 )
 
 var adminDSN, skipReason string
@@ -41,6 +42,12 @@ func TestMain(m *testing.M) {
 
 // apiLab menjalankan API in-process dengan PostgreSQL uji dan kartu sintetis terdaftar.
 func apiLab(t *testing.T, cards int) *Client {
+	c, _ := apiLabDB(t, cards)
+	return c
+}
+
+// apiLabDB seperti apiLab, plus DSN database untuk memeriksa jejak permintaan.
+func apiLabDB(t *testing.T, cards int) (*Client, string) {
 	t.Helper()
 	if adminDSN == "" {
 		testpg.Skip(t, skipReason)
@@ -107,7 +114,7 @@ func apiLab(t *testing.T, cards int) *Client {
 	}
 	server := httptest.NewServer(httpapi.New(httpapi.Config{EnabledChannels: []string{"ble"}}, httpapi.Deps{Routes: h.Register}))
 	t.Cleanup(server.Close)
-	return &Client{Base: server.URL, HTTP: server.Client(), SiteID: site, JoinCode: code, Cards: pool, Creds: &CredPool{}}
+	return &Client{Base: server.URL, HTTP: server.Client(), SiteID: site, JoinCode: code, Cards: pool, Creds: &CredPool{}}, dsn
 }
 
 func TestSkenarioTerhadapAPI(t *testing.T) {
@@ -146,8 +153,8 @@ func TestSkenarioTerhadapAPI(t *testing.T) {
 func TestRenewTanpaKredensialGagalJelas(t *testing.T) {
 	c := &Client{Base: "http://127.0.0.1:1", HTTP: http.DefaultClient, Creds: &CredPool{}}
 	rec := NewRecorder()
-	if err := c.Renew(context.Background(), rec); err == nil {
-		t.Fatal("renew tanpa kredensial tidak gagal")
+	if err := c.Renew(context.Background(), rec); !errors.Is(err, ErrStop) {
+		t.Fatalf("renew tanpa kredensial = %v, ingin ErrStop (tanpa itu -prepare 0 berputar tanpa henti)", err)
 	}
 	if s := rec.Summary(); len(s) != 1 || s[0].Step != "renew.tanpa_kredensial" || s[0].Errors != 1 {
 		t.Fatalf("ringkasan = %+v", s)
@@ -201,5 +208,33 @@ func TestEnrolKartuTerpakaiGagalJelas(t *testing.T) {
 		if s.Step == "enrol.provisioning" && s.Count != 1 {
 			t.Fatalf("provisioning dijalankan untuk kartu terpakai: %+v", s)
 		}
+	}
+}
+
+func TestEnrolMengikutiJalurApp(t *testing.T) {
+	// Review akhir ADR-0055 (Important 2): app selalu mengirim Idempotency-Key saat enrolment dan
+	// status_token_hash saat provisioning, jadi skenario harus menempuh jalur server yang sama.
+	c, dsn := apiLabDB(t, 3)
+	rec := NewRecorder()
+	ctx := context.Background()
+	for i := 0; i < 3; i++ {
+		if err := c.Enrol(ctx, rec); err != nil {
+			t.Fatal(err)
+		}
+	}
+	conn, err := pgx.Connect(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(ctx)
+	var keys, tokens int
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM idempotency_keys`).Scan(&keys); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM card_instances WHERE status_token_hash IS NOT NULL`).Scan(&tokens); err != nil {
+		t.Fatal(err)
+	}
+	if keys != 6 || tokens != 3 {
+		t.Fatalf("baris idempotency = %d (ingin 6: enrolment + provisioning), instance dengan hash token = %d (ingin 3)", keys, tokens)
 	}
 }

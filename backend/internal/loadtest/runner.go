@@ -8,6 +8,7 @@ import (
 	"math"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -96,48 +97,96 @@ func Percentile(sorted []time.Duration, p float64) time.Duration {
 	return sorted[min(max(i, 0), len(sorted)-1)]
 }
 
-// Runner menjalankan Concurrency pekerja selama Duration. Rate > 0 membatasi jumlah iterasi per detik untuk
-// semua pekerja bersama. Saat durasi habis tidak ada iterasi baru yang dimulai, tetapi iterasi yang sedang
-// berjalan diselesaikan dengan context pemanggil, agar permintaan yang terpotong tidak dihitung sebagai galat.
+// Runner menjalankan Concurrency pekerja selama Duration. Saat durasi habis tidak ada iterasi baru yang dimulai,
+// tetapi iterasi yang sedang berjalan diselesaikan dengan context pemanggil, agar permintaan yang terpotong
+// tidak dihitung sebagai galat.
+//
+// Rate > 0 menjadwalkan token dengan selang tetap untuk semua pekerja. Token yang jatuh tempo saat semua pekerja
+// masih sibuk dibuang dan dihitung Missed, bukan ditunda. Pekerja tetap closed-loop: latensi diukur dari awal
+// permintaan, bukan dari jadwalnya, jadi server yang melambat menurunkan laju alih-alih menaikkan latensi
+// (coordinated omission). Karena itu laju yang tidak tercapai harus terlihat dari Missed.
 type Runner struct {
 	Concurrency int
 	Duration    time.Duration
 	Rate        float64
 }
 
-// Run menjalankan iterasi dan mengembalikan perekam serta waktu yang benar-benar terpakai.
-func (r Runner) Run(ctx context.Context, it Iteration) (*Recorder, time.Duration) {
+// Result adalah hasil satu run. Dengan Rate > 0 setiap token terjadwal menjadi satu iterasi atau terlewat, jadi
+// Iterations == Scheduled - Missed.
+type Result struct {
+	Recorder   *Recorder
+	Elapsed    time.Duration
+	Iterations int64 // iterasi yang dimulai
+	Scheduled  int64 // token laju yang jatuh tempo selama run; 0 tanpa Rate
+	Missed     int64 // token yang tidak diambil pekerja mana pun pada jadwalnya
+	EarlyStop  error // galat ErrStop pertama bila iterasi menghentikan run; nil bila durasi habis atau context dibatalkan
+}
+
+// AchievedRate adalah jumlah iterasi per detik yang benar-benar dimulai.
+func (r Result) AchievedRate() float64 {
+	if r.Elapsed <= 0 {
+		return 0
+	}
+	return float64(r.Iterations) / r.Elapsed.Seconds()
+}
+
+// MissedRatio adalah porsi token terjadwal yang terlewat; 0 tanpa Rate.
+func (r Result) MissedRatio() float64 {
+	if r.Scheduled == 0 {
+		return 0
+	}
+	return float64(r.Missed) / float64(r.Scheduled)
+}
+
+// Run menjalankan iterasi sampai durasi habis, context dibatalkan, atau sebuah iterasi mengembalikan ErrStop.
+func (r Runner) Run(ctx context.Context, it Iteration) Result {
 	rec := NewRecorder()
 	stop := make(chan struct{})
 	var stopOnce sync.Once
 	halt := func() { stopOnce.Do(func() { close(stop) }) }
 	timer := time.AfterFunc(r.Duration, halt)
 	defer timer.Stop()
+	var iterations, scheduled, missed atomic.Int64
+	var earlyStop error
+	var earlyOnce sync.Once
+	start := time.Now()
 	var tokens chan struct{}
+	var ticking sync.WaitGroup
 	if r.Rate > 0 {
 		tokens = make(chan struct{})
+		interval := time.Duration(float64(time.Second) / r.Rate)
+		ticking.Add(1)
 		go func() {
-			ticker := time.NewTicker(time.Duration(float64(time.Second) / r.Rate))
-			defer ticker.Stop()
+			defer ticking.Done()
+			next := start.Add(interval)
+			tick := time.NewTimer(interval)
+			defer tick.Stop()
 			for {
 				select {
 				case <-stop:
 					return
 				case <-ctx.Done():
 					return
-				case <-ticker.C:
-					select {
-					case tokens <- struct{}{}:
-					case <-stop:
-						return
-					case <-ctx.Done():
-						return
-					}
+				case <-tick.C:
 				}
+				select {
+				case <-stop:
+					return
+				case <-ctx.Done():
+					return
+				default:
+				}
+				scheduled.Add(1)
+				select {
+				case tokens <- struct{}{}:
+				default:
+					missed.Add(1) // semua pekerja masih sibuk
+				}
+				next = next.Add(interval)
+				tick.Reset(time.Until(next))
 			}
 		}()
 	}
-	start := time.Now()
 	var wg sync.WaitGroup
 	for range max(r.Concurrency, 1) {
 		wg.Add(1)
@@ -161,7 +210,9 @@ func (r Runner) Run(ctx context.Context, it Iteration) (*Recorder, time.Duration
 					default:
 					}
 				}
+				iterations.Add(1)
 				if err := it(ctx, rec); errors.Is(err, ErrStop) {
+					earlyOnce.Do(func() { earlyStop = err })
 					halt()
 					return
 				}
@@ -169,5 +220,8 @@ func (r Runner) Run(ctx context.Context, it Iteration) (*Recorder, time.Duration
 		}()
 	}
 	wg.Wait()
-	return rec, time.Since(start)
+	elapsed := time.Since(start)
+	ticking.Wait() // penjadwal ikut berhenti karena stop atau context, jadi hitungan token sudah final
+	return Result{Recorder: rec, Elapsed: elapsed, Iterations: iterations.Load(), Scheduled: scheduled.Load(),
+		Missed: missed.Load(), EarlyStop: earlyStop}
 }
