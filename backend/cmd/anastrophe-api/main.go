@@ -6,6 +6,9 @@
 //	ANASTROPHE_DATABASE_URL     DSN PostgreSQL 16 (wajib)
 //	ANASTROPHE_DEV_SOFTWARE_CA  "1" = Site CA perangkat lunak sementara (HANYA dev/lab;
 //	                            produksi wajib KMS/HSM, belum diimplementasikan)
+//	ANASTROPHE_METRICS_ADDR     alamat listener internal untuk GET /metrics (kosong = tidak dibuat;
+//	                            jangan diekspos ke publik, ADR-0054)
+//	ANASTROPHE_LOG_FORMAT       "json" untuk log terpusat; selain itu teks
 package main
 
 import (
@@ -17,6 +20,7 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -39,6 +43,8 @@ func main() {
 }
 
 func run() error {
+	logger := loggerFromEnv(os.Getenv, os.Stderr)
+	slog.SetDefault(logger)
 	ctx := context.Background()
 	dsn := os.Getenv("ANASTROPHE_DATABASE_URL")
 	if dsn == "" {
@@ -108,12 +114,14 @@ func run() error {
 	if addr == "" {
 		addr = ":8080"
 	}
+	metrics := httpapi.NewMetrics()
 	server := &http.Server{
 		Addr:              addr,
 		WriteTimeout:      httpapi.RequestTimeout + 5*time.Second,
-		Handler:           httpapi.New(httpapi.Config{EnabledChannels: enabledChannels}, httpapi.Deps{Routes: handlers.Register}),
+		Handler:           httpapi.New(httpapi.Config{EnabledChannels: enabledChannels}, httpapi.Deps{Routes: handlers.Register, Logger: logger, Metrics: metrics}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
+	metricsServer := newMetricsServer(os.Getenv("ANASTROPHE_METRICS_ADDR"), metrics)
 	// SIGTERM (deploy/failover ADR-0014): berhenti menerima permintaan baru dan tunggu
 	// permintaan berjalan selesai, agar transaksi tidak terputus di tengah.
 	stop := make(chan os.Signal, 1)
@@ -123,14 +131,45 @@ func run() error {
 		slog.Info("listening", "addr", addr)
 		errs <- server.ListenAndServe()
 	}()
+	if metricsServer != nil {
+		go func() {
+			slog.Info("metrics listening", "addr", metricsServer.Addr)
+			if err := metricsServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+				errs <- err
+			}
+		}()
+	}
 	select {
 	case err := <-errs:
 		return err
 	case <-stop:
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), httpapi.RequestTimeout+5*time.Second)
 		defer cancel()
+		if metricsServer != nil {
+			_ = metricsServer.Shutdown(shutdownCtx)
+		}
 		return server.Shutdown(shutdownCtx)
 	}
+}
+
+// loggerFromEnv memilih format log (ANASTROPHE_LOG_FORMAT=json untuk log terpusat, selain itu teks) dan
+// membungkusnya agar log dengan context permintaan membawa request_id (ADR-0054).
+func loggerFromEnv(getenv func(string) string, w io.Writer) *slog.Logger {
+	var h slog.Handler = slog.NewTextHandler(w, nil)
+	if getenv("ANASTROPHE_LOG_FORMAT") == "json" {
+		h = slog.NewJSONHandler(w, nil)
+	}
+	return slog.New(httpapi.WithRequestID(h))
+}
+
+// newMetricsServer membuat listener internal yang hanya melayani GET /metrics; nil bila addr kosong.
+func newMetricsServer(addr string, metrics *httpapi.Metrics) *http.Server {
+	if addr == "" {
+		return nil
+	}
+	mux := http.NewServeMux()
+	mux.Handle("GET /metrics", metrics)
+	return &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 }
 
 // logAuditHeads memverifikasi setiap rantai audit dan mencatat head-nya ke log terpusat sebagai

@@ -78,24 +78,27 @@ func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter 
 // accessLog memberi setiap permintaan request id (juga di header X-Request-ID) dan menulis satu baris log
 // sesudah handler selesai: pola rute, status, durasi, dan ukuran respons. Path mentah, query, body, header,
 // dan alamat IP tidak dicatat (aturan 6, NFR-PR01).
-func accessLog(logger *slog.Logger, next http.Handler) http.Handler {
+func accessLog(logger *slog.Logger, metrics *Metrics, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		info := &requestInfo{id: newRequestID()}
 		w.Header().Set("X-Request-ID", info.id)
 		rec := &statusRecorder{ResponseWriter: w}
 		start := time.Now()
+		metrics.begin()
 		aborted := true
 		defer func() {
 			status := rec.status
 			if status == 0 && !aborted {
 				status = http.StatusOK // handler tidak menulis apa pun: net/http mengirim 200
 			}
+			elapsed := time.Since(start)
+			metrics.end(info.route(), status, elapsed)
 			// Context kosong: request_id ditulis eksplisit, tidak digandakan oleh WithRequestID.
 			logger.LogAttrs(context.Background(), slog.LevelInfo, "http request",
 				slog.String("request_id", info.id),
 				slog.String("route", info.route()),
 				slog.Int("status", status),
-				slog.Float64("duration_ms", float64(time.Since(start).Microseconds())/1000),
+				slog.Float64("duration_ms", float64(elapsed.Microseconds())/1000),
 				slog.Int("bytes", rec.bytes))
 		}()
 		next.ServeHTTP(rec, r.WithContext(context.WithValue(r.Context(), requestInfoKey{}, info)))

@@ -16,8 +16,9 @@ type Config struct {
 
 // Deps berisi layanan yang dipakai handler; diisi bertahap oleh task berikutnya. Logger nil = slog.Default().
 type Deps struct {
-	Routes func(mux *http.ServeMux)
-	Logger *slog.Logger
+	Routes  func(mux *http.ServeMux)
+	Logger  *slog.Logger
+	Metrics *Metrics // nil = tanpa metrik; diekspos di listener internal, bukan di sini (ADR-0054)
 }
 
 // New mengembalikan handler HTTP lengkap. Urutan middleware: log akses (request id) → recoverer →
@@ -47,7 +48,7 @@ func New(cfg Config, deps Deps) http.Handler {
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		WriteProblem(w, NewProblem("NOT-FOUND", http.StatusNotFound))
 	})
-	return accessLog(logger, recoverer(logger, withDeadline(capturePattern(mux))))
+	return accessLog(logger, deps.Metrics, recoverer(logger, withDeadline(capturePattern(mux))))
 }
 
 // Route mendaftarkan handler untuk satu metode, plus jawaban 405 problem+json untuk metode
