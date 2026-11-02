@@ -30,7 +30,7 @@ type testPKI struct {
 	pool     *x509.CertPool
 }
 
-func newTestPKI(t *testing.T) *testPKI {
+func newTestPKI(t testing.TB) *testPKI {
 	t.Helper()
 	rootKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	rootTmpl := &x509.Certificate{
@@ -83,7 +83,7 @@ type synthAtt struct {
 
 func sha(b []byte) []byte { s := sha256.Sum256(b); return s[:] }
 
-func (p *testPKI) attestation(t *testing.T, o attOpts) synthAtt {
+func (p *testPKI) attestation(t testing.TB, o attOpts) synthAtt {
 	t.Helper()
 	curve := o.curve
 	if curve == nil {
@@ -147,7 +147,7 @@ func (p *testPKI) attestation(t *testing.T, o attOpts) synthAtt {
 	return synthAtt{attestation: obj, keyID: keyID, clientDataHash: clientDataHash, key: key, point: point}
 }
 
-func (p *testPKI) verifier(t *testing.T, env Environment, categories ...uint32) *Verifier {
+func (p *testPKI) verifier(t testing.TB, env Environment, categories ...uint32) *Verifier {
 	t.Helper()
 	v, err := NewVerifier(Config{AppID: testAppID, Environment: env, Roots: p.pool, Now: func() time.Time { return testNow }, Categories: categories})
 	if err != nil {

@@ -24,7 +24,7 @@ type appleSample struct {
 	} `json:"expected"`
 }
 
-func loadAppleSample(t *testing.T) (appleSample, []byte, []byte, time.Time) {
+func loadAppleSample(t testing.TB) (appleSample, []byte, []byte, time.Time) {
 	t.Helper()
 	raw, err := os.ReadFile("testdata/apple-sample-attestation-2026.json")
 	if err != nil {
