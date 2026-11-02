@@ -289,6 +289,7 @@ private struct SimulatorSecretStore: SecretStore {
 
     func get(_ key: String) throws -> Data? { try base.get(key) }
     func delete(_ key: String) throws { try base.delete(key) }
+    func deleteAll() throws { try base.deleteAll() }
 }
 #endif
 

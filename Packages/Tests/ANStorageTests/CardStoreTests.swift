@@ -13,6 +13,7 @@ struct FailingSecretStore: SecretStore {
     func set(_ data: Data, for key: String, accessibility: SecretAccessibility) throws { throw ANError.internalError }
     func get(_ key: String) throws -> Data? { throw ANError.internalError }
     func delete(_ key: String) throws { throw ANError.internalError }
+    func deleteAll() throws { throw ANError.internalError }
 }
 
 func temporaryDirectory() -> URL {
