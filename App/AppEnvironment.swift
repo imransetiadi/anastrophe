@@ -19,7 +19,15 @@ enum AppEnvironment {
         #endif
         // Alamat API enrolment dari Info.plist ANAPIBaseURL (AN_API_BASE_URL); DEBUG: -ANAPIBaseURL menimpanya.
         let apiBaseURL = BackendConfiguration.apiBaseURL(infoValue: Bundle.main.object(forInfoDictionaryKey: "ANAPIBaseURL") as? String, arguments: arguments)
-        let services = (try? AppServices.live(nfcEmulationEntitled: nfcEmulationEntitled, apiBaseURL: apiBaseURL)) ?? AppServices.storageUnavailable(apiBaseURL: apiBaseURL)
+        let services: AppServices
+        if let live = try? AppServices.live(nfcEmulationEntitled: nfcEmulationEntitled, apiBaseURL: apiBaseURL) {
+            // ADR-0053: sisa Keychain instal ulang dibersihkan sebelum UI menerima layanan, jadi tidak bisa
+            // berbalapan dengan alur Tambah Kartu.
+            await live.prepareInstall()
+            services = live
+        } else {
+            services = AppServices.storageUnavailable(apiBaseURL: apiBaseURL)
+        }
         #if DEBUG
         // -ANLabBackend/-ANLabDevice/-ANLabSite, -ANLabRenew, -ANLabDelete, dan alur Tambah Kartu
         // (-ANLabCardReader, -ANLabOpenURL, -ANLabAddCode).

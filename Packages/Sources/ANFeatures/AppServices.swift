@@ -156,6 +156,19 @@ public final class AppServices {
         return await statusRefresher.refresh(transport: transport)
     }
 
+    /// FR-43 (ADR-0053): pada peluncuran pertama sesudah instal ulang, sisa Keychain instalasi lama dihapus
+    /// sebelum layanan dipakai. Store kartu yang gagal dibaca dianggap berisi kartu, jadi tidak ada yang
+    /// dihapus; galat penghapusan tidak menghentikan app dan dicoba lagi di peluncuran berikutnya.
+    public func prepareInstall() async {
+        let hasCards: Bool
+        do {
+            hasCards = try await !cards.all().isEmpty
+        } catch {
+            hasCards = true
+        }
+        _ = try? deviceIdentity.purgeLeftoversIfFreshInstall(hasCards: hasCards)
+    }
+
     /// Membatalkan presentasi yang sedang berjalan (Review Focus 2).
     public func cancelPresentation() async {
         await launcher.cancel()
