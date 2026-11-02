@@ -41,6 +41,7 @@ struct PresentationSheet: View {
                 if model.phase == .unavailable(.bluetoothUnauthorized), let settings = Self.settingsURL {
                     Link(localized("present.open_settings"), destination: settings)
                         .frame(minHeight: 44)
+                        .accessibilityIdentifier("present.open_settings")
                 }
                 if case .coolingDown = model.phase, let cooldownUntil {
                     ProgressView(timerInterval: Date.now...max(Date.now, cooldownUntil), countsDown: true) {
@@ -92,14 +93,17 @@ struct PresentationSheet: View {
             VStack(spacing: 8) {
                 Button(localized("present.done")) { dismiss() }
                     .buttonStyle(ANPrimaryButtonStyle())
+                    .accessibilityIdentifier("present.done")
                 if model.phase != .granted {
                     Button(localized("present.retry"), action: onRetry)
                         .frame(maxWidth: .infinity, minHeight: 44)
+                        .accessibilityIdentifier("present.retry")
                 }
             }
         } else {
             Button(localized("present.cancel"), role: .cancel, action: onCancel)
                 .frame(maxWidth: .infinity, minHeight: 44)
+                .accessibilityIdentifier("present.cancel")
         }
     }
 

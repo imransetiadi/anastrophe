@@ -12,6 +12,10 @@ struct AddCardRequest: Identifiable {
     let entry: AddCardEntry
     var labAutoCode: String?
     var labAutoSubmit = false
+    #if DEBUG
+    /// Langkah demo untuk audit aksesibilitas (`-ANDemoScreen add-*`, ADR-0057).
+    var demoScreen: DemoScreen?
+    #endif
 }
 
 /// Lembar Tambah Kartu Akses (FR-10–FR-13, ADR-0043). Mengikuti `pages/ios-app.md`:
@@ -25,6 +29,9 @@ struct AddCardView: View {
     private let labAutoCode: String?
     private let labAutoSubmit: Bool
     private let onFinished: () -> Void
+    #if DEBUG
+    private var demoScreen: DemoScreen?
+    #endif
     @Environment(\.dismiss) private var dismiss
 
     /// `labAutoCode` dan `labAutoSubmit` hanya dipakai DEBUG untuk e2e di simulator (`-ANLabAddCode`,
@@ -75,6 +82,15 @@ struct AddCardView: View {
         .task { await start() }
     }
 
+    #if DEBUG
+    /// Membuka lembar pada langkah demo (`-ANDemoScreen add-*`) tanpa jaringan.
+    func demo(_ screen: DemoScreen?) -> AddCardView {
+        var copy = self
+        copy.demoScreen = screen
+        return copy
+    }
+    #endif
+
     private var showsBack: Bool {
         switch model.step {
         case .siteCode, .confirmSite, .invitation: true
@@ -108,7 +124,9 @@ struct AddCardView: View {
                 .foregroundStyle(ANColor.warning)
         }
         methodButton(localized("add.method.card"), detail: localized("add.method.card.detail"), systemImage: "creditcard") { model.chooseCard() }
+            .accessibilityIdentifier("add.method.card")
         methodButton(localized("add.method.invitation"), detail: localized("add.method.invitation.detail"), systemImage: "link") { model.chooseInvitation() }
+            .accessibilityIdentifier("add.method.invitation")
     }
 
     @ViewBuilder
@@ -126,6 +144,7 @@ struct AddCardView: View {
                 #endif
                 .submitLabel(.continue)
                 .onSubmit { Task { await model.submitCode() } }
+                .accessibilityIdentifier("add.code.field")
             Text(localized("add.code.help"))
                 .font(.footnote)
                 .foregroundStyle(ANColor.mutedForeground)
@@ -151,6 +170,7 @@ struct AddCardView: View {
         .accessibilityElement(children: .combine)
         Text(localized("add.confirm.message"))
         primaryButton(localized("add.confirm.read")) { await model.confirmAndRead() }
+            .accessibilityIdentifier("add.confirm.read")
         secondaryButton(localized("add.confirm.wrong_site")) { model.back() }
     }
 
@@ -168,6 +188,7 @@ struct AddCardView: View {
                 #endif
                 .submitLabel(.go)
                 .onSubmit { Task { await model.submitInvitation() } }
+                .accessibilityIdentifier("add.link.field")
             Text(localized("add.link.help"))
                 .font(.footnote)
                 .foregroundStyle(ANColor.mutedForeground)
@@ -191,6 +212,7 @@ struct AddCardView: View {
     @ViewBuilder
     private func done(_ card: Card) -> some View {
         resultHeader(localized("add.done.title"), systemImage: "checkmark.circle.fill", tint: ANColor.success)
+            .accessibilityIdentifier("add.result.done")
         VStack(alignment: .leading, spacing: 4) {
             Text(card.siteName)
                 .font(.headline)
@@ -211,6 +233,7 @@ struct AddCardView: View {
     @ViewBuilder
     private func pending(_ siteName: String?) -> some View {
         resultHeader(localized("add.pending.title"), systemImage: "clock", tint: ANColor.warning)
+            .accessibilityIdentifier("add.result.pending")
         if let siteName {
             Text(siteName)
                 .font(.headline)
@@ -223,6 +246,7 @@ struct AddCardView: View {
     @ViewBuilder
     private func failed(_ failure: AddCardModel.Failure) -> some View {
         resultHeader(localized("add.failed.title"), systemImage: "exclamationmark.triangle", tint: ANColor.destructive)
+            .accessibilityIdentifier("add.result.failed")
         Text(failure.message)
         if failure.offersInvitation {
             // FR-13: kartu tak terdaftar atau tak terbaca → jalur undangan sebagai tindakan utama.
@@ -243,6 +267,7 @@ struct AddCardView: View {
             Label(error, systemImage: "exclamationmark.circle")
                 .font(.footnote)
                 .foregroundStyle(ANColor.destructive)
+                .accessibilityIdentifier("add.field_error")
         }
     }
 
@@ -318,6 +343,12 @@ struct AddCardView: View {
     // MARK: Masuk
 
     private func start() async {
+        #if DEBUG
+        if let demoScreen {
+            await AddCardDemo.apply(demoScreen, to: model)
+            return
+        }
+        #endif
         switch entry {
         case .invitation(let url):
             model.prefill(invitationURL: url)

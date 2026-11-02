@@ -114,6 +114,9 @@ public struct KeysView: View {
                         labAutoCode: request.labAutoCode, labAutoSubmit: request.labAutoSubmit) {
                 Task { await model.load() }
             }
+            #if DEBUG
+            .demo(request.demoScreen)
+            #endif
         }
         .alert(deleteMessage ?? "", isPresented: Binding(get: { deleteMessage != nil }, set: { if !$0 { deleteMessage = nil } })) {
             Button(localized("present.done"), role: .cancel) {}
@@ -167,6 +170,7 @@ public struct KeysView: View {
                     .buttonStyle(ANPrimaryButtonStyle())
                     .disabled(!model.canAddCard)
                     .padding(.horizontal)
+                    .accessibilityIdentifier("keys.empty.add")
             }
         } else {
             List(model.cards) { card in
@@ -175,6 +179,7 @@ public struct KeysView: View {
                 }
             }
             .scrollContentBackground(.hidden)
+            .accessibilityIdentifier("keys.list")
         }
     }
 
@@ -232,12 +237,17 @@ public struct KeysView: View {
 
     private func openDemoScreen() {
         #if DEBUG
-        switch services.demoScreen {
-        case "lab": showsLab = true
-        case "help": showsHelp = true
-        case "detail": if let first = model.cards.first { path = [first.id] }
-        case "presentation", "bluetooth-denied": if let first = model.cards.first(where: { model.presentability(of: $0).canPresent }) { use(first) }
-        default: break
+        guard let screen = services.demoScreen else { return }
+        switch screen {
+        case .lab: showsLab = true
+        case .help: showsHelp = true
+        case .detail: if let first = model.cards.first { path = [first.id] }
+        case .detailSuspended: if let card = model.cards.first(where: { $0.status == .suspended }) { path = [card.id] }
+        case .presentation, .bluetoothDenied, .presentationDenied:
+            if let first = model.cards.first(where: { model.presentability(of: $0).canPresent }) { use(first) }
+        case .empty: break
+        case .add, .addCode, .addConfirm, .addInvitation, .addDone, .addPending, .addFailed:
+            addCard = AddCardRequest(entry: .start, demoScreen: screen)
         }
         #endif
     }

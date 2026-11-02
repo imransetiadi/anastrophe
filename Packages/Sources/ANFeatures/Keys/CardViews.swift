@@ -155,6 +155,7 @@ struct CardDetailView: View {
                         } label: {
                             LabeledContent(localized("detail.history.see_all"), value: preview.total.formatted())
                         }
+                        .accessibilityIdentifier("detail.history.see_all")
                     }
                 }
             }
@@ -176,6 +177,7 @@ struct CardDetailView: View {
         }
         .scrollContentBackground(.hidden)
         .background(ANColor.background)
+        .accessibilityIdentifier("detail.list")
         .navigationTitle(card.name)
         .confirmationDialog(localized("detail.delete.confirm_title"), isPresented: $confirmsDelete, titleVisibility: .visible) {
             Button(localized("detail.delete"), role: .destructive) { onDelete?() }
@@ -231,6 +233,7 @@ struct TapHistoryList: View {
         }
         .scrollContentBackground(.hidden)
         .background(ANColor.background)
+        .accessibilityIdentifier("history.list")
         .navigationTitle(localized("detail.history"))
     }
 }

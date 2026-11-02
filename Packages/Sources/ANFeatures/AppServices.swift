@@ -67,8 +67,8 @@ public final class AppServices {
     /// Store kartu tidak bisa dibuka; UI memberi tahu alih-alih menampilkan daftar kosong.
     public let storageFailed: Bool
     #if DEBUG
-    /// Layar yang dibuka otomatis untuk verifikasi visual (`-ANDemoScreen`).
-    public var demoScreen: String?
+    /// Layar yang dibuka otomatis untuk verifikasi visual dan audit aksesibilitas (`-ANDemoScreen`, ADR-0057).
+    public var demoScreen: DemoScreen?
     /// Provisioning lab yang menunggu layar Kunci (`-ANLabBackend`), lihat `LabBackendTarget`.
     var pendingLabBackend: LabBackendTarget?
     /// Perpanjangan lab saat peluncuran (`-ANLabRenew`) untuk verifikasi di simulator.
@@ -501,9 +501,14 @@ final class ScriptedPresentationLauncher: PresentationLaunching {
 #if DEBUG
 extension AppServices {
     /// Data contoh untuk preview dan verifikasi visual (`-ANDemo`).
-    public static func demo(screen: String? = nil) async -> AppServices {
-        let services = inMemory(events: screen == "bluetooth-denied" ? [.waitingForReader, .unavailable(.bluetoothUnauthorized)] : [.waitingForReader])
+    /// `screen` adalah nilai `-ANDemoScreen`; nilai tak dikenal diabaikan. Layar Tambah Kartu memakai alamat
+    /// layanan di TLD cadangan `.invalid` (RFC 2606) agar tampak tersedia tanpa pernah tersambung.
+    public static func demo(screen raw: String? = nil) async -> AppServices {
+        let screen = raw.flatMap(DemoScreen.init(rawValue:))
+        let services = inMemory(events: screen?.presentmentEvents ?? [.waitingForReader],
+                                apiBaseURL: screen?.opensAddCard == true ? URL(string: "https://demo.invalid") : nil)
         services.demoScreen = screen
+        guard screen != .empty else { return services }
         let lobbyID = Data(repeating: 0x01, count: 16), meetingID = Data(repeating: 0x04, count: 16)
         _ = try? services.keys.createKey(for: lobbyID)
         _ = try? services.keys.createKey(for: meetingID)

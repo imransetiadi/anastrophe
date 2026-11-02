@@ -26,6 +26,7 @@ struct HelpView: View {
                             Text(topic.question)
                                 .font(.headline)
                         }
+                        .accessibilityIdentifier("help.faq.\(topic.rawValue)")
                     }
                 }
                 Section {
@@ -54,6 +55,7 @@ struct HelpView: View {
             }
             .scrollContentBackground(.hidden)
             .background(ANColor.background)
+            .accessibilityIdentifier("help.list")
             .navigationTitle(localized("help.title"))
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
