@@ -12,7 +12,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 ## Status terkini
 
 - Branch kerja: `feat/r1-scaffold`, di-push ke GitHub private `imransetiadi/anastrophe` (origin) atas permintaan pengguna; belum di-merge.
-- Suite terakhir: Swift host 364 test (1 dilewati, tanpa gagal), simulator 362 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 11 paket lulus dengan PostgreSQL.
+- Suite terakhir: Swift host 364 test (1 dilewati, tanpa gagal), simulator 362 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 13 paket lulus dengan PostgreSQL dan `-race`.
 - Menunggu keputusan pengguna:
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
   - ADR-0038: cara mencegah pemegang kartu membatalkan suspend/revoke operator; rekomendasi `hold_pending_approval`, JEV 0,45.
@@ -21,7 +21,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
   - ADR-0047: kedaluwarsa permintaan `PENDING_APPROVAL` (batas 4 per kartu sudah diterapkan), JEV 0,51.
   - Penyambungan App Attest (ADR-0053, seri JEV 0,47): pengikatan kunci attested ke `device_id` (terkait ADR-0041/0046), endpoint yang wajib attestation, bypass dev, dan kategori produksi.
 
-  - Tinjauan 19 gate JEV (17 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan, verifier App Attest, sisa Keychain instal ulang, observabilitas backend (`docs/adr/jev-log/*-gate.json`).
+  - Tinjauan 20 gate JEV (18 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan, verifier App Attest, sisa Keychain instal ulang, observabilitas backend, uji beban API (`docs/adr/jev-log/*-gate.json`).
   - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
 
@@ -45,7 +45,55 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Bantuan | Tombol Bantuan di tab Kunci: FAQ sepuluh topik (ID/EN), status cara akses di iPhone ini, iPhone yang didukung, laporan diagnostik tanpa rahasia | FR-60, FR-02, FR-27, FR-63, ADR-0048 |
 | Kebijakan gedung | CLI `policy` untuk masa berlaku sertifikat dan kanal per gedung; kanal efektif gedung di lookup/enrolment dan ditegakkan saat provisioning; app memilih kanal yang diizinkan | FR-55 (sebagian), FR-05, ADR-0049 |
 | Observabilitas | Log akses terstruktur per permintaan (request id di header dan log galat, pola rute, status, durasi; tanpa path, query, body, atau IP) dan metrik teks Prometheus di listener internal; alert, on-call, dan log terpusat menunggu infrastruktur | NFR-O01 (sebagian), ADR-0054 |
+| Uji beban | Alat `anastrophe-loadtest`: skenario config, lookup, enrol, dan renew dengan kartu sintetis, hanya ke loopback, porsi ≤ 0,3 dtk dari `/metrics`, serta exit code untuk galat, laju tak tercapai, dan run terpotong. Baseline lab di QA §11.1; uji 1.000 rps menunggu lingkungan Load | TC-PERF-05 (baseline lab), ADR-0055 |
 | App Attest (verifier) | Paket backend `internal/appattest` memverifikasi attestation dan assertion menurut langkah Apple; teruji dengan contoh resmi Apple dan data iOS 27 nyata (scratch). Belum disambungkan ke endpoint, database, atau app; gerbang pra-pilot NFR-S03 masih terbuka | NFR-S03 (sebagian), ADR-0052 |
+
+## API-2026-11-02-1425 - Uji beban API dan baseline lab (Selesai, commit lokal; gate eskalasi)
+
+Fokus dari ADR-0055 (JEV 0,95, Diterima). TC-PERF-05 belum pernah dijalankan. Backend kini punya histogram durasi per rute (ADR-0054), sehingga latensi sisi klien bisa dibandingkan dengan sisi server.
+
+Perubahan:
+- **Alat `anastrophe-loadtest` (stdlib):**
+  - `gen-cards` membuat kartu sintetis (awalan `084c54`);
+  - `run` menjalankan skenario config, lookup, enrol (enrolment + provisioning), atau renew (tantangan + perpanjangan).
+- **Laporan per langkah:** jumlah, galat, rps, p50/p95/p99, maks, dan kode status, ditambah porsi ≤ 0,3 dtk per rute dari dua cuplikan `/metrics`.
+- **Penjaga:** hanya host loopback kecuali `-allow-remote`, redirect tidak diikuti, dan CSV berisi kartu bukan sintetis ditolak.
+- **Exit code:**
+  - exit 1 bila galat mencapai `-max-galat` (bawaan 0,001) atau lebih dari 5% token `-rate` terlewat;
+  - exit 3 bila run berhenti lebih awal.
+- **Dokumen:** baseline lab di QA §11.1 (bukan bukti produksi) dan SDD §14.
+
+Bukti:
+- **Baseline lab ulang** (build `4d31e51`, 8 run, semua exit 0, 0 galat, server 100% ≤ 0,3 dtk), c=8 / c=32:
+
+  | Skenario | Laju |
+  |---|---|
+  | config | 69,7 rb / 67,6 rb rps |
+  | lookup | 40,0 rb / 37,2 rb rps |
+  | enrol | 1.114 / 869 iterasi/dtk |
+  | renew | 2.226 / 1.635 iterasi/dtk |
+
+- **Jejak database:** 40.086 instance ber-hash token dan 157.416 baris idempotency, cocok dengan laporan.
+- **Suite dan mutasi:** Go 13 paket lulus dengan `-race`; mutasi pada perbaikan 15/15 tertangkap.
+
+Review akhir (opus): "with fixes".
+- **Important, diperbaiki:**
+  - redirect diikuti, sehingga penjaga loopback bisa terlewati;
+  - enrol tidak menempuh jalur app;
+  - kekurangan laju `-rate` tidak terlihat.
+- **Minor yang dinaikkan dan diperbaiki:**
+  - `-prepare 0` berputar tanpa henti;
+  - kegagalan `/metrics` diam-diam;
+  - batas galat `>`;
+  - run terpotong tidak terlihat;
+  - path `-cards` relatif di README;
+  - sebab perlambatan c=32 yang ditulis sebagai fakta.
+- **Cacat dari baseline pertama:** kartu dipakai ulang antar-run, pekerja berputar saat pool habis, dan persiapan renew 409. Ketiganya diperbaiki di `1d7d800`.
+- **Ditunda di backlog:** sisa minor alat dan titik panas, yaitu rute challenge/renew yang tergabung dan enrolment yang melambat pada c=32.
+
+`jev_gate`: eskalasi (komposit 0,81, rubrik pembatas *test_gap*). Klaim suite lemah karena log suite hanya ada di kolom `tests`, dan kalimatnya mencakup perbaikan dokumen yang tidak punya test. Tidak diajukan ulang.
+
+Commit unit ini: `d7fa8e5`, `ba90dfe`, `78f7ea9`, `8b701df`, `1d7d800`, `dc44e23`, `4d31e51`, dan commit ini. Obsidian: `sessions/2026-11-02-uji-beban-api.md`, `decisions/ADR-0055…`, `lessons/jev-gate-butir-evidence.md`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
 
 ## API-2026-11-02-1005 - Observabilitas backend: log akses dan metrik (Selesai, commit lokal; gate eskalasi)
 

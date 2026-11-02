@@ -131,8 +131,17 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
     - `ANASTROPHE_LOG_FORMAT` tidak peka huruf besar, atau tolak nilai tak dikenal.
 - **Uji beban (temuan baseline lab, ADR-0055):**
   - **Rute gabungan:** challenge dan renew berbagi pola `POST /v1/credentials/{action}`, sehingga latensinya tidak bisa dibedakan di `/metrics`. Pertimbangkan rute terpisah atau label aksi terbatas.
-  - **Enrolment melambat pada c=32:** p95 naik dari 5 ke 23 ms. Kandidat penyebab: serialisasi rantai audit per gedung (semua beban di satu gedung), penandatanganan CA perangkat lunak, dan CPU yang dipakai bersama. Butuh profil (pprof, wait event PostgreSQL) di lingkungan Load dan skenario multi-gedung.
+  - **Enrolment melambat pada c=32:** p95 naik dari 5 ke 25 ms (baseline ulang sesudah review akhir). Kandidat penyebab: serialisasi rantai audit per gedung (semua beban di satu gedung), penandatanganan CA perangkat lunak, dan CPU yang dipakai bersama. Butuh profil (pprof, wait event PostgreSQL) di lingkungan Load dan skenario multi-gedung.
   - **Klien boros CPU:** generator beban sendiri berat (keygen P-256 dan tanda tangan per iterasi enrol/renew). Di lingkungan Load, jalankan klien di mesin terpisah.
   - **Uji belum dikerjakan:** uji 1.000 rps campuran (TC-PERF-05 penuh) dan uji panjang (rendam) belum dilakukan.
+  - **Alat (minor tertunda dari review akhir):**
+    - validasi input: `-rate` yang sangat besar membuat selang token 0, dan `-offset` bisa negatif atau overflow;
+    - pool kartu atau kredensial yang habis tercatat sebagai galat di tabel langkah (exit 3 sudah membedakannya dari galat API);
+    - penjaga kartu sintetis hanya memeriksa awalan `084c54`, jadi impor ke gedung sungguhan masih mungkin. Usul: `--allow-synthetic` di `anastrophe-registry import`;
+    - laporan belum mencetak metadata run (commit, versi, ukuran pool DB, tujuan log), dan presisi angkanya kasar;
+    - celah test: `Measure` yang mencatat durasi nol, serta pernyataan bahwa rahasia tidak muncul di laporan;
+    - memori recorder tumbuh tanpa batas pada uji rendam (simpan histogram, bukan semua sampel);
+    - laporan mentah baseline hanya tersimpan lokal;
+    - koreksi coordinated omission: ukur latensi dari jadwal token (open-loop), agar latensi dekat titik jenuh tidak terlalu optimistis.
 - **Test flaky:** `BLETapTests.autentikasiBatalMembatalkanPemindaian` sesekali gagal (pembatalan pemindaian bergantung waktu); lulus 6/6 saat diulang.
 - **Riwayat tap:** judul baris "Ditolak · alasan" dirakit di kode (M8; dikerjakan saat bahasa ketiga ditambahkan); VoiceOver baris Status belum diperiksa dengan Accessibility Inspector.

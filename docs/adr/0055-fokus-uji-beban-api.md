@@ -38,3 +38,13 @@ Desain dan rencananya ada di `docs/superpowers/specs/2026-11-02-uji-beban-api-de
 
 - Ada alat yang bisa diulang di staging/load environment (NFR-O02) begitu infrastruktur tersedia.
 - TC-PERF-05 penuh (1.000 rps) tetap menunggu lingkungan Load.
+
+## Catatan sesudah review akhir
+
+Review akhir menemukan tiga masalah penting yang sudah diperbaiki dengan test lebih dulu sebelum baseline diukur ulang:
+
+- **Redirect:** alat tidak lagi mengikuti redirect, dan garis miring di akhir `-base` dipangkas. Tujuan redirect bisa melewati penjaga loopback, dan setiap sampel sebelumnya menjadi dua permintaan.
+- **Jalur enrol:** skenario enrol kini mengirim `Idempotency-Key` saat enrolment dan `status_token_hash` saat provisioning, sama seperti app. Tanpa keduanya yang diukur adalah jalur server yang berbeda.
+- **Laju:** pekerja tetap closed-loop. Dengan `-rate`, token yang jatuh tempo saat semua pekerja sibuk dihitung terlewat; laporan memuat laju target dan laju tercapai, dan run gagal (exit 1) bila lebih dari 5% token terlewat. Koreksi coordinated omission, yaitu latensi diukur dari jadwal, masuk backlog.
+
+Selain itu run yang berhenti lebih awal (pool kartu atau kredensial habis) keluar dengan exit 3, kegagalan `/metrics` dilaporkan, dan batas galat inklusif sesuai TC-PERF-05 (< 0,1%).

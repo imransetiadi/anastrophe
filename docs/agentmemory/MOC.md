@@ -1,7 +1,7 @@
 ---
 type: moc
 project: anastrophe
-updated: 2026-11-01
+updated: 2026-11-02
 ---
 # Anastrophe — Map of Content
 
@@ -11,6 +11,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Sesi
 
+- [2026-11-02 — Uji beban API dan baseline lab](sessions/2026-11-02-uji-beban-api.md)
 - [2026-11-02 — Observabilitas backend: log akses dan metrik](sessions/2026-11-02-observabilitas-backend.md)
 - [2026-11-02 — Pembersihan sisa Keychain saat instal ulang](sessions/2026-11-02-sisa-instal-ulang.md)
 - [2026-11-02 — Verifier App Attest di backend](sessions/2026-11-02-verifier-app-attest.md)
@@ -31,6 +32,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Keputusan
 
+- [ADR-0055 — Fokus berikutnya: uji beban API dan baseline lab](decisions/ADR-0055-fokus-uji-beban-api.md) · JEV 0,95
 - [ADR-0054 — Fokus berikutnya: observabilitas backend](decisions/ADR-0054-fokus-observabilitas-backend.md) · JEV 0,99
 - [ADR-0053 — Fokus berikutnya: bersihkan sisa Keychain saat instal ulang](decisions/ADR-0053-fokus-sisa-keychain-instal-ulang.md) · JEV 0,39 (eskalasi; diterapkan risiko rendah)
 - [ADR-0052 — Fokus berikutnya: verifier App Attest di backend](decisions/ADR-0052-fokus-verifier-app-attest.md) · JEV 0,60 (provisional)
@@ -71,6 +73,6 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 ## Menunggu pengguna
 
 - ADR-0017 (entitas hukum untuk entitlement), ADR-0022 (bentuk reader uji BLE), ADR-0038 (cegah pembatalan suspend/revoke; rekomendasi `hold_pending_approval`), ADR-0041 (pengambilalihan enrolment yang belum selesai; rekomendasi `first_writer_wins`), ADR-0046 (kontrol enumerasi kartu sebagai gerbang pra-pilot; rekomendasi deteksi per gedung + App Attest), ADR-0047 (kedaluwarsa permintaan menunggu), penyambungan App Attest (ADR-0053: pengikatan kunci attested ke `device_id`, endpoint wajib, bypass dev, kategori produksi).
-- Tinjauan gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung (review), filter daftar kartu (review), deadlock enrolment–sapuan, verifier App Attest, sisa Keychain instal ulang, observabilitas backend.
+- Tinjauan gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung (review), filter daftar kartu (review), deadlock enrolment–sapuan, verifier App Attest, sisa Keychain instal ulang, observabilitas backend, uji beban API.
 - Integrasi branch `feat/r1-scaffold`: merge ke `main` atau PR (sudah di-push ke GitHub private).
 - `DEVELOPMENT_TEAM` serta iPhone dan reader untuk uji bertipe H.

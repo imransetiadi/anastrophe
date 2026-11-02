@@ -46,6 +46,7 @@
 | 2.30 | 2026-11-02 | Instal ulang (ADR-0053): sisa Keychain service app dari instalasi lama dihapus pada peluncuran pertama tanpa penanda instalasi dan tanpa kartu lokal, sebelum layanan dipakai (§5.3). |
 | 2.31 | 2026-11-02 | Observabilitas backend R1 (ADR-0054): log akses terstruktur dengan request id tanpa data pribadi dan metrik teks Prometheus di listener internal; OpenTelemetry menjadi target lanjutan (§13). |
 | 2.32 | 2026-11-02 | Uji beban API (ADR-0055): alat `anastrophe-loadtest` (stdlib, kartu sintetis, penjaga loopback, porsi SLO dari `/metrics`) dan baseline lab (§14). |
+| 2.33 | 2026-11-02 | Perbaikan review akhir uji beban (ADR-0055): redirect tidak diikuti, enrol mengikuti jalur app (`Idempotency-Key`, `status_token_hash`), token laju terlewat dan run terpotong terlihat; baseline lab diukur ulang (§14). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -910,7 +911,9 @@ Tidak ada GPS, tidak ada tracking lintas app (ATT tidak dipakai). Privacy Manife
 
 **Alat dan baseline lab (ADR-0055):** `anastrophe-loadtest` menjalankan skenario config, lookup, enrol (enrolment + provisioning), dan renew (tantangan + perpanjangan). Alat ini memakai kartu sintetis berawalan `084c54` dan hanya menembak host loopback kecuali `-allow-remote`. Laporannya berisi p50/p95/p99 per langkah serta porsi permintaan ≤ 0,3 dtk dari histogram `/metrics`.
 
-Baseline lab (QA §11.1): semua rute 100% ≤ 0,3 dtk tanpa galat pada konkurensi 8 dan 32, dengan enrolment sekitar 1.100 iterasi/dtk dan perpanjangan sekitar 1.800 iterasi/dtk pada konkurensi 8. Angka laptop ini bukan bukti TC-PERF-05, karena klien, API, dan PostgreSQL berebut CPU yang sama. Verifikasi 1.000 rps menunggu lingkungan Load (NFR-O02).
+Pekerja beban bersifat closed-loop. Dengan `-rate`, token yang jatuh tempo saat semua pekerja sibuk dihitung terlewat, dan run gagal bila lebih dari 5% terlewat. Redirect tidak diikuti, dan skenario enrol mengirim `Idempotency-Key` serta `status_token_hash` seperti app.
+
+Baseline lab (QA §11.1): semua rute 100% ≤ 0,3 dtk tanpa galat pada konkurensi 8 dan 32, dengan enrolment sekitar 1.100 iterasi/dtk dan perpanjangan sekitar 2.200 iterasi/dtk pada konkurensi 8. Angka laptop ini bukan bukti TC-PERF-05, karena klien, API, dan PostgreSQL berebut CPU yang sama. Verifikasi 1.000 rps menunggu lingkungan Load (NFR-O02).
 
 ## 15. Katalog error & mode kegagalan
 

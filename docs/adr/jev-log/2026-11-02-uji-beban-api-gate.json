@@ -1,0 +1,104 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "action": "escalate",
+  "label": "uji-beban-api-plan-close-gate",
+  "request": "Close plan 2026-11-02-uji-beban-api (ADR-0055, TC-PERF-05): a stdlib Go load generator (anastrophe-loadtest) with config, site-code lookup, enrolment+provisioning and renewal scenarios, synthetic cards only, a loopback-only target guard, per-step latency percentiles and the server-side share of requests <= 0.3 s from /metrics; including the final-review fix pass (redirects not followed, enrol scenario follows the app request path, rate shortfall and early stop made visible with exit codes, inclusive error threshold, visible /metrics failure) and a re-measured lab baseline recorded in QA 11.1 as a lab baseline, not production evidence.",
+  "evidence_ids": [
+    "red-green",
+    "mutations",
+    "lab-baseline",
+    "app-path",
+    "review-ledger",
+    "docs"
+  ],
+  "reason_codes": [
+    "confidence_below_review",
+    "review_escalated",
+    "claim_confidence_low",
+    "claim_confidence_below_auto_accept"
+  ],
+  "review": {
+    "action": "escalate",
+    "safe_to_apply": 0.71,
+    "composite": 0.81025,
+    "limiting_rubrics": [
+      "test_gap"
+    ],
+    "scores": {
+      "correctness": 1.85,
+      "spec_match": 1.83,
+      "test_gap": 0.46,
+      "blast_radius": 1.33
+    },
+    "confidence": {
+      "correctness": 0.79,
+      "spec_match": 0.74,
+      "test_gap": 0.31,
+      "blast_radius": 0.44
+    }
+  },
+  "verification": {
+    "action": "escalate",
+    "verified": 8,
+    "contradicted": 0,
+    "unsupported": 0,
+    "needs_review": 3,
+    "results": [
+      {
+        "claim": "Alat anastrophe-loadtest menjalankan skenario config, lookup, enrol (enrolment + provisioning), dan renew (tantangan + perpanjangan) terhadap API, lalu melaporkan jumlah, galat, rps, p50/p95/p99, maks, dan kode status per langkah, serta porsi permintaan ≤ 0,3 dtk per rute dari histogram /metrics server.",
+        "verdict": "verified",
+        "confidence": 0.89,
+        "action": "auto"
+      },
+      {
+        "claim": "Alat hanya menerima host loopback kecuali -allow-remote dan tidak mengikuti redirect: respons 3xx dihitung galat dan host tujuan redirect tidak menerima permintaan; garis miring di akhir -base dipangkas.",
+        "verdict": "verified",
+        "confidence": 0.96,
+        "action": "auto"
+      },
+      {
+        "claim": "Skenario enrol mengirim Idempotency-Key pada POST /v1/enrollments dan status_token_hash pada provisioning, sama dengan app; di database lab hal ini terlihat sebagai 2 baris idempotency per enrol dan hash token pada setiap instance yang diprovisikan.",
+        "verdict": "verified",
+        "confidence": 0.61,
+        "action": "review"
+      },
+      {
+        "claim": "Dengan -rate, token yang jatuh tempo saat semua pekerja sibuk dihitung terlewat sehingga Iterations = Scheduled − Missed; laporan memuat laju target dan laju tercapai, dan run keluar dengan exit 1 bila lebih dari 5% token terlewat.",
+        "verdict": "verified",
+        "confidence": 0.92,
+        "action": "auto"
+      },
+      {
+        "claim": "Run yang berhenti lebih awal karena pool kartu atau kredensial habis keluar dengan exit 3 dan pesan 'berhenti lebih awal'; renew tanpa kredensial (-prepare 0) menghentikan run alih-alih berputar.",
+        "verdict": "verified",
+        "confidence": 0.8,
+        "action": "auto"
+      },
+      {
+        "claim": "Batas galat inklusif: tingkat galat tepat 0,1% gagal dengan bawaan -max-galat 0,001, -max-galat 0 hanya meloloskan run tanpa galat, dan kegagalan /metrics dilaporkan alih-alih dilewati diam-diam.",
+        "verdict": "verified",
+        "confidence": 0.89,
+        "action": "auto"
+      },
+      {
+        "claim": "Baseline lab ulang dengan build 4d31e51: 8 run (4 skenario × konkurensi 8 dan 32) keluar dengan exit 0, tanpa galat, dan histogram server 100% ≤ 0,3 dtk di semua rute; angkanya dicatat di QA §11.1 sebagai baseline lab, bukan bukti produksi.",
+        "verdict": "verified",
+        "confidence": 0.76,
+        "action": "review"
+      },
+      {
+        "claim": "Suite backend lulus dengan -race (13 paket), setiap perbaikan dari review akhir punya test yang gagal lebih dulu, dan 15 mutasi terkompilasi pada perbaikan itu tertangkap.",
+        "verdict": "verified",
+        "confidence": 0.09,
+        "action": "escalate"
+      }
+    ]
+  },
+  "note": "Tidak diajukan ulang (ADR-0018); masuk daftar gate yang menunggu tinjauan pengguna. Klaim 8 (confidence 0,09) lemah karena dua hal: log suite hanya dikirim di kolom tests, bukan sebagai butir evidence (mengulang pelajaran jev-gate-butir-evidence), dan kalimatnya berlebihan, karena dua perbaikan dokumen dari review akhir (path -cards di README dan klaim sebab perlambatan c=32 di QA) tidak punya test, sementara TestRunnerBerhentiSaatContextDibatalkan dan kasus userinfo adalah penjaga regresi yang lulus sejak awal. Pengajuan ulang tidak akan mengubah aksi, karena review patch sendiri tereskalasi (safe_to_apply 0,71, rubrik test_gap 0,46). Rubrik itu sejalan dengan minor yang ditunda: Measure dengan durasi nol, pernyataan rahasia tidak muncul di laporan, dan perilaku token tepat di batas durasi yang tidak dipin test.",
+  "usage": {
+    "input_tokens": 10092,
+    "output_tokens": 398
+  }
+}

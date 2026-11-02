@@ -2,9 +2,9 @@
 // adalah baseline lab, bukan bukti produksi.
 //
 //	go -C backend run ./cmd/anastrophe-loadtest gen-cards -n 5000 [-offset 0] > kartu-beban.csv
-//	go -C backend run ./cmd/anastrophe-registry import --site <uuid> --file kartu-beban.csv --operator lab
+//	go -C backend run ./cmd/anastrophe-registry import --site <uuid> --file "$PWD/kartu-beban.csv" --operator lab
 //	go -C backend run ./cmd/anastrophe-loadtest run -base http://127.0.0.1:8080 -scenario enrol \
-//	    -site <uuid> -cards kartu-beban.csv -duration 20s -concurrency 8 -metrics http://127.0.0.1:9090/metrics
+//	    -site <uuid> -cards "$PWD/kartu-beban.csv" -duration 20s -concurrency 8 -metrics http://127.0.0.1:9090/metrics
 //
 // Skenario: config, lookup (-code), enrol (-site -cards), renew (-site -cards; -prepare kredensial
 // disiapkan lebih dulu tanpa diukur). Hanya host loopback kecuali -allow-remote; redirect tidak diikuti.
