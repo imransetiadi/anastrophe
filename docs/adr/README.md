@@ -60,3 +60,4 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0054](0054-fokus-observabilitas-backend.md) | Fokus berikutnya: observabilitas backend — log akses terstruktur dan metrik (NFR-O01 sebagian) | Diterima | `observability_nfr_o01` | 0.99 |
 | [ADR-0055](0055-fokus-uji-beban-api.md) | Fokus berikutnya: uji beban API dan baseline lab (TC-PERF-05) | Diterima | `uji_beban_api` | 0.95 |
 | [ADR-0056](0056-fokus-pemindaian-secret-dependensi.md) | Fokus berikutnya: pemindaian secret dan dependensi (TC-SEC-11) | Diterima | `pemindaian_secret_dependensi` | 0.93 |
+| [ADR-0057](0057-fokus-audit-aksesibilitas.md) | Fokus berikutnya: audit aksesibilitas app (NFR-A01, TC-UX-01–04/09) | Provisional (ditinjau M2) | `audit_aksesibilitas` | 0.70 |
