@@ -190,4 +190,6 @@ private final class DeleteFailingSecretStore: SecretStore, @unchecked Sendable {
         if key == failingKey { throw ANError.internalError }
         try base.delete(key)
     }
+
+    func deleteAll() throws { try base.deleteAll() }
 }

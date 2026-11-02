@@ -15,6 +15,9 @@ Bahasa domain bersama (*ubiquitous language*) untuk PRD, SDD, QA Suite, kode, da
 | **ACS (panel)** | Access Control System milik operator: memutuskan buka/tolak berdasarkan identitas yang diteruskan reader. | Backend Anastrophe | `AccessControlSystem` |
 | **Kartu fisik** | Kartu/fob plastik yang sudah ada; dipakai **hanya** sebagai bukti kepemilikan saat enrolment. | Kredensial | `PhysicalCard` |
 | **Registri kartu** | Daftar kartu fisik milik gedung (identitas & kontak pemegang dalam bentuk HMAC, zona). | Database kredensial | `CardRegistry` |
+| **Identitas kartu** | Nilai yang dibaca dari kartu fisik saat enrolment (UID ISO 14443A/15693/FeliCa, atau ID aplikasi ISO 7816). Hanya dikirim lewat TLS lalu di-HMAC per gedung; tidak pernah disimpan, dicatat, atau dipakai sebagai faktor autentikasi. | Kredensial | `CardIdentity` |
+| **Perangkat tambahan** | Perangkat yang mendaftarkan kartu fisik yang sudah dipegang perangkat lain. Sebelum ada akun, card instance-nya menunggu persetujuan operator (ADR-0032). | Anggota (setelah akun ada) | — |
+| **Enrolment terbengkalai** | Card instance `PROVISIONING` tanpa kredensial yang melewati 15 menit; menjadi `ABANDONED` dan tidak lagi memakai slot (ADR-0034). | Ditolak operator (`REJECTED`) | `ABANDONED` |
 | **Kartu (digital)** | Hak akses seorang pengguna atas satu kartu fisik/undangan di satu iPhone, seperti yang terlihat di daftar Kunci. Maksimal 8 per perangkat. | Kredensial (satu kartu bisa punya kredensial per kanal) | `CardInstance` |
 | **Kredensial** | Pasangan kunci + sertifikat untuk **satu kanal** dari sebuah kartu digital. Kunci privatnya tidak pernah keluar dari Secure Enclave/SE. | Kartu fisik; pass Wallet | `Credential` |
 | **Sertifikat kredensial** | Pernyataan yang ditandatangani Site CA: `cred_id`, kunci publik, zona, dan masa berlaku (default 7 hari). | Sertifikat TLS | `CredentialCert` |
@@ -39,11 +42,17 @@ Bahasa domain bersama (*ubiquitous language*) untuk PRD, SDD, QA Suite, kode, da
 | Istilah | Definisi | Nama di kode |
 |---|---|---|
 | **Security code** | Kode 6 digit buatan pemegang utama; diverifikasi server dan dibatasi percobaannya (ADR-0005). | `SecurityCode` |
-| **Undangan** | Token sekali pakai dari admin untuk enrolment tanpa kartu fisik. | `Invitation` |
+| **Undangan** | Token sekali pakai dari admin untuk enrolment tanpa kartu fisik (ADR-0033). Bisa diikat ke kartu terdaftar; undangan berkartu sekaligus menyetujui enrolment perangkat itu yang masih menunggu untuk kartu tersebut (ADR-0035). | `Invitation` |
 | **Sengketa klaim** | Laporan pemegang sah bahwa kartunya diklaim orang lain; diputuskan admin (FR-59). | `ClaimDispute` |
-| **Suspend / Resume** | Penangguhan sementara kredensial/pass (pengguna, admin, atau Lost Mode). | `suspend()` / `resume()` |
+| **Suspend / Resume** | Penangguhan sementara kredensial/pass (pengguna, admin, atau Lost Mode). Sebelum portal ada, operator memakai CLI `anastrophe-registry suspend\|resume` (ADR-0036). | `suspend()` / `resume()` |
 | **Revoke (cabut)** | Penonaktifan permanen kredensial; masuk denylist reader. | `revoke()` |
-| **Denylist** | Daftar `cred_id` yang dicabut, disinkronkan ke reader/gateway. | `Denylist` |
+| **Denylist** | Daftar `cred_id` yang dicabut, disinkronkan ke reader/gateway. Ditulis saat pencabutan oleh operator maupun hapus kartu, sampai sertifikatnya kedaluwarsa (ADR-0036). | `Denylist` |
+| **Token baca status** | Token 32 byte per kartu digital yang dibuat app untuk membaca status kartu dari server tanpa Face ID atau passcode; server hanya menyimpan hash-nya (ADR-0037). | `StatusToken` |
+| **Rahasia enrolment** | 32 byte acak yang dibuat app per enrolment dan hanya ada di memori; hash-nya dikirim saat enrolment dan rahasianya membuktikan bahwa provisioning kredensial pertama berasal dari pihak yang melakukan enrolment terakhir untuk instance itu (ADR-0040). Tanpa autentikasi perangkat, pihak yang tahu id perangkat dan identitas kartu masih bisa mengganti hash instance yang belum selesai (ADR-0041). | `ProvisioningSecret` |
+| **Kode gedung** | Kode 8 simbol (Crockford base32, tampil `XXXX-XXXX`) yang diberikan pengelola gedung untuk enrolment kartu fisik dari app; app mencarinya lalu pengguna mengonfirmasi nama gedung sebelum menempel kartu (ADR-0044). Bukan rahasia; rotasi membuat kode lama tidak berlaku. Berbeda dengan `site_code` (8 byte biner di sertifikat) dan token undangan. | `sites.join_code`, `SiteJoinCode` |
+| **Id perangkat** | UUID v4 acak yang dibuat app untuk enrolment; server membuat baris perangkat pada enrolment pertama (ADR-0045). Disimpan di Keychain tanpa ikut backup dan dibuat ulang setelah instal ulang; tidak pernah ditampilkan atau di-log. | `device_id`, `DeviceIdentityStore` |
+| **Kebijakan gedung** | Pengaturan per gedung di `sites.policy`: zona, masa berlaku sertifikat (1–30 hari), dan kanal yang diizinkan; diatur operator lewat `anastrophe-registry policy` (FR-55, ADR-0049). | `sites.policy`, `SitePolicy`, `UpdateSitePolicy` |
+| **Kanal efektif gedung** | Kanal yang benar-benar boleh dipakai untuk kartu baru di sebuah gedung: kanal kebijakan gedung ∩ kanal yang diaktifkan layanan (`/v1/config`). Dikirim di lookup kode gedung dan respons enrolment; kosong berarti enrolment baru tidak bisa diprovisikan. | `effectiveChannels`, `SiteSummary.channels`, `EnrollmentStart.channels` |
 | **Transfer perangkat** | Re-provisioning ke iPhone baru dan pencabutan kredensial lama (ADR-0007). | `DeviceTransfer` |
 | **Perpanjangan** | Penerbitan ulang sertifikat untuk kunci yang sama (FR-45). Hanya setelah autentikasi tap: sertifikat kedaluwarsa diperpanjang sebelum presentasi, sisa < 50% setelah tap (ADR-0023). | `CredentialRenewer`, `RenewalScheduler`, `RenewalPolicy` |
 | **Nonce perpanjangan** | 32 B acak dari server, berlaku 120 dtk, sekali pakai, terikat ke satu kredensial (SDD §8.4.2). | `RenewalChallenge` |
@@ -54,6 +63,9 @@ Bahasa domain bersama (*ubiquitous language*) untuk PRD, SDD, QA Suite, kode, da
 | **Head rantai** | Baris terakhir sebuah rantai `(chain, seq, hash)`, dicatat per jam ke log terpusat sebagai anchor parsial. | `AuditHeads` |
 | **Perlu diperbarui** | Status tampilan kartu aktif dengan sisa masa berlaku < 24 jam atau yang sudah lewat (FR-38, TC-DEV-10). | `CardStatus.needsRenewal`, `Card.displayStatus` |
 | **UNREACHABLE** | Status server untuk kredensial yang perangkatnya tidak lagi melapor (mis. app dihapus). | `.unreachable` |
+| **App Attest** | Layanan Apple (DeviceCheck) yang membuktikan ke server bahwa permintaan datang dari app Anastrophe asli di perangkat Apple asli (NFR-S03, ADR-0052). | `appattest` (backend) |
+| **Attestation (App Attest)** | Objek sekali per kunci App Attest yang ditandatangani rantai sertifikat Apple dan mengikat kunci publik, App ID, dan challenge server. | `appattest.Verifier.VerifyAttestation` |
+| **Assertion (App Attest)** | Tanda tangan kunci App Attest atas data permintaan (`clientData`) dengan penghitung yang terus naik, untuk permintaan sesudah attestation. | `appattest.Verifier.VerifyAssertion` |
 
 ## Protokol & platform
 

@@ -14,13 +14,20 @@ type Config struct {
 	WalletProgramEnabled bool
 }
 
-// Deps berisi layanan yang dipakai handler; diisi bertahap oleh task berikutnya.
+// Deps berisi layanan yang dipakai handler; diisi bertahap oleh task berikutnya. Logger nil = slog.Default().
 type Deps struct {
-	Routes func(mux *http.ServeMux)
+	Routes  func(mux *http.ServeMux)
+	Logger  *slog.Logger
+	Metrics *Metrics // nil = tanpa metrik; diekspos di listener internal, bukan di sini (ADR-0054)
 }
 
-// New mengembalikan handler HTTP lengkap.
+// New mengembalikan handler HTTP lengkap. Urutan middleware: log akses (request id) → recoverer →
+// deadline → pola rute → mux (ADR-0054).
 func New(cfg Config, deps Deps) http.Handler {
+	logger := deps.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -41,7 +48,7 @@ func New(cfg Config, deps Deps) http.Handler {
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		WriteProblem(w, NewProblem("NOT-FOUND", http.StatusNotFound))
 	})
-	return recoverer(withDeadline(mux))
+	return accessLog(logger, deps.Metrics, recoverer(logger, withDeadline(capturePattern(mux))))
 }
 
 // Route mendaftarkan handler untuk satu metode, plus jawaban 405 problem+json untuk metode
@@ -67,14 +74,19 @@ func withDeadline(next http.Handler) http.Handler {
 }
 
 // recoverer mengubah panik menjadi 500 tanpa membocorkan detail ke klien.
-func recoverer(next http.Handler) http.Handler {
+func recoverer(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if v := recover(); v != nil {
 				if v == http.ErrAbortHandler {
 					panic(v) // sinyal net/http untuk memutus koneksi; jangan ditelan
 				}
-				slog.Error("panic in handler", "path", r.URL.Path) // nilai panik tidak di-log: bisa memuat data sensitif
+				route := "/"
+				if info := requestInfoFrom(r.Context()); info != nil {
+					route = info.route()
+				}
+				// Nilai panik dan path mentah tidak di-log: bisa memuat data sensitif atau id (aturan 6).
+				logger.ErrorContext(r.Context(), "panic in handler", "route", route)
 				WriteProblem(w, NewProblem("INTERNAL", http.StatusInternalServerError))
 			}
 		}()

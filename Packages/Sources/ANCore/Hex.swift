@@ -6,9 +6,10 @@ extension Data {
         map { String(format: "%02x", $0) }.joined()
     }
 
-    /// `nil` bila panjang ganjil atau ada karakter non-hex.
+    /// `nil` bila panjang ganjil atau ada karakter non-hex (termasuk tanda `+`/`-`, yang diterima
+    /// `UInt8(_:radix:)`).
     public init?(hexString: String) {
-        guard hexString.count.isMultiple(of: 2) else { return nil }
+        guard hexString.count.isMultiple(of: 2), hexString.allSatisfy(\.isHexDigit) else { return nil }
         var bytes: [UInt8] = []
         bytes.reserveCapacity(hexString.count / 2)
         var index = hexString.startIndex

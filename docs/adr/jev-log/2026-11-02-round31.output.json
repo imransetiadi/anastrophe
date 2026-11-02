@@ -1,0 +1,47 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "deteksi_per_gedung",
+    "escaped": false,
+    "confidence": 0.49,
+    "probabilities": {
+      "catat_gerbang_pra_pilot": 0.33,
+      "deteksi_per_gedung": 0.56,
+      "batas_per_ip": 0,
+      "batas_per_gedung": 0,
+      "ask_user": 0.01,
+      "investigate": 0.02,
+      "none": 0.08
+    },
+    "contradicted_requirements": []
+  },
+  "checks": {
+    "catat_gerbang_pra_pilot": [
+      "unknown",
+      "supported",
+      "supported"
+    ],
+    "deteksi_per_gedung": [
+      "supported",
+      "supported",
+      "supported"
+    ],
+    "batas_per_ip": [
+      "unknown",
+      "supported",
+      "contradicted"
+    ],
+    "batas_per_gedung": [
+      "contradicted",
+      "supported",
+      "unknown"
+    ]
+  },
+  "warnings": [],
+  "usage": {
+    "input_tokens": 3179,
+    "output_tokens": 593
+  }
+}

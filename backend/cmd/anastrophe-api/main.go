@@ -6,6 +6,9 @@
 //	ANASTROPHE_DATABASE_URL     DSN PostgreSQL 16 (wajib)
 //	ANASTROPHE_DEV_SOFTWARE_CA  "1" = Site CA perangkat lunak sementara (HANYA dev/lab;
 //	                            produksi wajib KMS/HSM, belum diimplementasikan)
+//	ANASTROPHE_METRICS_ADDR     alamat listener internal untuk GET /metrics (kosong = tidak dibuat;
+//	                            jangan diekspos ke publik, ADR-0054)
+//	ANASTROPHE_LOG_FORMAT       "json" untuk log terpusat; selain itu teks
 package main
 
 import (
@@ -17,6 +20,7 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -27,6 +31,7 @@ import (
 	"github.com/imransetiadi/anastrophe/backend/internal/certs"
 	"github.com/imransetiadi/anastrophe/backend/internal/enroll"
 	"github.com/imransetiadi/anastrophe/backend/internal/httpapi"
+	"github.com/imransetiadi/anastrophe/backend/internal/registry"
 	"github.com/imransetiadi/anastrophe/backend/internal/store"
 )
 
@@ -38,6 +43,8 @@ func main() {
 }
 
 func run() error {
+	logger := loggerFromEnv(os.Getenv, os.Stderr)
+	slog.SetDefault(logger)
 	ctx := context.Background()
 	dsn := os.Getenv("ANASTROPHE_DATABASE_URL")
 	if dsn == "" {
@@ -45,6 +52,10 @@ func run() error {
 	}
 	if os.Getenv("ANASTROPHE_DEV_SOFTWARE_CA") != "1" {
 		return errors.New("Site CA KMS/HSM belum tersedia; set ANASTROPHE_DEV_SOFTWARE_CA=1 hanya untuk dev/lab")
+	}
+	registryMAC, err := registryFromEnv(os.Getenv)
+	if err != nil {
+		return err
 	}
 	db, err := store.Open(ctx, dsn)
 	if err != nil {
@@ -72,6 +83,7 @@ func run() error {
 		Now:             time.Now,
 		Validity:        7 * 24 * time.Hour,
 		EnabledChannels: enabledChannels,
+		Registry:        registryMAC,
 	}
 	go func() {
 		for range time.Tick(time.Hour) {
@@ -80,10 +92,20 @@ func run() error {
 			} else if n > 0 {
 				slog.Info("purged idempotency keys", "count", n)
 			}
+			if n, err := db.AbandonStaleEnrollments(ctx, time.Now()); err != nil {
+				slog.Error("abandon stale enrollments failed")
+			} else if n > 0 {
+				slog.Info("abandoned stale enrollments", "count", n) // ADR-0034
+			}
 			if n, err := db.PurgeRenewalChallenges(ctx, time.Now()); err != nil {
 				slog.Error("purge renewal challenges failed")
 			} else if n > 0 {
 				slog.Info("purged renewal challenges", "count", n)
+			}
+			if n, err := db.PurgeDenylist(ctx, time.Now()); err != nil {
+				slog.Error("purge denylist failed")
+			} else if n > 0 {
+				slog.Info("purged denylist", "count", n) // sertifikatnya sudah habis
 			}
 			logAuditHeads(ctx, db)
 		}
@@ -92,12 +114,14 @@ func run() error {
 	if addr == "" {
 		addr = ":8080"
 	}
+	metrics := httpapi.NewMetrics()
 	server := &http.Server{
 		Addr:              addr,
 		WriteTimeout:      httpapi.RequestTimeout + 5*time.Second,
-		Handler:           httpapi.New(httpapi.Config{EnabledChannels: enabledChannels}, httpapi.Deps{Routes: handlers.Register}),
+		Handler:           httpapi.New(httpapi.Config{EnabledChannels: enabledChannels}, httpapi.Deps{Routes: handlers.Register, Logger: logger, Metrics: metrics}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
+	metricsServer := newMetricsServer(os.Getenv("ANASTROPHE_METRICS_ADDR"), metrics)
 	// SIGTERM (deploy/failover ADR-0014): berhenti menerima permintaan baru dan tunggu
 	// permintaan berjalan selesai, agar transaksi tidak terputus di tengah.
 	stop := make(chan os.Signal, 1)
@@ -107,14 +131,51 @@ func run() error {
 		slog.Info("listening", "addr", addr)
 		errs <- server.ListenAndServe()
 	}()
+	if metricsServer != nil {
+		go func() {
+			slog.Info("metrics listening", "addr", metricsServer.Addr)
+			if err := metricsServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+				errs <- err
+			}
+		}()
+	}
 	select {
 	case err := <-errs:
 		return err
 	case <-stop:
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), httpapi.RequestTimeout+5*time.Second)
 		defer cancel()
-		return server.Shutdown(shutdownCtx)
+		// Server publik dulu dengan seluruh anggaran, agar transaksi berjalan tidak terputus dan drain tetap
+		// teramati di /metrics; listener metrik menyusul dengan anggarannya sendiri (review akhir ADR-0054).
+		err := server.Shutdown(shutdownCtx)
+		if metricsServer != nil {
+			metricsCtx, cancelMetrics := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancelMetrics()
+			_ = metricsServer.Shutdown(metricsCtx)
+		}
+		return err
 	}
+}
+
+// loggerFromEnv memilih format log (ANASTROPHE_LOG_FORMAT=json untuk log terpusat, selain itu teks) dan
+// membungkusnya agar log dengan context permintaan membawa request_id (ADR-0054).
+func loggerFromEnv(getenv func(string) string, w io.Writer) *slog.Logger {
+	var h slog.Handler = slog.NewTextHandler(w, nil)
+	if getenv("ANASTROPHE_LOG_FORMAT") == "json" {
+		h = slog.NewJSONHandler(w, nil)
+	}
+	return slog.New(httpapi.WithRequestID(h))
+}
+
+// newMetricsServer membuat listener internal yang hanya melayani GET /metrics; nil bila addr kosong.
+func newMetricsServer(addr string, metrics *httpapi.Metrics) *http.Server {
+	if addr == "" {
+		return nil
+	}
+	mux := http.NewServeMux()
+	mux.Handle("GET /metrics", metrics)
+	// Timeout membatasi scraper yang lambat atau macet (review akhir ADR-0054).
+	return &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: time.Minute}
 }
 
 // logAuditHeads memverifikasi setiap rantai audit dan mencatat head-nya ke log terpusat sebagai
@@ -132,4 +193,14 @@ func logAuditHeads(ctx context.Context, db *store.Store) {
 		}
 		slog.Info("audit chain head", "chain", h.Chain, "seq", h.Seq, "hash", hex.EncodeToString(h.Hash))
 	}
+}
+
+// registryFromEnv memberi kunci registri per gedung (ADR-0031). Produksi memakai KMS (belum
+// tersedia); dev/lab memakai ANASTROPHE_DEV_REGISTRY_KEY (32 byte hex). Tanpa kunci, API tidak start.
+func registryFromEnv(getenv func(string) string) (registry.MAC, error) {
+	key := getenv("ANASTROPHE_DEV_REGISTRY_KEY")
+	if key == "" {
+		return nil, errors.New("ANASTROPHE_DEV_REGISTRY_KEY wajib diisi (32 byte hex; KMS registri belum tersedia)")
+	}
+	return registry.NewDevMAC(key)
 }

@@ -1,6 +1,614 @@
 {
   "sourceLanguage": "id",
   "strings": {
+    "add.back": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kembali"
+          }
+        }
+      }
+    },
+    "add.close": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutup"
+          }
+        }
+      }
+    },
+    "add.code.help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "8 letters and numbers from your building management, for example on a lobby poster."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "8 huruf dan angka dari pengelola gedung, misalnya di poster lobi."
+          }
+        }
+      }
+    },
+    "add.code.invalid": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The building code has 8 letters and numbers."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kode gedung terdiri dari 8 huruf dan angka."
+          }
+        }
+      }
+    },
+    "add.code.label": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Building code"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kode gedung"
+          }
+        }
+      }
+    },
+    "add.confirm.caption": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your building"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gedung Anda"
+          }
+        }
+      }
+    },
+    "add.confirm.message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make sure this is your building, then hold your access card near the top of your iPhone."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pastikan ini gedung Anda, lalu tempelkan kartu akses ke bagian atas iPhone."
+          }
+        }
+      }
+    },
+    "add.confirm.read": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap card"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempel kartu"
+          }
+        }
+      }
+    },
+    "add.confirm.wrong_site": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not my building"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bukan gedung saya"
+          }
+        }
+      }
+    },
+    "add.continue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lanjutkan"
+          }
+        }
+      }
+    },
+    "add.done.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your card is ready"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu siap dipakai"
+          }
+        }
+      }
+    },
+    "add.error.channel_unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This feature isn't available on your device or in your region yet."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fitur ini belum tersedia di perangkat atau wilayah Anda."
+          }
+        }
+      }
+    },
+    "add.error.generic": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Something went wrong. Try again."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terjadi kesalahan. Coba lagi."
+          }
+        }
+      }
+    },
+    "add.error.offline": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This step needs an internet connection."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Butuh koneksi internet untuk langkah ini."
+          }
+        }
+      }
+    },
+    "add.error.reader_unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This iPhone can't read physical cards."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone ini tidak bisa membaca kartu fisik."
+          }
+        }
+      }
+    },
+    "add.error.service_unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The service isn't available yet. Try again later."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Layanan belum tersedia. Coba lagi nanti."
+          }
+        }
+      }
+    },
+    "add.error.site_channel_unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The access methods your building allows aren't available on this iPhone yet. Contact your building management."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cara akses yang diizinkan gedung ini belum tersedia di iPhone ini. Hubungi pengelola gedung."
+          }
+        }
+      }
+    },
+    "add.error.site_channels_not_offered": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The access methods your building allows aren't available yet. Contact your building management."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cara akses yang diizinkan gedung ini belum tersedia. Hubungi pengelola gedung."
+          }
+        }
+      }
+    },
+    "add.error.site_code_unknown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We don't recognize this building code. Check the code from your building management."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kode gedung tidak dikenal. Periksa kode dari pengelola gedung."
+          }
+        }
+      }
+    },
+    "add.error.unreadable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your iPhone couldn't read this card."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu tidak dapat dibaca iPhone."
+          }
+        }
+      }
+    },
+    "add.failed.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The card couldn't be added"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu belum bisa ditambahkan"
+          }
+        }
+      }
+    },
+    "add.finish": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selesai"
+          }
+        }
+      }
+    },
+    "add.intro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose how to add your building access card."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pilih cara menambahkan kartu akses gedung Anda."
+          }
+        }
+      }
+    },
+    "add.link.help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste the link from your building management."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempel tautan dari pengelola gedung."
+          }
+        }
+      }
+    },
+    "add.link.invalid": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We don't recognize this invitation link. Check the link again."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tautan undangan tidak dikenali. Periksa lagi tautannya."
+          }
+        }
+      }
+    },
+    "add.link.label": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invitation link"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tautan undangan"
+          }
+        }
+      }
+    },
+    "add.link.submit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add card"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambahkan kartu"
+          }
+        }
+      }
+    },
+    "add.method.card": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap your physical card"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempel kartu fisik"
+          }
+        }
+      }
+    },
+    "add.method.card.detail": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You'll need the building code from your building management."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Butuh kode gedung dari pengelola gedung."
+          }
+        }
+      }
+    },
+    "add.method.invitation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use an invitation link"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pakai tautan undangan"
+          }
+        }
+      }
+    },
+    "add.method.invitation.detail": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From a message or email sent by your building management."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dari pesan atau email pengelola gedung."
+          }
+        }
+      }
+    },
+    "add.pending.message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your building management needs to approve this iPhone. After approval, add the card again by tapping the same card, or ask your building management for an invitation link."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pengelola gedung perlu menyetujui iPhone ini. Setelah disetujui, tambahkan kartu lagi dengan menempelkan kartu yang sama, atau minta tautan undangan dari pengelola."
+          }
+        }
+      }
+    },
+    "add.pending.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for approval"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menunggu persetujuan"
+          }
+        }
+      }
+    },
+    "add.read.multiple": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More than one card detected. Hold just one card."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terdeteksi lebih dari satu kartu. Tempelkan satu kartu saja."
+          }
+        }
+      }
+    },
+    "add.read.prompt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold your access card near the top of your iPhone."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempelkan kartu akses ke bagian atas iPhone."
+          }
+        }
+      }
+    },
+    "add.retry": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coba lagi"
+          }
+        }
+      }
+    },
+    "add.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Access Card"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tambah Kartu Akses"
+          }
+        }
+      }
+    },
+    "add.working": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Setting up your card…"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menyiapkan kartu…"
+          }
+        }
+      }
+    },
     "card.reason.bluetooth_denied": {
       "localizations": {
         "en": {
@@ -593,6 +1201,710 @@
         }
       }
     },
+    "enroll.error.duplicate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This card is already on this iPhone."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu ini sudah ada di iPhone ini."
+          }
+        }
+      }
+    },
+    "enroll.error.invitation_invalid": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This invitation is invalid or has already been used."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undangan tidak berlaku atau sudah dipakai."
+          }
+        }
+      }
+    },
+    "enroll.error.limit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can have up to 8 cards per iPhone."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Maksimal 8 kartu per iPhone."
+          }
+        }
+      }
+    },
+    "enroll.error.not_registered": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This card isn't registered at your building."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu ini belum terdaftar di gedung Anda."
+          }
+        }
+      }
+    },
+    "enroll.error.pending_approval": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for approval from the building manager."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menunggu persetujuan pengelola gedung."
+          }
+        }
+      }
+    },
+    "enroll.error.pending_limit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This card already has several requests waiting for your building management. Contact your building management."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu ini sudah punya beberapa permintaan yang menunggu pengelola gedung. Hubungi pengelola gedung."
+          }
+        }
+      }
+    },
+    "enroll.error.site_unsupported": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This building doesn't support adding cards with a physical card yet. Ask your building management for an invitation link."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gedung ini belum memakai pendaftaran dengan kartu fisik. Minta tautan undangan dari pengelola gedung."
+          }
+        }
+      }
+    },
+    "help.channel.available": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tersedia"
+          }
+        }
+      }
+    },
+    "help.channel.bluetooth_denied": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow Bluetooth in Settings"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Izinkan Bluetooth di Pengaturan"
+          }
+        }
+      }
+    },
+    "help.channel.bluetooth_off": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bluetooth is off"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bluetooth mati"
+          }
+        }
+      }
+    },
+    "help.channel.not_yet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not available yet"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum tersedia"
+          }
+        }
+      }
+    },
+    "help.channel.unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not available on this iPhone or in this region yet"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum tersedia di iPhone atau wilayah ini"
+          }
+        }
+      }
+    },
+    "help.channel.unsupported_device": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not supported on this iPhone"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak didukung iPhone ini"
+          }
+        }
+      }
+    },
+    "help.devices.list": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone 11 and later, plus iPhone SE (2nd and 3rd generation), running iOS 26 or later."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone 11 dan yang lebih baru, serta iPhone SE generasi 2 dan 3, dengan iOS 26 atau lebih baru."
+          }
+        }
+      }
+    },
+    "help.devices.note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“Hold near reader” is only available in some regions and when your building supports it. Bluetooth works in every supported region."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“Tempel ke pembaca” hanya tersedia di wilayah tertentu dan bila gedung Anda mendukungnya. Bluetooth tersedia di semua wilayah yang didukung."
+          }
+        }
+      }
+    },
+    "help.diagnostics.note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The report contains the app and iOS versions, language and region, storage and service status, access method status, and the number, status, access methods, and validity dates of your cards. It doesn't include keys, secret codes, card identities, or card names."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laporan berisi versi app dan iOS, bahasa dan wilayah, status penyimpanan dan layanan, status cara akses, serta jumlah, status, cara akses, dan masa berlaku kartu. Laporan tidak memuat kunci, kode rahasia, identitas kartu, atau nama kartu."
+          }
+        }
+      }
+    },
+    "help.diagnostics.share": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share diagnostic report"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bagikan laporan diagnostik"
+          }
+        }
+      }
+    },
+    "help.faq.cards.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Building access cards that your building management has registered with Anastrophe. You hold your physical card to your iPhone once to prove it's yours; Anastrophe doesn't copy your physical card. If the card can't be read (for example a 125 kHz card) or isn't registered, ask your building management for an invitation link."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu akses gedung yang sudah didaftarkan pengelola gedung di Anastrophe. Kartu fisik hanya ditempelkan sekali untuk membuktikan bahwa kartu itu milik Anda; Anastrophe tidak menyalin kartu fisik. Bila kartu tidak terbaca (misalnya kartu 125 kHz) atau belum terdaftar, minta tautan undangan dari pengelola gedung."
+          }
+        }
+      }
+    },
+    "help.faq.cards.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Which cards can I add?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu apa yang bisa ditambahkan?"
+          }
+        }
+      }
+    },
+    "help.faq.delete.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the card details, tap “Delete card”, then confirm. Access through this iPhone is revoked; your physical card isn't affected."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buka detail kartu, ketuk “Hapus kartu”, lalu konfirmasi. Akses lewat iPhone ini dicabut; kartu fisik Anda tidak terpengaruh."
+          }
+        }
+      }
+    },
+    "help.faq.delete.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How do I delete a card?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bagaimana cara menghapus kartu?"
+          }
+        }
+      }
+    },
+    "help.faq.devices.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone 11 and later, plus iPhone SE (2nd and 3rd generation), running iOS 26 or later. “Hold near reader” is only available in some regions and when your building supports it; Bluetooth works in every supported region. See “Access methods on this iPhone” above."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone 11 dan yang lebih baru, serta iPhone SE generasi 2 dan 3, dengan iOS 26 atau lebih baru. “Tempel ke pembaca” hanya tersedia di wilayah tertentu dan bila gedung Anda mendukungnya; Bluetooth bisa dipakai di semua wilayah yang didukung. Lihat “Cara akses di iPhone ini” di atas."
+          }
+        }
+      }
+    },
+    "help.faq.devices.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Which iPhones are supported?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone apa saja yang didukung?"
+          }
+        }
+      }
+    },
+    "help.faq.limit.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up to 8 cards per iPhone. Delete a card you no longer use to add a new one."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hingga 8 kartu per iPhone. Hapus kartu yang tidak dipakai lagi untuk menambah kartu baru."
+          }
+        }
+      }
+    },
+    "help.faq.limit.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How many cards can I keep?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Berapa banyak kartu yang bisa saya simpan?"
+          }
+        }
+      }
+    },
+    "help.faq.lockedScreen.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No. Cards in the app can't be used while your iPhone is locked, the screen is off, or the battery is empty. Open the app, choose a card, then confirm with Face ID, Touch ID, or your passcode."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak. Kartu di app tidak bisa dipakai saat iPhone terkunci, layar mati, atau baterai habis. Buka app, pilih kartu, lalu konfirmasi dengan Face ID, Touch ID, atau kode sandi."
+          }
+        }
+      }
+    },
+    "help.faq.lockedScreen.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can I use a card while my iPhone is locked?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bisakah kartu dipakai saat iPhone terkunci?"
+          }
+        }
+      }
+    },
+    "help.faq.lost.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cards in the app can't be used without unlocking the iPhone and authenticating. Contact your building management right away so they can suspend or revoke the card. Erasing the iPhone, for example with Find My, also removes the cards from it."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu di app tidak bisa dipakai tanpa membuka kunci iPhone dan autentikasi. Segera hubungi pengelola gedung agar kartu ditangguhkan atau dicabut. Menghapus isi iPhone, misalnya lewat Lacak, juga menghapus kartu dari iPhone itu."
+          }
+        }
+      }
+    },
+    "help.faq.lost.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What if I lose my iPhone?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bagaimana bila iPhone saya hilang?"
+          }
+        }
+      }
+    },
+    "help.faq.members.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everyone adds the card on their own iPhone. If the same card is already on another iPhone, your building management needs to approve the additional iPhone, or can send an invitation link."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Setiap orang menambahkan kartu di iPhone-nya sendiri. Bila kartu yang sama sudah ada di iPhone lain, pengelola gedung perlu menyetujui iPhone tambahan, atau bisa mengirim tautan undangan."
+          }
+        }
+      }
+    },
+    "help.faq.members.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can family members use the same card?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bisakah anggota keluarga memakai kartu yang sama?"
+          }
+        }
+      }
+    },
+    "help.faq.offline.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes, as long as the card is still valid. Cards work without mobile data or Wi-Fi, and they're renewed automatically when you use them while your iPhone is connected to the internet. If you don't use a card with an internet connection for a long time, it expires and works again only after your iPhone connects. So use your card while connected to the internet at least every few days."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ya, selama kartu masih berlaku. Kartu bisa dipakai tanpa data seluler atau Wi-Fi, dan diperbarui otomatis saat dipakai ketika iPhone terhubung ke internet. Bila lama tidak dipakai dengan internet, kartu kedaluwarsa dan baru bisa dipakai lagi setelah iPhone terhubung. Jadi, pakai kartu saat iPhone terhubung ke internet setidaknya setiap beberapa hari."
+          }
+        }
+      }
+    },
+    "help.faq.offline.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Do cards work without internet?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apakah kartu bisa dipakai tanpa internet?"
+          }
+        }
+      }
+    },
+    "help.faq.sharing.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No. Cards are tied to this iPhone and can't be shared with other people."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak. Kartu terikat ke iPhone ini dan tidak bisa dibagikan ke orang lain."
+          }
+        }
+      }
+    },
+    "help.faq.sharing.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can I share or forward a card?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bisakah kartu dibagikan atau diteruskan?"
+          }
+        }
+      }
+    },
+    "help.faq.transfer.answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cards don't move to a new iPhone through iCloud backup. If you still have your old iPhone, delete the card there first (you need an internet connection), then add the card on your new iPhone. If the card is still on another iPhone, for example because your old iPhone was lost, your building management needs to approve the new iPhone."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartu tidak ikut pindah lewat cadangan iCloud. Bila iPhone lama masih ada, hapus kartu di sana lebih dulu (butuh internet), lalu tambahkan kartu di iPhone baru. Bila kartu masih ada di iPhone lain, misalnya karena iPhone lama hilang, pengelola gedung perlu menyetujui iPhone baru."
+          }
+        }
+      }
+    },
+    "help.faq.transfer.question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What if I get a new iPhone?"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bagaimana bila saya ganti iPhone?"
+          }
+        }
+      }
+    },
+    "help.section.channels": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Access methods on this iPhone"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cara akses di iPhone ini"
+          }
+        }
+      }
+    },
+    "help.section.devices": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supported iPhones"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone yang didukung"
+          }
+        }
+      }
+    },
+    "help.section.diagnostics": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostics"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostik"
+          }
+        }
+      }
+    },
+    "help.section.faq": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frequently asked questions"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pertanyaan umum"
+          }
+        }
+      }
+    },
+    "help.section.support": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Support"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dukungan"
+          }
+        }
+      }
+    },
+    "help.support.text": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For cards and building access, contact your building management."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Untuk kartu dan akses gedung, hubungi pengelola gedung Anda."
+          }
+        }
+      }
+    },
+    "help.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Help"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bantuan"
+          }
+        }
+      }
+    },
     "history.reason.expired": {
       "localizations": {
         "en": {
@@ -694,13 +2006,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Add card"
+            "value": "Add access card"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tambah kartu"
+            "value": "Tambah kartu akses"
           }
         }
       }
@@ -733,6 +2045,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Belum ada kartu"
+          }
+        }
+      }
+    },
+    "keys.help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Help"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bantuan"
           }
         }
       }

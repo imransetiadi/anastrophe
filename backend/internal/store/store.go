@@ -155,18 +155,11 @@ func (t *Tx) StartEnrollment(ctx context.Context, deviceID, siteID string, at ti
 func addCardInstance(ctx context.Context, tx pgx.Tx, deviceID, siteID string) (id, device, site string, err error) {
 	id = newUUID()
 	err = func() error {
-		var locked string
 		if !looksLikeUUID(deviceID) || !looksLikeUUID(siteID) {
 			return ErrNotFound
 		}
-		if err := tx.QueryRow(ctx, `SELECT id FROM devices WHERE id = $1 FOR UPDATE`, deviceID).Scan(&locked); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrNotFound
-			}
-			return err
-		}
-		var active int
-		if err := tx.QueryRow(ctx, `SELECT count(*) FROM card_instances WHERE device_id = $1 AND status = ANY($2)`, deviceID, activeStatuses).Scan(&active); err != nil {
+		_, active, err := lockDevice(ctx, tx, deviceID)
+		if err != nil {
 			return err
 		}
 		if active >= MaxActiveCardsPerDevice {
@@ -229,12 +222,16 @@ type Enrollment struct {
 	SiteID   string
 	SiteName string
 	SiteCode []byte
-	// Zones dan ZonesBitmap berasal dari sites.policy. Tanpa kebijakan zona, bitmap = 0
-	// (fail-closed: sertifikat tidak membuka zona mana pun).
+	// Zones dan ZonesBitmap berasal dari kartu terdaftar bila card instance tertaut (FR-52), selain itu
+	// dari sites.policy. Tanpa bitmap, nilainya 0 (fail-closed: sertifikat tidak membuka zona mana pun).
 	Zones       []string
 	ZonesBitmap uint64
 	// CertValidityDays dari sites.policy (ADR-0010: 1–30); 0 = pakai default.
 	CertValidityDays int
+	// ProvisioningKeyHash: SHA-256 rahasia enrolment (ADR-0040); nil setelah kredensial pertama.
+	ProvisioningKeyHash []byte
+	// Channels: kanal yang diizinkan kebijakan gedung (ADR-0049); nil = semua kanal global.
+	Channels []string
 }
 
 // Credential yang diterbitkan untuk satu kanal.
@@ -253,7 +250,12 @@ var ErrNotProvisionable = errors.New("store: card instance tidak dapat diprovisi
 // Tx adalah transaksi yang memegang advisory lock idempotency. Semua kerja satu permintaan
 // berjalan di koneksi ini, sehingga permintaan tidak pernah butuh koneksi kedua (review C1)
 // dan hasilnya ter-commit atomik bersama baris idempotency (review I1).
-type Tx struct{ tx pgx.Tx }
+type Tx struct {
+	tx pgx.Tx
+	// deferring dan pending: event audit yang ditahan sampai flushAudits (ADR-0051).
+	deferring bool
+	pending   []AuditEvent
+}
 
 // EnrollmentForUpdate membaca card instance dan mengunci barisnya sampai transaksi selesai.
 func (t *Tx) EnrollmentForUpdate(ctx context.Context, id string) (Enrollment, error) {
@@ -263,22 +265,42 @@ func (t *Tx) EnrollmentForUpdate(ctx context.Context, id string) (Enrollment, er
 	var e Enrollment
 	var zones []string
 	var bitmap, validity *string
+	var cardBitmap, invitationBitmap *int64
 	err := t.tx.QueryRow(ctx, `
 		SELECT ci.id, ci.status, ci.device_id, s.id, s.name, s.site_code,
-		       COALESCE(ARRAY(SELECT jsonb_array_elements_text(s.policy -> 'zones')), '{}'),
+		       `+zonesSQL("s.policy")+`,
 		       s.policy ->> 'zones_bitmap',
-		       s.policy ->> 'cert_validity_days'
+		       s.policy ->> 'cert_validity_days',
+		       pc.zones_bitmap,
+		       inv.zones_bitmap,
+		       ci.provisioning_key_hash,
+		       `+sitePolicyChannelsSQL+`
 		FROM card_instances ci JOIN sites s ON s.id = ci.site_id
+		LEFT JOIN physical_cards pc ON pc.id = ci.physical_card_id
+		LEFT JOIN invitations inv ON inv.id = ci.invitation_id
 		WHERE ci.id = $1
-		FOR UPDATE OF ci`, id).Scan(&e.ID, &e.Status, &e.DeviceID, &e.SiteID, &e.SiteName, &e.SiteCode, &zones, &bitmap, &validity)
+		FOR UPDATE OF ci`, id).Scan(&e.ID, &e.Status, &e.DeviceID, &e.SiteID, &e.SiteName, &e.SiteCode, &zones, &bitmap, &validity, &cardBitmap, &invitationBitmap, &e.ProvisioningKeyHash, &e.Channels)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Enrollment{}, ErrNotFound
 	}
 	if err != nil {
 		return Enrollment{}, err
 	}
-	e.applyPolicy(zones, bitmap, validity)
+	e.applyZones(zones, bitmap, validity, cardBitmap, invitationBitmap)
 	return e, nil
+}
+
+// applyZones mengisi zona dan masa berlaku untuk penerbitan maupun perpanjangan: kartu terdaftar
+// menentukan zona bila card instance tertaut (FR-52), lalu undangan tanpa kartu, selain itu sites.policy. Satu helper untuk
+// EnrollmentForUpdate dan CredentialForRenewal agar keduanya tidak menyimpang (review registri C1).
+func (e *Enrollment) applyZones(zones []string, policyBitmap, validity *string, cardBitmap, invitationBitmap *int64) {
+	e.applyPolicy(zones, policyBitmap, validity)
+	switch {
+	case cardBitmap != nil:
+		e.applyCardZones(zones, uint64(*cardBitmap))
+	case invitationBitmap != nil:
+		e.applyCardZones(zones, uint64(*invitationBitmap)) // undangan tanpa kartu (ADR-0033)
+	}
 }
 
 // applyPolicy mengisi zona dan masa berlaku dari sites.policy (fail-closed: tanpa bitmap = 0).
@@ -363,10 +385,13 @@ func (s *Store) PurgeRenewalChallenges(ctx context.Context, before time.Time) (i
 type RevokedCredential struct {
 	CredID  []byte
 	Channel string
+	// NotAfter: masa berlaku terpanjang yang pernah diterbitkan (batas denylist, review M3).
+	NotAfter time.Time
 }
 
 // RevokeCard menandai nonce terpakai, lalu mencabut semua kredensial ACTIVE kartu dan card
-// instance-nya dalam transaksi pemanggil (hapus kartu, ADR-0026). Slot batas 8 kartu terbebas.
+// instance-nya dalam transaksi pemanggil (hapus kartu, ADR-0026). Slot batas 8 kartu terbebas, dan
+// kredensialnya masuk denylist seperti pencabutan oleh operator.
 func (t *Tx) RevokeCard(ctx context.Context, cardID string, nonce []byte, reason string, now time.Time) ([]RevokedCredential, error) {
 	tag, err := t.tx.Exec(ctx, `UPDATE renewal_challenges SET used_at = $2 WHERE nonce = $1 AND used_at IS NULL`, nonce, now)
 	if err != nil {
@@ -375,30 +400,7 @@ func (t *Tx) RevokeCard(ctx context.Context, cardID string, nonce []byte, reason
 	if tag.RowsAffected() != 1 {
 		return nil, ErrNotRenewable
 	}
-	rows, err := t.tx.Query(ctx, `
-		UPDATE credentials SET status = 'REVOKED', revoked_at = $2, revoke_reason = $3
-		WHERE card_instance_id = $1 AND status IN ('ACTIVE', 'SUSPENDED')
-		RETURNING cred_id, channel`, cardID, now, reason)
-	if err != nil {
-		return nil, err
-	}
-	var revoked []RevokedCredential
-	for rows.Next() {
-		var r RevokedCredential
-		if err := rows.Scan(&r.CredID, &r.Channel); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		revoked = append(revoked, r)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	if _, err := t.tx.Exec(ctx, `UPDATE card_instances SET status = 'REVOKED' WHERE id = $1`, cardID); err != nil {
-		return nil, err
-	}
-	return revoked, nil
+	return t.revokeInstance(ctx, cardID, reason, now)
 }
 
 // CredentialCert membaca sertifikat dan masa berlaku yang tersimpan (diagnostik dan test).
@@ -418,17 +420,22 @@ func (t *Tx) CredentialForRenewal(ctx context.Context, credID []byte) (Renewable
 	var c RenewableCredential
 	var zones []string
 	var bitmap, validity *string
+	var cardBitmap, invitationBitmap *int64
 	err := t.tx.QueryRow(ctx, `
 		SELECT c.id, c.channel, c.status, c.cred_id, c.pubkey, ci.id, ci.status, ci.device_id, s.id, s.name, s.site_code,
-		       COALESCE(ARRAY(SELECT jsonb_array_elements_text(s.policy -> 'zones')), '{}'),
+		       `+zonesSQL("s.policy")+`,
 		       s.policy ->> 'zones_bitmap',
-		       s.policy ->> 'cert_validity_days'
+		       s.policy ->> 'cert_validity_days',
+		       pc.zones_bitmap,
+		       inv.zones_bitmap
 		FROM credentials c
 		JOIN card_instances ci ON ci.id = c.card_instance_id
 		JOIN sites s ON s.id = ci.site_id
+		LEFT JOIN physical_cards pc ON pc.id = ci.physical_card_id
+		LEFT JOIN invitations inv ON inv.id = ci.invitation_id
 		WHERE c.cred_id = $1
 		FOR NO KEY UPDATE OF c`, credID).Scan(&c.ID, &c.Channel, &c.Status, &c.CredID, &c.PubKey, &c.Site.ID, &c.CardStatus, &c.Site.DeviceID,
-		&c.Site.SiteID, &c.Site.SiteName, &c.Site.SiteCode, &zones, &bitmap, &validity)
+		&c.Site.SiteID, &c.Site.SiteName, &c.Site.SiteCode, &zones, &bitmap, &validity, &cardBitmap, &invitationBitmap)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return RenewableCredential{}, ErrNotFound
 	}
@@ -436,7 +443,7 @@ func (t *Tx) CredentialForRenewal(ctx context.Context, credID []byte) (Renewable
 		return RenewableCredential{}, err
 	}
 	c.Site.Status = c.CardStatus
-	c.Site.applyPolicy(zones, bitmap, validity)
+	c.Site.applyZones(zones, bitmap, validity, cardBitmap, invitationBitmap)
 	return c, nil
 }
 
@@ -463,7 +470,7 @@ func (t *Tx) CompleteRenewal(ctx context.Context, credentialID string, nonce, ce
 	if tag.RowsAffected() != 1 {
 		return ErrNotRenewable
 	}
-	_, err = t.tx.Exec(ctx, `UPDATE credentials SET cert = $2, not_after = $3 WHERE id = $1`, credentialID, cert, notAfter)
+	_, err = t.tx.Exec(ctx, `UPDATE credentials SET cert = $2, not_after = $3, max_not_after = GREATEST(COALESCE(max_not_after, not_after), $3) WHERE id = $1`, credentialID, cert, notAfter)
 	return err
 }
 
@@ -498,14 +505,15 @@ func (t *Tx) HasActiveCredential(ctx context.Context, cardInstanceID, channel st
 // SaveCredential menyimpan kredensial dan mengaktifkan card instance (hanya dari
 // PROVISIONING atau ACTIVE). Indeks unik parsial menolak kredensial aktif kedua per kanal.
 func (t *Tx) SaveCredential(ctx context.Context, c Credential) error {
-	tag, err := t.tx.Exec(ctx, `UPDATE card_instances SET status = 'ACTIVE' WHERE id = $1 AND status IN ('PROVISIONING', 'ACTIVE')`, c.CardInstanceID)
+	// Rahasia enrolment hanya untuk kredensial pertama (ADR-0040), jadi hash-nya dihapus di sini.
+	tag, err := t.tx.Exec(ctx, `UPDATE card_instances SET status = 'ACTIVE', provisioning_key_hash = NULL WHERE id = $1 AND status IN ('PROVISIONING', 'ACTIVE')`, c.CardInstanceID)
 	if err != nil {
 		return err
 	}
 	if tag.RowsAffected() != 1 {
 		return ErrNotProvisionable
 	}
-	_, err = t.tx.Exec(ctx, `INSERT INTO credentials (id, card_instance_id, channel, cred_id, pubkey, cert, not_after) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+	_, err = t.tx.Exec(ctx, `INSERT INTO credentials (id, card_instance_id, channel, cred_id, pubkey, cert, not_after, max_not_after) VALUES ($1, $2, $3, $4, $5, $6, $7, $7)`,
 		newUUID(), c.CardInstanceID, c.Channel, c.CredID, c.PubKey, c.Cert, c.NotAfter)
 	return err
 }

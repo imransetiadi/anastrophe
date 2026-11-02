@@ -30,9 +30,11 @@ type SeedInput struct {
 type SeedOutput struct {
 	SiteID   string `json:"site_id"`
 	DeviceID string `json:"device_id"`
+	// JoinCode: kode gedung lab XXXX-XXXX untuk alur Tambah Kartu (ADR-0044); kosong untuk -new-device.
+	JoinCode string `json:"join_code,omitempty"`
 }
 
-// SeedLab membuat organisasi, gedung (dengan kebijakan zona), reader group, dan satu
+// SeedLab membuat organisasi, gedung (dengan kebijakan zona dan kode gedung), reader group, dan satu
 // perangkat dalam satu transaksi.
 func (s *Store) SeedLab(ctx context.Context, in SeedInput) (SeedOutput, error) {
 	zones := in.Zones
@@ -43,14 +45,15 @@ func (s *Store) SeedLab(ctx context.Context, in SeedInput) (SeedOutput, error) {
 	if err != nil {
 		return SeedOutput{}, err
 	}
-	out := SeedOutput{SiteID: newUUID(), DeviceID: newUUID()}
+	joinCode := newJoinCode()
+	out := SeedOutput{SiteID: newUUID(), DeviceID: newUUID(), JoinCode: FormatJoinCode(joinCode)}
 	orgID := newUUID()
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `INSERT INTO organizations (id, name, region) VALUES ($1, $2, 'ID')`, orgID, in.OrgName); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO sites (id, org_id, name, country, timezone, site_code, policy) VALUES ($1, $2, $3, 'ID', 'Asia/Jakarta', $4, $5::jsonb)`,
-			out.SiteID, orgID, in.SiteName, in.SiteCode, string(policy)); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO sites (id, org_id, name, country, timezone, site_code, policy, join_code) VALUES ($1, $2, $3, 'ID', 'Asia/Jakarta', $4, $5::jsonb, $6)`,
+			out.SiteID, orgID, in.SiteName, in.SiteCode, string(policy), joinCode); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO reader_groups (id, site_id, pubkey) VALUES ($1, $2, $3)`, in.GroupID, out.SiteID, in.GroupKey); err != nil {

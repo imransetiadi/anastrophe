@@ -1,5 +1,6 @@
 import ANCore
 import Foundation
+import SwiftData
 import Testing
 @testable import ANStorage
 
@@ -12,6 +13,7 @@ struct FailingSecretStore: SecretStore {
     func set(_ data: Data, for key: String, accessibility: SecretAccessibility) throws { throw ANError.internalError }
     func get(_ key: String) throws -> Data? { throw ANError.internalError }
     func delete(_ key: String) throws { throw ANError.internalError }
+    func deleteAll() throws { throw ANError.internalError }
 }
 
 func temporaryDirectory() -> URL {
@@ -20,6 +22,25 @@ func temporaryDirectory() -> URL {
 
 @Suite("Metadata kartu (SDD §5.3, FR-15, FR-38)")
 struct CardStoreTests {
+    @Test func barisKartuTakTerbacaMembuatAllGagal() async throws {
+        // Kontrak yang diandalkan sapu riwayat: all() gagal, bukan mengembalikan daftar sebagian.
+        let directory = temporaryDirectory()
+        let card = makeCard("Lobi")
+        do {
+            let store = try SwiftDataCardStore(directory: directory)
+            try await store.add(card)
+            try await store.add(makeCard("Parkir"))
+        }
+        do {
+            let configuration = ModelConfiguration(schema: Schema([CardEntity.self]), url: directory.appending(path: "cards.store"), cloudKitDatabase: .none)
+            let context = ModelContext(try ModelContainer(for: CardEntity.self, configurations: configuration))
+            try context.fetch(FetchDescriptor<CardEntity>()).first { $0.name == card.name }?.statusRaw = "status-masa-depan"
+            try context.save()
+        }
+        let reopened = try SwiftDataCardStore(directory: directory)
+        await #expect(throws: ANError.invalidData) { try await reopened.all() }
+    }
+
     @Test func kartuKesembilanDitolak() async throws {
         let store = try SwiftDataCardStore(directory: temporaryDirectory())
         for i in 1...8 { try await store.add(makeCard("Kartu \(i)")) }
@@ -87,5 +108,21 @@ struct CardStoreTests {
         let keys = DeviceKeyStore(store: InMemorySecretStore(), factory: SoftwareKeyFactory())
         let card = makeCard("Kantor", credentials: [.ble: Data(repeating: 0x06, count: 16)], status: status)
         #expect(RestoreCheck.reconcile([card], keys: keys).first?.status == status)
+    }
+
+    @Test func pembaruanTerarahMemakaiNilaiTerbaru() async throws {
+        // Review akhir siklus hidup M4: penulis lain (mis. perpanjangan) tidak tertimpa salinan basi.
+        let store = try SwiftDataCardStore(directory: temporaryDirectory())
+        let card = Card(id: UUID(), name: "Gedung", siteName: "Gedung", zones: [], status: .active, credentials: [:], notAfter: nil)
+        try await store.add(card)
+        var renewed = card
+        renewed.notAfter = Date(timeIntervalSince1970: 1_800_000_000)
+        try await store.update(renewed)
+        let changed = try await store.update(id: card.id) { current in
+            current.status = .suspended
+            return true
+        }
+        let stored = try #require(try await store.all().first)
+        #expect(changed && stored.status == .suspended && stored.notAfter == renewed.notAfter)
     }
 }

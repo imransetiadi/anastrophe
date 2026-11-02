@@ -1,0 +1,88 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "status_read_token",
+    "escaped": false,
+    "confidence": 0.96,
+    "probabilities": {
+      "status_read_token": 0.97,
+      "signed_status_on_user_action": 0,
+      "challenge_reports_status": 0,
+      "renewal_time_only": 0,
+      "ask_user": 0,
+      "investigate": 0,
+      "none": 0.03
+    },
+    "contradicted_requirements": []
+  },
+  "requirements_checked": 3,
+  "checks": [
+    {
+      "candidate": "status_read_token",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "status_read_token",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "status_read_token",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "signed_status_on_user_action",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "signed_status_on_user_action",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "signed_status_on_user_action",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "challenge_reports_status",
+      "requirement": 0,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "challenge_reports_status",
+      "requirement": 1,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "challenge_reports_status",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "renewal_time_only",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "renewal_time_only",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "renewal_time_only",
+      "requirement": 2,
+      "answer": "contradicted"
+    }
+  ],
+  "warnings": [],
+  "usage": {
+    "input_tokens": 3532,
+    "output_tokens": 596
+  }
+}

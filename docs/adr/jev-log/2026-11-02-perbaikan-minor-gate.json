@@ -1,0 +1,81 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "action": "escalate",
+  "label": "perbaikan-minor-plan-close-gate",
+  "request": "Close the hardening plan 2026-11-02-perbaikan-minor (ADR-0042) plus its final-review fix pass.",
+  "reason_codes": [
+    "confidence_below_review",
+    "review_escalated",
+    "claim_confidence_low"
+  ],
+  "review": {
+    "safe_to_apply": 0.57,
+    "composite": 0.731,
+    "limiting_rubrics": [
+      "spec_match"
+    ],
+    "scores": {
+      "correctness": 1.78,
+      "spec_match": 1.6,
+      "test_gap": 0.22,
+      "blast_radius": 1.98
+    }
+  },
+  "verification": {
+    "verified": 7,
+    "contradicted": 0,
+    "unsupported": 0,
+    "needs_review": 1,
+    "results": [
+      {
+        "claim": "Go suite 10/10 ok",
+        "verdict": "verified",
+        "confidence": 0.92,
+        "action": "auto"
+      },
+      {
+        "claim": "Swift host 288, simulator TEST SUCCEEDED 286",
+        "verdict": "verified",
+        "confidence": 1.0,
+        "action": "auto"
+      },
+      {
+        "claim": "Guarded resume: old instance before, new PROVISIONING after (card and invitation)",
+        "verdict": "verified",
+        "confidence": 0.42,
+        "action": "escalate"
+      },
+      {
+        "claim": "Renewal locks instance before credential (55P03 before, pass after)",
+        "verdict": "verified",
+        "confidence": 0.83,
+        "action": "auto"
+      },
+      {
+        "claim": "Denylist lasts until longest certificate; purge only past rows",
+        "verdict": "verified",
+        "confidence": 0.91,
+        "action": "auto"
+      },
+      {
+        "claim": "Refresher no whole-card writes (fullWrites 0)",
+        "verdict": "verified",
+        "confidence": 0.85,
+        "action": "auto"
+      },
+      {
+        "claim": "check_docs 0",
+        "verdict": "verified",
+        "confidence": 1.0,
+        "action": "auto"
+      }
+    ]
+  },
+  "note": "Klaim resume kurang bukti eksplisit untuk keadaan sesudah (hanya 'semua lulus'). Tidak diajukan ulang (ADR-0018).",
+  "usage": {
+    "input_tokens": 4068,
+    "output_tokens": 358
+  }
+}

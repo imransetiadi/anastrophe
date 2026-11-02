@@ -69,7 +69,7 @@ func (h *Handler) renewalChallenge(w http.ResponseWriter, r *http.Request, credI
 	case errors.Is(err, store.ErrNotRenewable):
 		httpapi.WriteProblem(w, problem("CRED-NOT-RENEWABLE", http.StatusConflict))
 	case err != nil:
-		slog.Error("renewal challenge failed", "err_type", errorType(err))
+		slog.ErrorContext(r.Context(), "renewal challenge failed", "err_type", errorType(err))
 		httpapi.WriteProblem(w, problem("INTERNAL", http.StatusInternalServerError))
 	default:
 		out, _ := json.Marshal(struct {
@@ -94,41 +94,49 @@ func (h *Handler) renewCredential(w http.ResponseWriter, r *http.Request, credID
 		return
 	}
 	var raw struct {
-		Nonce     string `json:"nonce"`
-		Signature string `json:"signature"`
+		Nonce           string  `json:"nonce"`
+		Signature       string  `json:"signature"`
+		StatusTokenHash *string `json:"status_token_hash"`
 	}
 	nonce, errNonce := []byte(nil), error(nil)
 	sig, errSig := []byte(nil), error(nil)
+	tokenOK := false
+	var tokenHash []byte
 	if err := json.Unmarshal(body, &raw); err == nil {
 		nonce, errNonce = base64.StdEncoding.DecodeString(raw.Nonce)
 		sig, errSig = base64.StdEncoding.DecodeString(raw.Signature)
+		tokenHash, tokenOK = parseHashField(raw.StatusTokenHash)
 	} else {
 		errNonce = err
 	}
-	if errNonce != nil || errSig != nil || len(nonce) != 32 || len(sig) != 64 {
+	if errNonce != nil || errSig != nil || !tokenOK || len(nonce) != 32 || len(sig) != 64 {
 		httpapi.WriteProblem(w, problem("REQ-INVALID", http.StatusBadRequest))
 		return
 	}
-	hash := sha256.Sum256([]byte(r.URL.Path + "\n" + raw.Nonce + "\n" + raw.Signature))
+	material := r.URL.Path + "\n" + raw.Nonce + "\n" + raw.Signature
+	if tokenHash != nil {
+		material += "\n" + base64.StdEncoding.EncodeToString(tokenHash)
+	}
+	hash := sha256.Sum256([]byte(material))
 	status, resp, err := h.Store.Idempotent(r.Context(), key, hash[:], func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
-		return h.renew(ctx, tx, credID, nonce, sig)
+		return h.renew(ctx, tx, credID, nonce, sig, tokenHash)
 	})
-	h.writeResult(w, status, resp, err, "renew credential failed")
+	h.writeResult(w, r, status, resp, err, "renew credential failed")
 }
 
 // renew: urutan cek SDD §8.4.2 dalam satu transaksi. Jalur gagal tidak menulis apa pun,
 // karena Idempotent meng-commit respons < 500.
-func (h *Handler) renew(ctx context.Context, tx *store.Tx, credID, nonce, sig []byte) (int, []byte, error) {
+func (h *Handler) renew(ctx context.Context, tx *store.Tx, credID, nonce, sig, statusTokenHash []byte) (int, []byte, error) {
+	// Urutan kunci instance → kredensial, sama dengan transisi operator dan hapus kartu (review M1).
+	if err := tx.LockInstanceOfCredential(ctx, credID); err != nil {
+		return 0, nil, err
+	}
 	cred, err := tx.CredentialForRenewal(ctx, credID)
 	if errors.Is(err, store.ErrNotFound) {
 		return problemBody("CRED-NOT-FOUND", http.StatusNotFound)
 	}
 	if err != nil {
 		return 0, nil, err
-	}
-	// Kill switch kanal (FR-04) juga menghentikan perpanjangan, bukan hanya penerbitan baru.
-	if !cred.Renewable() || !h.channelEnabled(cred.Channel) {
-		return problemBody("CRED-NOT-RENEWABLE", http.StatusConflict)
 	}
 	now := h.Now().UTC().Truncate(time.Second)
 	valid, err := tx.RenewalChallengeValid(ctx, cred.ID, nonce, now)
@@ -145,6 +153,11 @@ func (h *Handler) renew(ctx context.Context, tx *store.Tx, credID, nonce, sig []
 	if !anp1.VerifyRaw(pub, RenewalMessage(cred.CredID, nonce), sig) {
 		return problemBody("CRED-PROOF-INVALID", http.StatusBadRequest)
 	}
+	// Status dan kill switch kanal (FR-04) baru diperiksa setelah bukti kepemilikan: tanpa kunci
+	// kredensial, kartu ditangguhkan dan aktif dijawab sama (ADR-0037, review akhir M2).
+	if !cred.Renewable() || !h.channelEnabled(cred.Channel) {
+		return problemBody("CRED-NOT-RENEWABLE", http.StatusConflict)
+	}
 	signer, err := h.Signers(cred.Site.SiteID)
 	if err != nil {
 		return 0, nil, err
@@ -159,6 +172,12 @@ func (h *Handler) renew(ctx context.Context, tx *store.Tx, credID, nonce, sig []
 	}
 	if err := tx.CompleteRenewal(ctx, cred.ID, nonce, cert, notAfter, now); err != nil {
 		return 0, nil, err
+	}
+	// ADR-0037: perpanjangan bertanda tangan boleh mengganti token baca status (kartu lama tanpa token).
+	if statusTokenHash != nil {
+		if err := tx.SetStatusTokenHash(ctx, cred.Site.ID, statusTokenHash); err != nil {
+			return 0, nil, err
+		}
 	}
 	if err := tx.AppendAudit(ctx, credentialAudit("credential.renewed", cred.Site, cred.CredID, cred.Channel, notAfter, now)); err != nil {
 		return 0, nil, err

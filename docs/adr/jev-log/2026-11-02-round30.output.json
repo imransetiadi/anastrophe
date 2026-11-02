@@ -1,0 +1,41 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "otomatis_saat_enrolment",
+    "escaped": false,
+    "confidence": 0.77,
+    "probabilities": {
+      "otomatis_saat_enrolment": 0.81,
+      "endpoint_registrasi": 0.07,
+      "operator_mendaftarkan": 0.01,
+      "ask_user": 0.03,
+      "investigate": 0.02,
+      "none": 0.06
+    },
+    "contradicted_requirements": []
+  },
+  "checks": {
+    "otomatis_saat_enrolment": [
+      "supported",
+      "supported",
+      "supported"
+    ],
+    "endpoint_registrasi": [
+      "supported",
+      "contradicted",
+      "contradicted"
+    ],
+    "operator_mendaftarkan": [
+      "contradicted",
+      "supported",
+      "supported"
+    ]
+  },
+  "warnings": [],
+  "usage": {
+    "input_tokens": 2607,
+    "output_tokens": 461
+  }
+}

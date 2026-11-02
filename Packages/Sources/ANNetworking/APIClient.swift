@@ -38,28 +38,65 @@ public struct APIClient: Sendable {
         return try Self.decoder.decode(RemoteConfig.self, from: data)
     }
 
-    /// `POST /v1/enrollments` versi tracer backend R1: mendaftarkan kartu untuk perangkat di gedung.
-    /// Enrolment produksi memakai identitas kartu fisik, security code, dan App Attest (SDD §8.4.1).
-    public func createEnrollment(deviceID: String, siteID: String, idempotencyKey: UUID) async throws -> String {
+    /// `GET /v1/sites/lookup?code=`: gedung dari kode gedung yang diketik penghuni (ADR-0044). Kode yang
+    /// tidak sah ditolak tanpa permintaan jaringan, dengan galat yang sama seperti kode tak dikenal.
+    public func lookupSite(code: String) async throws -> SiteSummary {
+        guard let normalized = SiteJoinCode.normalized(code),
+              var components = URLComponents(url: baseURL.appending(path: "v1/sites/lookup"), resolvingAgainstBaseURL: false)
+        else { throw ANError.enrollmentRejected(.siteCodeUnknown) }
+        components.queryItems = [URLQueryItem(name: "code", value: normalized)]
+        guard let url = components.url else { throw ANError.enrollmentRejected(.siteCodeUnknown) }
+        return try Self.decoder.decode(SiteSummary.self, from: try await perform(URLRequest(url: url)))
+    }
+
+    /// `POST /v1/enrollments`: enrolment untuk kartu fisik terdaftar (ADR-0031). Identitas kartu hanya
+    /// lewat TLS; server menghitung HMAC per gedung. Security code dan App Attest menyusul (SDD §8.4.1).
+    public func createEnrollment(deviceID: String, siteID: String, card: CardIdentity, provisioningKeyHash: Data, idempotencyKey: UUID) async throws -> EnrollmentStart {
+        struct Body: Encodable {
+            struct Card: Encodable {
+                let tech: String
+                let id: String
+            }
+            let deviceID: String
+            let siteID: String
+            let card: Card
+            let provisioningKeyHash: String
+            enum CodingKeys: String, CodingKey { case deviceID = "device_id", siteID = "site_id", card, provisioningKeyHash = "provisioning_key_hash" }
+        }
+        let body = Body(deviceID: deviceID, siteID: siteID, card: .init(tech: card.technology.rawValue, id: card.hex),
+                        provisioningKeyHash: provisioningKeyHash.base64EncodedString())
+        return try await postEnrollment(body, idempotencyKey: idempotencyKey)
+    }
+
+    /// `POST /v1/enrollments` dengan undangan (FR-12, ADR-0033): token menggantikan kartu fisik. Gedung
+    /// dan zona berasal dari undangan, jadi body hanya perangkat dan token.
+    public func createEnrollment(deviceID: String, invitation: String, provisioningKeyHash: Data, idempotencyKey: UUID) async throws -> EnrollmentStart {
+        // ADR-0040: hanya hash rahasia enrolment yang dikirim.
+        return try await postEnrollment(["device_id": deviceID, "invitation": invitation, "provisioning_key_hash": provisioningKeyHash.base64EncodedString()],
+                                        idempotencyKey: idempotencyKey)
+    }
+
+    private func postEnrollment(_ body: some Encodable, idempotencyKey: UUID) async throws -> EnrollmentStart {
         var request = URLRequest(url: baseURL.appending(path: "v1/enrollments"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(idempotencyKey.uuidString, forHTTPHeaderField: "Idempotency-Key")
-        request.httpBody = try JSONEncoder().encode(["device_id": deviceID, "site_id": siteID])
-        struct Created: Decodable {
-            let enrollmentID: String
-            enum CodingKeys: String, CodingKey { case enrollmentID = "enrollment_id" }
-        }
-        return try Self.decoder.decode(Created.self, from: try await perform(request)).enrollmentID
+        request.httpBody = try JSONEncoder().encode(body)
+        return try Self.decoder.decode(EnrollmentStart.self, from: try await perform(request))
     }
 
     /// `POST /v1/enrollments/{id}/credentials`: kirim kunci publik kanal, terima sertifikat (FR-16).
-    public func submitCredentialKey(enrollmentID: String, channel: ChannelKind, publicKey: Data, idempotencyKey: UUID) async throws -> ProvisionedCredential {
+    public func submitCredentialKey(enrollmentID: String, channel: ChannelKind, publicKey: Data, statusTokenHash: Data? = nil, provisioningSecret: Data, idempotencyKey: UUID) async throws -> ProvisionedCredential {
         var request = URLRequest(url: baseURL.appending(path: "v1/enrollments/\(enrollmentID)/credentials"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(idempotencyKey.uuidString, forHTTPHeaderField: "Idempotency-Key")
-        request.httpBody = try JSONEncoder().encode(["channel": channel.rawValue, "public_key": publicKey.base64EncodedString()])
+        // ADR-0040: rahasia enrolment membuktikan bahwa provisioning berasal dari perangkat yang mendaftar.
+        request.setValue(Self.bearer(provisioningSecret), forHTTPHeaderField: "Authorization")
+        var body = ["channel": channel.rawValue, "public_key": publicKey.base64EncodedString()]
+        // ADR-0037: hanya hash token baca status yang dikirim; tokennya tetap di perangkat.
+        body["status_token_hash"] = statusTokenHash?.base64EncodedString()
+        request.httpBody = try JSONEncoder().encode(body)
         return try ProvisionedCredential.decode(try await perform(request))
     }
 
@@ -71,12 +108,14 @@ public struct APIClient: Sendable {
     }
 
     /// `POST /v1/credentials/{cred}:renew`: tanda tangan atas nonce → sertifikat baru (FR-45).
-    public func renewCredential(credentialID: Data, nonce: Data, signature: Data, idempotencyKey: UUID) async throws -> ProvisionedCredential {
+    public func renewCredential(credentialID: Data, nonce: Data, signature: Data, statusTokenHash: Data? = nil, idempotencyKey: UUID) async throws -> ProvisionedCredential {
         var request = URLRequest(url: credentialURL(credentialID, action: "renew"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(idempotencyKey.uuidString, forHTTPHeaderField: "Idempotency-Key")
-        request.httpBody = try JSONEncoder().encode(["nonce": nonce.base64EncodedString(), "signature": signature.base64EncodedString()])
+        var body = ["nonce": nonce.base64EncodedString(), "signature": signature.base64EncodedString()]
+        body["status_token_hash"] = statusTokenHash?.base64EncodedString()  // kartu lama tanpa token (ADR-0037)
+        request.httpBody = try JSONEncoder().encode(body)
         return try ProvisionedCredential.decode(try await perform(request))
     }
 
@@ -90,6 +129,24 @@ public struct APIClient: Sendable {
             "credential_id": credentialID.base64EncodedString(), "nonce": nonce.base64EncodedString(), "signature": signature.base64EncodedString(),
         ])
         _ = try await perform(request)
+    }
+
+    /// `GET /v1/cards/{id}/status` dengan token baca status sebagai bearer (ADR-0037). Tanpa tanda tangan
+    /// kunci kredensial, jadi tidak ada prompt autentikasi.
+    public func cardStatus(cardID: String, token: Data) async throws -> String {
+        var request = URLRequest(url: baseURL.appending(path: "v1/cards/\(cardID)/status"))
+        request.setValue(Self.bearer(token), forHTTPHeaderField: "Authorization")
+        struct Reply: Decodable { let status: String }
+        return try Self.decoder.decode(Reply.self, from: try await perform(request)).status
+    }
+
+    /// Header bearer: base64url tanpa padding (token baca status, rahasia enrolment).
+    static func bearer(_ secret: Data) -> String {
+        let encoded = secret.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        return "Bearer \(encoded)"
     }
 
     /// `cred_id` dalam hex huruf kecil, diikuti `:aksi` (SDD §8.5).
@@ -109,4 +166,63 @@ public struct APIClient: Sendable {
         }
         return data
     }
+}
+
+/// Gedung hasil pencarian kode gedung, untuk dikonfirmasi pengguna sebelum menempelkan kartu.
+public struct SiteSummary: Equatable, Sendable, Decodable {
+    public let siteID: String
+    public let name: String
+    /// Kanal efektif gedung (ADR-0049); nil bila server belum mengirimnya (= semua kanal global).
+    public let channels: Set<ChannelKind>?
+
+    public init(siteID: String, name: String, channels: Set<ChannelKind>? = nil) {
+        self.siteID = siteID
+        self.name = name
+        self.channels = channels
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        siteID = try container.decode(String.self, forKey: .siteID)
+        name = try container.decode(String.self, forKey: .name)
+        channels = try container.decodeIfPresent([String].self, forKey: .channels).map(ChannelKind.known)
+    }
+
+    enum CodingKeys: String, CodingKey { case siteID = "site_id", name, channels }
+}
+
+extension ChannelKind {
+    /// Kanal yang dikenal app dari daftar nama di respons server; nama lain diabaikan.
+    static func known(_ names: [String]) -> Set<ChannelKind> {
+        Set(names.compactMap(ChannelKind.init(rawValue:)))
+    }
+}
+
+/// Hasil `POST /v1/enrollments`: perangkat pertama diprovisikan, perangkat tambahan menunggu
+/// persetujuan operator sampai ada akun (ADR-0032).
+public struct EnrollmentStart: Equatable, Sendable, Decodable {
+    public enum Status: String, Equatable, Sendable, Decodable {
+        case provisioning = "PROVISIONING"
+        case pendingApproval = "PENDING_APPROVAL"
+    }
+
+    public let enrollmentID: String
+    public let status: Status
+    /// Kanal efektif gedung (ADR-0049); nil bila server belum mengirimnya (= semua kanal global).
+    public let channels: Set<ChannelKind>?
+
+    public init(enrollmentID: String, status: Status, channels: Set<ChannelKind>? = nil) {
+        self.enrollmentID = enrollmentID
+        self.status = status
+        self.channels = channels
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        enrollmentID = try container.decode(String.self, forKey: .enrollmentID)
+        status = try container.decode(Status.self, forKey: .status)
+        channels = try container.decodeIfPresent([String].self, forKey: .channels).map(ChannelKind.known)
+    }
+
+    enum CodingKeys: String, CodingKey { case enrollmentID = "enrollment_id", status, channels }
 }

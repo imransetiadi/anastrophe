@@ -14,4 +14,12 @@ struct HexTests {
     func hexTidakValid(input: String) {
         #expect(Data(hexString: input) == nil)
     }
+
+    @Test func tandaDanSpasiDitolak() {
+        // Review registri minor 11: UInt8(_:radix:) menerima tanda, jadi "+4" sempat terbaca 0x04.
+        #expect(Data(hexString: "+4") == nil)
+        #expect(Data(hexString: "-0") == nil)
+        #expect(Data(hexString: " 4") == nil)
+        #expect(Data(hexString: "0A") == Data([0x0A]))
+    }
 }

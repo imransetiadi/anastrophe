@@ -1,0 +1,22 @@
+{
+  "tool": "jev_decide",
+  "decision": "Fokus unit kerja berikutnya untuk app Anastrophe setelah alur Tambah Kartu produksi (ADR-0043) selesai di commit 3f32f20.",
+  "candidates": [
+    "bantuan_faq",
+    "minor_tambah_kartu",
+    "kebijakan_gedung",
+    "akses_cepat"
+  ],
+  "requirements": [
+    "Dapat diselesaikan dan diverifikasi tanpa input yang belum tersedia: DEVELOPMENT_TEAM, kunci Apple/APNs, iPhone fisik, atau keputusan pengguna yang masih menunggu.",
+    "Menutup requirement P0 R1 yang belum diimplementasikan sama sekali.",
+    "Tidak menuntut keputusan semantik keamanan baru yang wajib dieskalasi ke pengguna sebelum bisa dibangun."
+  ],
+  "escalate_on_contradiction": true,
+  "evidence_summary": [
+    "Alur Tambah Kartu kini ada di build Release (bukti baru terhadap ADR-0043).",
+    "Belum ada layar Bantuan/FAQ; FR-60, FR-02, dan FR-27 (P0) bergantung padanya; FR-63 (P1) diagnostik.",
+    "Minor review Tambah Kartu tidak memblokir pengguna; FR-55 sebagian ada; FR-24 butuh target extension.",
+    "Terblokir: gerbang pra-pilot ADR-0046, akun, push, anggota, uji H."
+  ]
+}

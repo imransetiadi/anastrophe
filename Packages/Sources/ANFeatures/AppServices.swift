@@ -2,6 +2,8 @@ import ANChannelBLE
 import ANChannelNFC
 import ANCore
 import ANCrypto
+import ANNetworking
+import ANNFCEnroll
 import ANProtocol
 import ANStorage
 import ANWallet
@@ -55,6 +57,13 @@ public final class AppServices {
     let authenticator: any UserAuthenticator
     /// Riwayat tap lokal 30 hari (FR-30).
     let tapHistory: any TapHistoryStore
+    /// Token baca status kartu (ADR-0037), di Keychain yang sama dengan record kredensial.
+    let statusTokens: any StatusTokenStore
+    private let statusRefresher: CardStatusRefresher
+    /// Alamat API enrolment dari Info.plist `ANAPIBaseURL` (nil = layanan belum tersedia).
+    let apiBaseURL: URL?
+    /// `device_id` untuk enrolment (ADR-0045).
+    let deviceIdentity: any DeviceIdentityStore
     /// Store kartu tidak bisa dibuka; UI memberi tahu alih-alih menampilkan daftar kosong.
     public let storageFailed: Bool
     #if DEBUG
@@ -66,6 +75,13 @@ public final class AppServices {
     var pendingLabRenewal = false
     /// Hapus kartu lab saat peluncuran (`-ANLabDelete`) untuk verifikasi di simulator.
     var pendingLabDelete = false
+    /// Identitas kartu untuk pembaca palsu di simulator (`-ANLabCardReader`), karena simulator tidak bisa
+    /// membaca kartu fisik.
+    var labCardIdentity: CardIdentity?
+    /// Tautan yang dibuka seperti `onOpenURL` saat peluncuran (`-ANLabOpenURL`).
+    var pendingLabOpenURL: URL?
+    /// Kode gedung untuk menjalankan alur Tambah Kartu otomatis saat peluncuran (`-ANLabAddCode`).
+    var pendingLabAddCode: String?
     #endif
 
     init(
@@ -79,7 +95,11 @@ public final class AppServices {
         connectivity: any ConnectivityStatus = FixedConnectivity(isOnline: true),
         authenticator: any UserAuthenticator,
         tapHistory: any TapHistoryStore,
-        storageFailed: Bool = false
+        statusTokens: any StatusTokenStore = KeychainStatusTokenStore(store: InMemorySecretStore()),
+        storageFailed: Bool = false,
+        apiBaseURL: URL? = nil,
+        deviceIdentity: any DeviceIdentityStore = KeychainDeviceIdentityStore(
+            store: InMemorySecretStore(), installMarker: FileManager.default.temporaryDirectory.appending(path: "anastrophe-\(UUID().uuidString)/installed"))
     ) {
         self.cards = cards
         self.keys = keys
@@ -91,11 +111,29 @@ public final class AppServices {
         self.connectivity = connectivity
         self.authenticator = authenticator
         self.tapHistory = tapHistory
+        self.statusTokens = statusTokens
+        self.statusRefresher = CardStatusRefresher(cards: cards, records: records, tokens: statusTokens)
         self.storageFailed = storageFailed
+        self.apiBaseURL = apiBaseURL
+        self.deviceIdentity = deviceIdentity
     }
 
-    /// Dipakai bila `live()` gagal membuka penyimpanan: tidak ada presentasi, UI memberi tahu.
-    public static func storageUnavailable() -> AppServices {
+    /// Pembaca kartu fisik untuk alur Tambah Kartu (FR-11). Teks lembar sistem terlokalisasi tanpa istilah
+    /// teknis.
+    func makeCardReader() -> any CardOwnershipReader {
+        #if DEBUG && targetEnvironment(simulator)
+        if let labCardIdentity { return FixedCardOwnershipReader(.identity(labCardIdentity)) }
+        #endif
+        #if os(iOS) && canImport(CoreNFC)
+        return NFCTagCardOwnershipReader(prompt: localized("add.read.prompt"), multipleCardsMessage: localized("add.read.multiple"))
+        #else
+        return FixedCardOwnershipReader(.failure(.cardReaderUnavailable))
+        #endif
+    }
+
+    /// Dipakai bila `live()` gagal membuka penyimpanan: tidak ada presentasi, UI memberi tahu. Alamat layanan
+    /// tetap diteruskan agar laporan diagnostik tidak salah menyebut layanan belum terkonfigurasi.
+    public static func storageUnavailable(apiBaseURL: URL? = nil) -> AppServices {
         let secrets = InMemorySecretStore()
         return AppServices(
             cards: EmptyCardStore(),
@@ -106,8 +144,30 @@ public final class AppServices {
             foreground: ForegroundState(),
             authenticator: UnavailableAuthenticator(),
             tapHistory: InMemoryTapHistoryStore(),
-            storageFailed: true
+            storageFailed: true,
+            apiBaseURL: apiBaseURL
         )
+    }
+
+    /// Status kartu dari server saat app masuk foreground (FR-38, ADR-0037); true bila ada kartu yang
+    /// berubah sehingga daftar perlu dimuat ulang.
+    public func refreshCardStatuses(transport: any HTTPTransport = URLSession.shared) async -> Bool {
+        guard !storageFailed else { return false }
+        return await statusRefresher.refresh(transport: transport)
+    }
+
+    /// FR-43 (ADR-0053): pada peluncuran pertama sesudah instal ulang, sisa Keychain instalasi lama dihapus
+    /// sebelum layanan dipakai. Store kartu yang gagal dibaca dianggap berisi kartu, jadi tidak ada yang
+    /// dihapus. Galat penghapusan tidak menghentikan app; pembersihan dicoba lagi di peluncuran berikutnya
+    /// selama belum ada enrolment (`deviceID()` membuat penanda saat enrolment).
+    public func prepareInstall() async {
+        let hasCards: Bool
+        do {
+            hasCards = try await !cards.all().isEmpty
+        } catch {
+            hasCards = true
+        }
+        _ = try? deviceIdentity.purgeLeftoversIfFreshInstall(hasCards: hasCards)
     }
 
     /// Membatalkan presentasi yang sedang berjalan (Review Focus 2).
@@ -128,7 +188,7 @@ public final class AppServices {
         RemoteConfig(enabledChannels: nfcEmulationEntitled ? [.ble, .nfcHCE] : [.ble])
     }
 
-    public static func live(nfcEmulationEntitled: Bool) throws -> AppServices {
+    public static func live(nfcEmulationEntitled: Bool, apiBaseURL: URL? = nil) throws -> AppServices {
         let secrets = deviceSecretStore()
         let keys = DeviceKeyStore(store: secrets, factory: keyFactory())
         let records = KeychainCredentialRecordStore(store: secrets)
@@ -138,7 +198,8 @@ public final class AppServices {
         let revision = CardsRevision()
         // ADR-0029: riwayat tidak pernah membuat kartu tak tersedia.
         let tapHistory = SwiftDataTapHistoryStore.openRecovering(directory: URL.applicationSupportDirectory.appending(path: "Anastrophe/TapHistory"))
-        let launcher = LivePresentationLauncher(keys: keys, records: records, cards: cards, counters: KeychainCounterStore(store: secrets), foreground: foreground, config: config, nfcEmulationEntitled: nfcEmulationEntitled, onCardsChanged: { revision.bump() })
+        let statusTokens = KeychainStatusTokenStore(store: secrets)
+        let launcher = LivePresentationLauncher(keys: keys, records: records, cards: cards, statusTokens: statusTokens, counters: KeychainCounterStore(store: secrets), foreground: foreground, config: config, nfcEmulationEntitled: nfcEmulationEntitled, onCardsChanged: { revision.bump() })
         return AppServices(
             cards: cards,
             keys: keys,
@@ -149,7 +210,11 @@ public final class AppServices {
             cardsRevision: revision,
             connectivity: LiveConnectivity(onChange: { Task { @MainActor in revision.bump() } }),
             authenticator: LAUserAuthenticator(),
-            tapHistory: tapHistory
+            tapHistory: tapHistory,
+            statusTokens: statusTokens,
+            apiBaseURL: apiBaseURL,
+            // ADR-0045: penanda instalasi di kontainer app; hilang saat instal ulang sehingga id dibuat ulang.
+            deviceIdentity: KeychainDeviceIdentityStore(store: secrets, installMarker: URL.applicationSupportDirectory.appending(path: "Anastrophe/installed"))
         )
     }
 
@@ -159,7 +224,7 @@ public final class AppServices {
     }
 
     static func inMemory(events: [PresentmentEvent], connectivity: any ConnectivityStatus = FixedConnectivity(isOnline: true),
-                         authenticator: any UserAuthenticator = ImmediateAuthenticator()) -> AppServices {
+                         authenticator: any UserAuthenticator = ImmediateAuthenticator(), apiBaseURL: URL? = nil) -> AppServices {
         let secrets = InMemorySecretStore()
         let keys = DeviceKeyStore(store: secrets, factory: SoftwareKeyFactory())
         let directory = FileManager.default.temporaryDirectory.appending(path: "anastrophe-\(UUID().uuidString)")
@@ -173,13 +238,15 @@ public final class AppServices {
             foreground: ForegroundState(),
             connectivity: connectivity,
             authenticator: authenticator,
-            tapHistory: tapHistory
+            tapHistory: tapHistory,
+            statusTokens: KeychainStatusTokenStore(store: secrets),
+            apiBaseURL: apiBaseURL
         )
     }
 
     /// Hapus kartu (FR-31): autentikasi pengguna, cabut di server (ADR-0026), lalu hapus lokal.
     public func removeCard(_ card: Card) async throws {
-        let remover = CardRemover(keys: keys, records: records, cards: cards)
+        let remover = CardRemover(keys: keys, records: records, cards: cards, statusTokens: statusTokens)
         let hasKey = try card.credentials.values.contains { try keys.hasKey(for: $0) }
         var context: AuthorizedContext?
         do {
@@ -236,6 +303,7 @@ private struct SimulatorSecretStore: SecretStore {
 
     func get(_ key: String) throws -> Data? { try base.get(key) }
     func delete(_ key: String) throws { try base.delete(key) }
+    func deleteAll() throws { try base.deleteAll() }
 }
 #endif
 
@@ -287,8 +355,8 @@ private final class LivePresentationLauncher: PresentationLaunching {
     private var hce: HCEPresentmentCoordinator?
     #endif
 
-    init(keys: any CredentialKeyStore, records: any CredentialRecordStore, cards: any CardStore, counters: any CounterStore, foreground: ForegroundState, config: RemoteConfig, nfcEmulationEntitled: Bool, onCardsChanged: @escaping @MainActor () -> Void) {
-        let scheduler = RenewalScheduler(renewer: CredentialRenewer(keys: keys, records: records, cards: cards), clock: ContinuousClock(),
+    init(keys: any CredentialKeyStore, records: any CredentialRecordStore, cards: any CardStore, statusTokens: any StatusTokenStore, counters: any CounterStore, foreground: ForegroundState, config: RemoteConfig, nfcEmulationEntitled: Bool, onCardsChanged: @escaping @MainActor () -> Void) {
+        let scheduler = RenewalScheduler(renewer: CredentialRenewer(keys: keys, records: records, cards: cards, statusTokens: statusTokens), clock: ContinuousClock(),
                                          isForeground: { foreground.isActive }, onRenewed: onCardsChanged)
         self.scheduler = scheduler
         self.foreground = foreground

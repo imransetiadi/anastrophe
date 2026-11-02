@@ -8,6 +8,21 @@ import Testing
 
 @Suite("Target backend lab (argumen peluncuran DEBUG)")
 struct LabBackendTargetTests {
+    @MainActor
+    @Test func argumenLabAlurTambahKartu() {
+        // E2e alur Tambah Kartu di simulator (ADR-0043): pembaca palsu, tautan undangan, kode gedung.
+        let token = String(repeating: "A", count: 42) + "w"
+        let services = AppServices.inMemory()
+        services.configureLabBackend(arguments: ["Anastrophe", "-ANLabCardReader", "iso14443a:04a1b2c3d4e5f6",
+                                                 "-ANLabOpenURL", "https://contoh.test/i/\(token)", "-ANLabAddCode", "7K2Q-9XA4"])
+        #expect(services.labCardIdentity == CardIdentity("iso14443a:04a1b2c3d4e5f6"))
+        #expect(services.pendingLabOpenURL == URL(string: "https://contoh.test/i/\(token)"))
+        #expect(services.pendingLabAddCode == "7K2Q-9XA4")
+        let empty = AppServices.inMemory()
+        empty.configureLabBackend(arguments: ["Anastrophe", "-ANLabCardReader", "iso14443a:zz"])
+        #expect(empty.labCardIdentity == nil && empty.pendingLabOpenURL == nil && empty.pendingLabAddCode == nil)
+    }
+
     @Test func argumenLengkapMenghasilkanTarget() {
         let target = LabBackendTarget(arguments: ["Anastrophe", "-ANLabBackend", "http://127.0.0.1:8080", "-ANLabDevice", "d1", "-ANLabSite", "s1"])
         #expect(target?.baseURL == URL(string: "http://127.0.0.1:8080"))
@@ -23,6 +38,27 @@ struct LabBackendTargetTests {
     ])
     func argumenTidakLengkapDiabaikan(arguments: [String]) {
         #expect(LabBackendTarget(arguments: arguments) == nil)
+    }
+
+    @Test func kartuLabDariArgumen() {
+        // ADR-0031: enrolment lab memakai identitas kartu yang sama dengan devseed -lab-card.
+        let base = ["Anastrophe", "-ANLabBackend", "http://127.0.0.1:8080", "-ANLabDevice", "d1", "-ANLabSite", "s1"]
+        #expect(LabBackendTarget(arguments: base + ["-ANLabCard", "iso15693:e004010203040506"])?.card.hex == "e004010203040506")
+        #expect(LabBackendTarget(arguments: base)?.card == LabBackendTarget.defaultCard)
+        #expect(LabBackendTarget(arguments: base + ["-ANLabCard", "iso14443a:zz"]) == nil)
+    }
+
+    @Test func undanganLabDariArgumen() {
+        // ADR-0033: lab bisa mendaftar dengan undangan sebagai pengganti kartu lab.
+        let token = String(repeating: "A", count: 42) + "w"
+        let base = ["Anastrophe", "-ANLabBackend", "http://127.0.0.1:8080", "-ANLabDevice", "d1", "-ANLabSite", "s1"]
+        #expect(LabBackendTarget(arguments: base + ["-ANLabInvite", token])?.invitation == token)
+        #expect(LabBackendTarget(arguments: base)?.invitation == nil)
+        #expect(LabBackendTarget(arguments: base + ["-ANLabInvite", "pendek"]) == nil)
+        #expect(LabBackendTarget(arguments: base + ["-ANLabInvite"]) == nil)
+        // Review akhir M1: alfabet base64url memuat "-", jadi ±1 dari 64 token diawali "-".
+        let dashed = "-" + String(repeating: "A", count: 41) + "w"
+        #expect(LabBackendTarget(arguments: base + ["-ANLabInvite", dashed])?.invitation == dashed)
     }
 
     @Test func isianFormDirapikan() {
@@ -46,13 +82,30 @@ struct LabBackendLaunchTests {
         services.configureLabBackend(arguments: arguments)
         let transport = SequenceTransport([
             configBody(),
-            (201, #"{"enrollment_id":"e1"}"#, "application/json"),
+            (201, #"{"enrollment_id":"e1","status":"PROVISIONING"}"#, "application/json"),
             (200, provisionedBody(credentialID: Data(repeating: 0x5E, count: 16)), "application/json"),
         ])
         #expect(await services.runPendingLabBackendProvisioning(transport: transport) == localized("lab.imported"))
         #expect(try await services.cards.all().map(\.siteName) == ["Gedung Lab"])
         #expect(await services.runPendingLabBackendProvisioning(transport: transport) == nil)
         #expect(transport.paths.count == 3)  // tidak ada enrolment kedua
+    }
+
+    @Test func provisioningPeluncuranDenganUndangan() async throws {
+        // ADR-0033: -ANLabInvite menggantikan kartu lab di body enrolment.
+        let token = String(repeating: "A", count: 42) + "w"
+        let services = AppServices.inMemory()
+        services.configureLabBackend(arguments: arguments + ["-ANLabInvite", token])
+        let transport = SequenceTransport([
+            configBody(),
+            (201, #"{"enrollment_id":"e1","status":"PROVISIONING"}"#, "application/json"),
+            (200, provisionedBody(credentialID: Data(repeating: 0x5E, count: 16)), "application/json"),
+        ])
+        #expect(await services.runPendingLabBackendProvisioning(transport: transport) == localized("lab.imported"))
+        let enrolment = try #require(transport.bodies[1])
+        let body = try #require(try JSONSerialization.jsonObject(with: enrolment) as? [String: String])
+        #expect(body["device_id"] == "d1" && body["invitation"] == token)
+        #expect(body.keys.sorted() == ["device_id", "invitation", "provisioning_key_hash"])
     }
 
     @Test func provisioningPeluncuranDilewatiBilaSudahAdaKartu() async throws {
@@ -120,7 +173,7 @@ struct LabBackendLaunchTests {
         let services = AppServices.inMemory()
         let transport = SequenceTransport([
             configBody(),
-            (201, #"{"enrollment_id":"e1"}"#, "application/json"),
+            (201, #"{"enrollment_id":"e1","status":"PROVISIONING"}"#, "application/json"),
             (400, #"{"type":"ENR-INVALID-KEY","status":400}"#, "application/problem+json"),
         ])
         let message = await services.provisionFromLabBackend(target, channel: .ble, transport: transport)

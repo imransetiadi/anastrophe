@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Cross-document consistency checks for PRD/SDD/QA/ADR/evidence ledger.
 
-Checks: every FR/NFR has test cases (QA §14), every referenced FR/NFR/TC/ADR/evidence id exists,
+Checks: every FR/NFR has test cases (QA §14), every TC id is defined once, every referenced FR/NFR/TC/ADR/evidence id exists,
 every US has a Gherkin AT, and every relative Markdown link resolves.
 Usage: python3 scripts/docs/check_docs.py <repo-root>   (exit 0 = no problems)
 """
@@ -17,6 +17,9 @@ fr_def = set(re.findall(r"^\| (FR-\d{2}) \|", prd, re.M)); nfr_def = set(re.find
 req_def = fr_def | nfr_def
 # 2. TC defined in QA tables
 tc_def = set(re.findall(r"^\| (TC-[A-Z]+-\d{2}) \|", qa, re.M))
+# 2b. a TC id is defined at most once in the test-case tables (result rows in §11 have 3 columns)
+tc_rows = [m.group(1) for m in re.finditer(r"^\| (TC-[A-Z]+-\d{2}) \|(.*)$", qa, re.M) if m.group(2).count("|") >= 4]
+for t in sorted({t for t in tc_rows if tc_rows.count(t) > 1}): problems.append(f"[dup] {t} defined more than once in QA test-case tables")
 # 3. traceability matrix
 mx = qa[qa.index("## 14. Matriks traceability"):]
 matrix = {}

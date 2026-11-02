@@ -1,0 +1,20 @@
+{
+  "tool": "jev_decide",
+  "decision": "Fokus unit kerja berikutnya untuk Anastrophe setelah kebijakan gedung (ADR-0049) selesai di commit 71d1951.",
+  "candidates": [
+    "filter_cli_fr50",
+    "laporan_fr58",
+    "akses_cepat",
+    "minor_klien"
+  ],
+  "requirements": [
+    "Dapat diselesaikan dan diverifikasi tanpa input yang belum tersedia: DEVELOPMENT_TEAM, kunci Apple/APNs, iPhone fisik, dokumen legal, atau keputusan pengguna yang masih menunggu.",
+    "Memajukan requirement P0 R1 yang belum terpenuhi.",
+    "Tidak menuntut keputusan semantik keamanan baru yang wajib dieskalasi ke pengguna sebelum bisa dibangun."
+  ],
+  "escalate_on_contradiction": true,
+  "evidence_summary": [
+    "FR-50 (P0): CLI list punya filter status, belum filter kanal dan pencarian; portal penuh terblokir FR-56.",
+    "FR-58 dan FR-24 P1; minor klien tidak memajukan P0."
+  ]
+}

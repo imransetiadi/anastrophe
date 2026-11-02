@@ -1,0 +1,58 @@
+{
+  "tool": "jev_verify",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "label": "sisa-instal-ulang-platform-claims",
+  "evidence_ids": [
+    "E42-secitemdelete",
+    "E43-forums"
+  ],
+  "summary": {
+    "verified": 5,
+    "contradicted": 0,
+    "unsupported": 0,
+    "needs_review": 0
+  },
+  "results": [
+    {
+      "claim": "SecItemDelete secara bawaan menghapus semua item yang cocok dengan query; perilaku ini hanya berubah bila query memakai kSecMatchItemList.",
+      "verdict": "verified",
+      "confidence": 0.91,
+      "action": "auto",
+      "evidence": "E42-secitemdelete"
+    },
+    {
+      "claim": "SecItemDelete memblokir thread pemanggil, dan Apple menyarankan memanggilnya dari queue latar atau fungsi async.",
+      "verdict": "verified",
+      "confidence": 1.0,
+      "action": "auto",
+      "evidence": "E42-secitemdelete"
+    },
+    {
+      "claim": "Menurut balasan DTS di Apple Developer Forums, item Keychain bertahan lebih lama dari app yang menghapusnya.",
+      "verdict": "verified",
+      "confidence": 1.0,
+      "action": "auto",
+      "evidence": "E43-forums"
+    },
+    {
+      "claim": "iOS 10.3 beta 2 sempat menghapus item Keychain saat app di-uninstall, tetapi perilaku itu tidak ikut rilis publik.",
+      "verdict": "verified",
+      "confidence": 1.0,
+      "action": "auto",
+      "evidence": "E43-forums"
+    },
+    {
+      "claim": "Apple tidak mendokumentasikan bahwa item Keychain tetap bertahan sesudah app dihapus sebagai jaminan.",
+      "verdict": "verified",
+      "confidence": 1.0,
+      "action": "auto",
+      "evidence": "E43-forums"
+    }
+  ],
+  "note": "Klaim platform baru di SDD §5.3 dan RESEARCH_EVIDENCE (O-K01, O-K02) untuk ADR-0053; diverifikasi sesuai CLAUDE.md sebelum ditutup.",
+  "usage": {
+    "input_tokens": 2835,
+    "output_tokens": 575
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "invitation_enrolment",
+    "escaped": false,
+    "confidence": 0.89,
+    "probabilities": {
+      "invitation_enrolment": 0.91,
+      "admin_actions_cli": 0.07,
+      "account_foundation": 0.01,
+      "hardening_minor_sweep": 0.01,
+      "ask_user": 0,
+      "investigate": 0,
+      "none": 0
+    },
+    "contradicted_requirements": []
+  },
+  "requirements_checked": 3,
+  "checks": [
+    {
+      "candidate": "invitation_enrolment",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "invitation_enrolment",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "invitation_enrolment",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "admin_actions_cli",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "admin_actions_cli",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "admin_actions_cli",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "account_foundation",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "account_foundation",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "account_foundation",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "hardening_minor_sweep",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "hardening_minor_sweep",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "hardening_minor_sweep",
+      "requirement": 2,
+      "answer": "unknown"
+    }
+  ],
+  "warnings": [],
+  "usage": {
+    "input_tokens": 3222,
+    "output_tokens": 587
+  }
+}

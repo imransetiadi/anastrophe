@@ -31,9 +31,16 @@ func (f fixture) exec(t *testing.T, sql string) {
 
 func (f fixture) audit(t *testing.T) []store.AuditRecord {
 	t.Helper()
-	events, err := f.store.AuditEvents(context.Background(), store.AuditChain(f.siteID))
+	all, err := f.store.AuditEvents(context.Background(), store.AuditChain(f.siteID))
 	if err != nil {
 		t.Fatal(err)
+	}
+	// Impor registri adalah setup fixture (kartu lab), bukan perilaku yang diuji di sini.
+	var events []store.AuditRecord
+	for _, e := range all {
+		if e.Action != "registry.imported" {
+			events = append(events, e)
+		}
 	}
 	return events
 }
@@ -75,7 +82,8 @@ func TestProvisioningDanRenewMencatatAudit(t *testing.T) {
 	if events[2].Data["not_after"] != f.h.Now().UTC().Add(7*24*time.Hour).Format(time.RFC3339) {
 		t.Fatalf("not_after perpanjangan: %v", events[2].Data["not_after"])
 	}
-	if n, err := f.store.VerifyAuditChain(context.Background(), store.AuditChain(f.siteID)); err != nil || n != 3 {
+	// 4 = impor registri fixture + tiga event di atas; rantai memverifikasi semuanya.
+	if n, err := f.store.VerifyAuditChain(context.Background(), store.AuditChain(f.siteID)); err != nil || n != 4 {
 		t.Fatalf("verify = %d, %v", n, err)
 	}
 }
@@ -92,7 +100,8 @@ func TestAuditTanpaDataPribadi(t *testing.T) {
 	}
 	for _, e := range f.audit(t) {
 		for k := range e.Data {
-			if k != "channel" && k != "not_after" {
+			// status = hasil enrolment (ADR-0032), bukan data pribadi.
+			if k != "channel" && k != "not_after" && k != "status" {
 				t.Fatalf("field audit tak diizinkan %q di %s", k, e.Action)
 			}
 		}
@@ -146,7 +155,9 @@ func TestAuditGagalMembatalkanProvisioning(t *testing.T) {
 func TestEnrolmentHurufBesarSatuRantai(t *testing.T) {
 	// Review audit C1: UUID huruf besar (mis. UUID.uuidString Swift) tidak membelah rantai gedung.
 	f := newFixture(t)
-	rec := f.do(t, http.MethodPost, "/v1/enrollments", "enr-upper", map[string]string{"device_id": strings.ToUpper(f.deviceID), "site_id": strings.ToUpper(f.siteID)})
+	body := f.cardBody()
+	body["device_id"], body["site_id"] = strings.ToUpper(f.deviceID), strings.ToUpper(f.siteID)
+	rec := f.do(t, http.MethodPost, "/v1/enrollments", "enr-upper", body)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("enrol: %d %s", rec.Code, rec.Body)
 	}
@@ -169,7 +180,7 @@ func TestEnrolmentHurufBesarSatuRantai(t *testing.T) {
 
 func TestRetryEnrolmentBerkunciTidakMenggandakanAudit(t *testing.T) {
 	f := newFixture(t)
-	body := map[string]string{"device_id": f.deviceID, "site_id": f.siteID}
+	body := f.cardBody()
 	for i := 0; i < 2; i++ {
 		if rec := f.do(t, http.MethodPost, "/v1/enrollments", "enr-retry", body); rec.Code != http.StatusCreated {
 			t.Fatalf("enrol %d: %d", i, rec.Code)

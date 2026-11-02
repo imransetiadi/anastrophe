@@ -1,0 +1,31 @@
+{
+ "tool": "jev_decide",
+ "label": "D42-fokus-setelah-provisioning-aman",
+ "decision": "Which focus should the next autonomous iteration of Anastrophe build, now that secure provisioning (ADR-0039/0040) is done and two security decisions (ADR-0038, ADR-0041) await the user?",
+ "candidates": [
+  {
+   "id": "faq_in_app",
+   "description": "FR-60: in-app FAQ screen with per-channel answers in Indonesian and English, reachable from the Keys tab, following the iOS design-system page; app-only with snapshot/structure tests and a simulator check."
+  },
+  {
+   "id": "hardening_minors",
+   "description": "Fix the verified deferred minors from the lifecycle, provisioning and invitation reviews (status-guarded updates, denylist max not_after and purge, refresher concurrency and pre-feature cards, required secret parameters, idempotency tests, link-base validation, printing invitation id). No new user-facing feature."
+  },
+  {
+   "id": "add_card_flow_mocked",
+   "description": "FR-05/FR-10: Release 'Tambah kartu' flow behind protocols with mocked device registration and NFC reading; live wiring waits for accounts, App Attest and a physical iPhone."
+  }
+ ],
+ "evidence_refs": [
+  "Memory.md Menunggu keputusan pengguna",
+  "PRD FR-60, FR-05, FR-10",
+  "docs/agentmemory/backlog.md (minor tertunda siklus hidup, provisioning, undangan)"
+ ],
+ "priorities": "1) Do not pre-empt pending user decisions. 2) Prefer a missing P0 requirement or correctness/robustness work that reduces real risk. 3) Verifiable in the simulator or with the local backend without hardware or an Apple team. 4) Bounded to one plan of 3–5 tasks.",
+ "requirements": [
+  "Does not implement or pre-empt ADR-0038, ADR-0041, ADR-0017 or ADR-0022.",
+  "Delivers either a currently missing P0 requirement or a measurable reduction of verified defects.",
+  "Can be verified in the iOS simulator or with the local backend, without a physical iPhone, reader hardware, or an Apple Developer team."
+ ],
+ "escalate_on_contradiction": true
+}

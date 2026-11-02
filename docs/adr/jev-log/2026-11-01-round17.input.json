@@ -1,0 +1,39 @@
+{
+  "tool": "jev_decide",
+  "label": "D33-fokus-iterasi-undangan",
+  "decision": "With the physical-card registry and card-based enrolment now built (ADR-0031/0032), which work should the next autonomous iteration of the Anastrophe build focus on, given that no user decisions, Apple developer team, iPhone, reader hardware, or external providers (Sign in with Apple, OTP/SMS, admin IdP) are available?",
+  "candidates": [
+    {
+      "id": "invitation_enrolment",
+      "description": "Invitation enrolment (FR-12): operator CLI creates one-time invitations (random token, only a hash stored, expiry, optionally tied to a registered card), POST /v1/enrollments accepts an invitation token as an alternative to a card identity, single-use enforced in a transaction, audit events; app lab flow can enrol with an invitation."
+    },
+    {
+      "id": "admin_actions_cli",
+      "description": "Admin credential actions (FR-51): suspend, resume and revoke card instances and credentials through a service layer and the operator CLI, with denylist_entries and audit; the admin HTTP API and RBAC follow when an admin IdP is chosen."
+    },
+    {
+      "id": "account_foundation",
+      "description": "Account foundation (FR-03): users table, device registration bound to users, sessions with short access tokens and device-bound refresh tokens (NFR-S06), Sign in with Apple and OTP behind interfaces with dev fakes; real providers configured later."
+    },
+    {
+      "id": "hardening_minor_sweep",
+      "description": "Close the remaining deferred minor findings from earlier plans (lab and renewal test gaps, devseed guard, DEBUG demo behaviours, documentation drift), each with a failing test first."
+    }
+  ],
+  "evidence_refs": [
+    "ADR-0031",
+    "ADR-0032",
+    "FR-03",
+    "FR-12",
+    "FR-51",
+    "NFR-S06",
+    "SDD §8.1"
+  ],
+  "priorities": "1) Progress on the R1 pilot critical path. 2) Completable and verifiable now with automated tests on host, simulator and local PostgreSQL, without hardware, an Apple team, or external providers. 3) Low risk of building on assumptions that a pending user decision or a future provider choice would invalidate. 4) Builds naturally on the registry just finished.",
+  "requirements": [
+    "Can be completed and verified with automated tests on the host, the simulator, and local PostgreSQL only.",
+    "Does not depend on the pending user decisions ADR-0017 or ADR-0022 or on an external provider choice.",
+    "Moves at least one P0 requirement of the R1 pilot closer to done."
+  ],
+  "escalate_on_contradiction": true
+}

@@ -1,0 +1,59 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "alur_tambah_kartu",
+    "escaped": false,
+    "confidence": 0.98,
+    "probabilities": {
+      "alur_tambah_kartu": 0.98,
+      "bantuan_faq": 0.01,
+      "kebijakan_gedung": 0,
+      "anggota_security_code": 0,
+      "sisa_minor": 0,
+      "akses_cepat": 0,
+      "ask_user": 0,
+      "investigate": 0,
+      "none": 0.01
+    },
+    "contradicted_requirements": []
+  },
+  "checks": {
+    "alur_tambah_kartu": [
+      "supported",
+      "supported",
+      "supported"
+    ],
+    "bantuan_faq": [
+      "supported",
+      "contradicted",
+      "supported"
+    ],
+    "kebijakan_gedung": [
+      "supported",
+      "unknown",
+      "supported"
+    ],
+    "anggota_security_code": [
+      "contradicted",
+      "unknown",
+      "contradicted"
+    ],
+    "sisa_minor": [
+      "supported",
+      "contradicted",
+      "supported"
+    ],
+    "akses_cepat": [
+      "unknown",
+      "unknown",
+      "unknown"
+    ]
+  },
+  "warnings": [],
+  "usage": {
+    "input_tokens": 5296,
+    "output_tokens": 869
+  }
+}

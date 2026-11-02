@@ -77,25 +77,51 @@ Backend (Go, ADR-0020; butuh PostgreSQL 16 lokal untuk test integrasi):
 
 ```bash
 (cd backend && go test ./... && go vet ./...)
-ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_SOFTWARE_CA=1 go -C backend run ./cmd/anastrophe-api   # dev/lab saja
+ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_SOFTWARE_CA=1 ANASTROPHE_DEV_REGISTRY_KEY=<32 byte hex> go -C backend run ./cmd/anastrophe-api   # dev/lab saja; kunci registri dev (ADR-0031), bukan untuk produksi
+# opsional (ADR-0054): ANASTROPHE_METRICS_ADDR=127.0.0.1:9090 (GET /metrics di listener internal, jangan publik), ANASTROPHE_LOG_FORMAT=json
+go -C backend run ./cmd/anastrophe-loadtest gen-cards -n 40000 -offset 0 > kartu-beban.csv   # kartu sintetis (awalan 084c54); impor dengan anastrophe-registry import --file "$PWD/kartu-beban.csv"
+go -C backend run ./cmd/anastrophe-loadtest run -base http://127.0.0.1:8080 -scenario enrol -site <uuid> -cards "$PWD/kartu-beban.csv" -duration 20s -concurrency 8 -metrics http://127.0.0.1:9090/metrics   # uji beban (ADR-0055); path absolut karena go -C menjalankan program dari backend/; hanya loopback kecuali -allow-remote, redirect dihitung galat; offset kartu berbeda per run; exit 1 = galat mencapai batas atau laju -rate tak tercapai, exit 3 = run berhenti lebih awal
 ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-audit   # verifikasi rantai audit (FR-54); keluar 1 bila ada yang rusak
+ANASTROPHE_DATABASE_URL=postgres://… ANASTROPHE_DEV_REGISTRY_KEY=<32 byte hex> go -C backend run ./cmd/anastrophe-registry import --site <uuid> --file ~/registri/kartu.csv --operator <pegangan>   # registri kartu fisik (FR-52); CSV berisi identitas mentah: simpan di luar repo dan hapus setelah impor; approve|reject --card-instance <uuid> untuk perangkat tambahan (ADR-0032)
+ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-registry invite --site <uuid> [--zones Lobi;Parkir | --card-file <berkas>|-] [--ttl 7] [--link-base https://<domain>/i/] --operator <pegangan>   # undangan sekali pakai (FR-12, ADR-0033); mencetak id undangan (untuk audit) dan token sekali; --link-base wajib https dan diakhiri /; berkas kartu berisi <tech>:<hex> (atau - lalu tempel di stdin), bukan argumen, dan butuh ANASTROPHE_DEV_REGISTRY_KEY; undangan berkartu menyetujui enrolment perangkat yang masih menunggu (ADR-0035)
+ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-registry list --site <uuid> [--status ACTIVE] [--channel ble|nfcHCE] [--id <awalan>]   # card instance gedung: id, status, asal, kanal (FR-50 sebagian, ADR-0050); filter digabung AND; tanpa identitas kartu
+ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-registry site-code --site <uuid> --operator <pegangan>   # kode gedung XXXX-XXXX untuk Tambah Kartu di app (ADR-0044); menjalankan ulang merotasi kode, dan kode lama langsung tidak berlaku
+ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-registry policy --site <uuid> [--cert-validity-days 1-30] [--channels ble,nfcHCE|semua] [--operator <pegangan>]   # kebijakan gedung (FR-55, ADR-0049): tanpa opsi hanya membaca; mengubah hanya kunci yang diberikan; kanal efektif = kebijakan ∩ kanal global
+ANASTROPHE_DATABASE_URL=postgres://… go -C backend run ./cmd/anastrophe-registry suspend|resume --card-instance <uuid> --operator <pegangan>   # tangguhkan/pulihkan kartu (FR-51, ADR-0036); revoke --card-instance <uuid> [--reason hilang] mencabut dan mengisi denylist
 ```
 
 Lab end-to-end (build DEBUG; kartu diterbitkan backend dev, tanpa `lab_ca.py issue`):
 
 ```bash
 export ANASTROPHE_DATABASE_URL=postgres://…
-go -C backend run ./cmd/anastrophe-devseed -lab-dir ../scripts/anp1/.lab   # mencetak {"site_id","device_id"}
+export ANASTROPHE_DEV_REGISTRY_KEY=$(openssl rand -hex 32)   # kunci registri dev, sama untuk devseed dan API
+go -C backend run ./cmd/anastrophe-devseed -lab-dir ../scripts/anp1/.lab   # mencetak {"site_id","device_id","join_code"}
+# devseed juga mendaftarkan kartu lab ke registri (-lab-card, default iso14443a:04a1b2c3d4e5f6)
 ANASTROPHE_DEV_SOFTWARE_CA=1 go -C backend run ./cmd/anastrophe-api
 xcrun simctl launch booted app.anastrophe -ANLabBackend http://127.0.0.1:8080 \
-  -ANLabDevice <device_id> -ANLabSite <site_id>
+  -ANLabDevice <device_id> -ANLabSite <site_id>   # opsional: -ANLabCard <tech>:<hex> (default sama dengan devseed) atau -ANLabInvite <token>
 ```
+
+Alur Tambah Kartu produksi (ADR-0043) di simulator, lewat jalur yang sama dengan pengguna:
+
+```bash
+xcrun simctl launch booted app.anastrophe -ANAPIBaseURL http://127.0.0.1:8080 \
+  -ANLabCardReader iso14443a:04a1b2c3d4e5f6 -ANLabAddCode <join_code>   # pembaca palsu (simulator tidak bisa membaca kartu)
+xcrun simctl launch booted app.anastrophe -ANAPIBaseURL http://127.0.0.1:8080 \
+  -ANLabOpenURL https://contoh.test/i/<token>   # sama seperti tautan undangan yang dibuka sistem, lalu dikirim otomatis
+```
+
+Build Release mengambil alamat API dari `AN_API_BASE_URL` di `Config/Local.xcconfig`, yang wajib `https` dan ditulis `https:/$()/host` karena `//` memulai komentar xcconfig. Tanpa nilai itu, Tambah Kartu menampilkan "Layanan belum tersedia". Perangkat app dibuat server pada enrolment pertamanya (ADR-0045), jadi tidak perlu devseed `-new-device`.
 
 Catatan alur lab:
 
 - **Reader uji.** `-lab-dir` memakai kunci reader group dari `lab_ca.py init`, sehingga ponsel menerima tanda tangan reader uji. Reader juga memverifikasi sertifikat terhadap Site CA (SDD §7.5). CA dev `anastrophe-api` dibuat ulang setiap start (kunci publiknya dicetak di log), dan `site_id` di sertifikat = `-site-code` devseed, jadi reader uji harus memakai keduanya. Tanpa `-lab-dir`, devseed membuat group baru yang kunci privatnya dibuang.
-- **Batas 8 kartu.** Setiap enrolment memakai satu dari 8 slot kartu perangkat di server, termasuk percobaan yang gagal setelah enrolment. Bila app menampilkan "Batas 8 kartu" padahal tidak ada kartu, buat perangkat baru untuk gedung yang sama dengan `go -C backend run ./cmd/anastrophe-devseed -site-code <hex> -new-device`.
-- **Provisioning otomatis.** Argumen `-ANLab*` hanya memprovisikan bila perangkat belum punya kartu dan penyimpanan berfungsi; kartu berikutnya lewat layar Lab → "Backend dev". Kode lab tidak ikut build Release.
+- **Batas 8 kartu.** Setiap enrolment memakai satu dari 8 slot kartu perangkat di server. Enrolment yang gagal sebelum kredensial dilanjutkan bila dicoba lagi, dan slotnya bebas otomatis setelah 15 menit (ADR-0034). Perangkat baru untuk gedung yang sama: `go -C backend run ./cmd/anastrophe-devseed -site-code <hex> -new-device` (tidak butuh kunci registri).
+- **Perangkat tambahan.** Perangkat kedua untuk kartu lab yang sama mendapat `PENDING_APPROVAL` dan app menampilkan "Menunggu persetujuan". Setujui dengan `anastrophe-registry approve --card-instance <id> --operator <pegangan>`, lalu jalankan app lagi: enrolment dilanjutkan dan kredensial diterbitkan (ADR-0032/0034).
+- **Undangan.** `anastrophe-registry invite --site <site_id> --operator <pegangan>` mencetak token sekali. Jalankan app dengan `-ANLabInvite <token>` sebagai pengganti kartu lab: enrolment tanpa kartu fisik, selalu langsung `PROVISIONING` (ADR-0033). Token yang terpakai, kedaluwarsa, atau tak dikenal ditolak dengan "Undangan tidak berlaku atau sudah dipakai."
+- **Status kartu.** `anastrophe-registry suspend|resume|revoke --card-instance <id> --operator <pegangan>` (id dari `list --site <site_id>`). App membaca status dengan token baca status saat layar Kunci dibuka atau app kembali aktif, paling sering sekali per menit; buka ulang app untuk melihat Ditangguhkan, Aktif, atau Dicabut (ADR-0037). Tidak ada prompt Face ID/passcode. Keterbatasan terbuka: setelah suspend/revoke, pemegang kartu masih bisa mendaftar ulang kartu fisik yang sama; CLI mencetak peringatan sampai ADR-0038 diputuskan.
+- **Provisioning aman.** App membuat rahasia enrolment per enrolment (hanya di memori) dan mengirim hash-nya; provisioning kredensial pertama wajib membawa rahasia itu, jadi id instance dari `:challenge` tidak cukup. Tambah kanal ke kartu aktif ditolak (ADR-0040). Risiko sisa: id perangkat + identitas kartu masih bisa mengambil alih enrolment yang belum selesai (ADR-0041, menunggu keputusan).
+- **Provisioning otomatis.** Argumen `-ANLab*` hanya memprovisikan bila perangkat belum punya kartu dan penyimpanan berfungsi. Layar Lab → "Backend dev" memakai kartu lab bawaan; untuk kartu lain, daftarkan dulu lewat `anastrophe-registry import` lalu jalankan app dengan `-ANLabCard <tech>:<hex>`. Kode lab tidak ikut build Release.
 - **Perpanjangan.** `-ANLabRenew` (atau tombol "Perpanjang (lab)" di detail kartu) memperpanjang sertifikat kartu dari backend tanpa tap. Di luar lab, perpanjangan hanya terjadi setelah tap (ADR-0023).
 - **Hapus kartu.** `-ANLabDelete` menghapus kartu pertama tanpa ketukan (verifikasi simulator). Di app biasa: Detail → Pengaturan → Hapus kartu, dengan konfirmasi dan autentikasi (FR-31, ADR-0026).
 - **iPhone fisik.** Alur ini baru diverifikasi di simulator (`http://127.0.0.1`). Mulai iOS 17, ATS tidak lagi mengizinkan HTTP ke alamat IP secara default (O-B07), jadi di iPhone fisik pakai nama `.local` Mac, mis. `http://nama-mac.local:8080`. API dev tanpa autentikasi, jadi jalankan hanya di jaringan tepercaya. Belum diverifikasi di perangkat.
@@ -109,10 +135,23 @@ python3 scripts/docs/check_docs.py .        # traceability FR/NFR → TC, ID, ta
 python3 scripts/docs/check_mermaid.py . /tmp/mmd <path-mmdc> <puppeteer.json>   # render semua diagram
 ```
 
+## Pemindaian keamanan
+
+Pemeriksaan secret dan dependensi (TC-SEC-11, ADR-0056). Butuh gitleaks ≥ 8.30, `go` di PATH, clone penuh (bukan `--depth`), serta akses ke `proxy.golang.org`, `vuln.go.dev`, dan `api.osv.dev`. Ke OSV hanya dikirim nama dan versi paket.
+
+```bash
+python3 scripts/security/scan.py                 # secret (seluruh riwayat git + staged) dan dependensi
+python3 scripts/security/scan.py --build build/DerivedDataScan/Build/Products/Release-iphonesimulator/Anastrophe.app   # ditambah produk build
+python3 -m unittest discover -s scripts/security  # test pemindai
+python3 -m pip install -r scripts/anp1/requirements.txt   # advisori Python diperiksa pada versi yang terpasang
+```
+
+Exit 0 berarti bersih, 1 ada temuan, dan 2 berarti alat, git, jaringan, atau keluaran alat gagal (tidak pernah dianggap lulus). Nilai secret tidak pernah dicetak. Penekanan hanya lewat allowlist sempit beralasan di `.gitleaks.toml`: komentar `gitleaks:allow` diabaikan dan `.gitleaksignore` ditolak. Hook pre-commit tidak dipasang otomatis; bila mau, jalankan `gitleaks git --staged --redact .` sebelum commit.
+
 ## Langkah berikutnya
 
 1. Putuskan ADR-0017 (entitas); ini tidak menghalangi rencana [R1 tracer bullet](docs/superpowers/plans/2026-11-01-r1-tracer-bullet.md) sisi app, tetapi menghalangi entitlement NFC.
 1. Putuskan ADR-0022 (reader uji BLE): menentukan cara menjalankan TC-PRSB-01 sebelum reader referensi R2 tersedia.
-1. Tinjau lima gate penutupan yang dieskalasi JEV (lab end-to-end, perpanjangan sertifikat, audit log, hapus kartu, riwayat tap): [`docs/adr/jev-log/`](docs/adr/jev-log/) (`*-gate.json`). Empat gate pertama memverifikasi semua klaim, tetapi skor keyakinannya di bawah ambang auto-accept. Gate riwayat tap: run pertama menandai klaim jumlah test *contradicted* (confidence 0,44); run kedua menandai empat klaim *unsupported* karena log uji hanya dikirim di kolom `tests`, bukan sebagai `evidence`.
+1. Tinjau tujuh gate penutupan yang dieskalasi JEV (lab end-to-end, perpanjangan sertifikat, audit log, hapus kartu, riwayat tap, minor riwayat tap, registri kartu): [`docs/adr/jev-log/`](docs/adr/jev-log/) (`*-gate.json`). Empat gate pertama memverifikasi semua klaim, tetapi skor keyakinannya di bawah ambang auto-accept. Gate riwayat tap: run pertama menandai klaim jumlah test *contradicted* (confidence 0,44); run kedua menandai empat klaim *unsupported* karena log uji hanya dikirim di kolom `tests`, bukan sebagai `evidence`. Gate minor riwayat tap memverifikasi semua klaim (0 *contradicted*, 0 *unsupported*), tetapi confidence-nya di bawah ambang. Gate registri kartu menandai klaim pertama *contradicted* karena terlalu luas: perangkat penuh sengaja menerima `ENR-LIMIT` untuk kartu tak dikenal.
 2. M0: survei reader gedung pilot, kontrak 2 operator pilot, ajukan entitlement NFC & SE, kirim kuesioner Apple Wallet Access Program.
 3. Setelah restart: jalankan `/setup-matt-pocock-skills`, lalu `/to-tickets` untuk memecah PRD/SDD menjadi tiket *tracer-bullet* R1.

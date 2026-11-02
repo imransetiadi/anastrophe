@@ -1,0 +1,37 @@
+{
+ "tool": "jev_decide",
+ "label": "D39-fokus-provisioning-aman",
+ "decision": "Which focus should the next autonomous iteration of Anastrophe build, now that operator lifecycle and card status (ADR-0036/0037) are done and ADR-0038 awaits the user?",
+ "candidates": [
+  {
+   "id": "secure_provisioning",
+   "description": "Close the credential-minting hole: provisioning (POST /v1/enrollments/{id}/credentials) must prove it comes from the device that started the enrolment, for example with an app-generated provisioning secret whose hash is sent at enrolment, and the unauthenticated challenge must stop being a source of usable instance ids for provisioning. Includes app changes, tests, and an e2e lab check."
+  },
+  {
+   "id": "faq_in_app",
+   "description": "FR-60: in-app FAQ screen with per-channel answers in ID and EN, reachable from the Keys tab. App-only."
+  },
+  {
+   "id": "hardening_backlog",
+   "description": "Fix the verified open backlog items (renewal gaps, presentation overlap, BLE fragment length, flaky test, audit time, invitation and lifecycle minors). No new user-facing feature."
+  },
+  {
+   "id": "add_card_flow_mocked",
+   "description": "FR-05/FR-10: Release 'Tambah kartu' flow behind protocols with mocked device registration and NFC reading; live wiring waits for accounts, App Attest and a physical iPhone."
+  }
+ ],
+ "evidence_refs": [
+  "review akhir siklus hidup (declined to judge: penerbitan kredensial lewat id instance, direproduksi 200)",
+  "ADR-0027 (card_instance_id di :challenge)",
+  "PRD FR-60, FR-05, FR-10",
+  "docs/agentmemory/backlog.md",
+  "ADR-0037 (pelajaran idempotency)"
+ ],
+ "priorities": "1) Security correctness first: close known high-severity holes before adding features (CLAUDE.md rules, SDD tracer note). 2) Not blocked by pending user decisions, hardware, or Apple capabilities. 3) Verifiable end-to-end in the iOS simulator with the local backend. 4) Bounded to one plan of 3–5 tasks on existing modules.",
+ "requirements": [
+  "Removes a known high-severity security gap or implements a currently missing P0 requirement.",
+  "Can be verified end-to-end in the iOS simulator with the local backend, without a physical iPhone, reader hardware, an Apple Developer team, or a pending user decision.",
+  "Fits in one plan of at most 5 tasks that builds on existing modules."
+ ],
+ "escalate_on_contradiction": true
+}

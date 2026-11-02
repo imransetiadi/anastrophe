@@ -10,4 +10,6 @@ tags: [jev, gate, proses]
 - Tulis klaim persis seperti bunyi log (misalnya baris `Test run with N tests … passed`), bukan angka turunan seperti "234 lulus".
 - Taruh kutipan log verbatim sebagai butir `evidence` tersendiri (host, simulator, mutasi, isi katalog).
 - Gate ulang paling banyak sekali, dan hanya dengan bukti baru (ADR-0018). Bila tetap tereskalasi, catat lognya dan teruskan ke pengguna.
-- Kasus: [Perbaikan review riwayat tap](../sessions/2026-11-01-perbaikan-riwayat-tap.md).
+- Kirim kode fungsi yang diklaim apa adanya di `diff`, bukan ringkasan komentar. Klaim tentang fungsi yang hanya diringkas bisa dinilai *contradicted*.
+- Klaim harus setepat buktinya. "Setiap perbaikan punya test yang gagal lebih dulu" salah bila sebagian perbaikan berupa dokumen; pisahkan perbaikan kode dan dokumen dalam klaim.
+- Kasus: [Perbaikan review riwayat tap](../sessions/2026-11-01-perbaikan-riwayat-tap.md); [Uji beban API](../sessions/2026-11-02-uji-beban-api.md) (log suite hanya di `tests`, klaim mencakup perbaikan dokumen); [Pemindaian secret dan dependensi](../sessions/2026-11-02-pemindaian-secret-dependensi.md) (fungsi dikirim sebagai ringkasan).

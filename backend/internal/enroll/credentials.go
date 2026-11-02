@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -12,11 +13,14 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/imransetiadi/anastrophe/backend/internal/anp1"
 	"github.com/imransetiadi/anastrophe/backend/internal/certs"
 	"github.com/imransetiadi/anastrophe/backend/internal/httpapi"
+	"github.com/imransetiadi/anastrophe/backend/internal/registry"
 	"github.com/imransetiadi/anastrophe/backend/internal/store"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -31,6 +35,8 @@ type Handler struct {
 	Validity time.Duration // default ADR-0010: 7 hari; gedung bisa mengatur 1–30 hari
 	// EnabledChannels = kanal yang diizinkan /v1/config (kill switch per kanal, FR-04).
 	EnabledChannels []string
+	// Registry menghitung HMAC identitas kartu per gedung (ADR-0031); wajib untuk enrolment.
+	Registry registry.MAC
 }
 
 func (h *Handler) channelEnabled(channel string) bool {
@@ -47,6 +53,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	httpapi.Route(mux, http.MethodPost, "/v1/enrollments/{id}/credentials", h.issueCredential)
 	httpapi.Route(mux, http.MethodPost, "/v1/credentials/{action}", h.credentialAction)
 	httpapi.Route(mux, http.MethodDelete, "/v1/cards/{id}", h.deleteCard)
+	httpapi.Route(mux, http.MethodGet, "/v1/cards/{id}/status", h.cardStatus)
+	httpapi.Route(mux, http.MethodGet, "/v1/sites/lookup", h.lookupSite)
 }
 
 // validIdempotencyKey: klien mengirim UUID; batasi ke [A-Za-z0-9_-]{1,128} agar byte aneh
@@ -82,34 +90,117 @@ const maxBody = 4 << 10
 
 var supportedChannels = map[string]bool{"ble": true, "nfcHCE": true}
 
-// createEnrollment adalah pengganti sementara tracer bullet: enrolment produksi memakai
-// identitas kartu fisik (HMAC registri), security code, dan App Attest (rencana berikutnya).
+// createEnrollment memulai enrolment untuk kartu fisik yang terdaftar di registri gedung (FR-11, FR-13;
+// ADR-0031) atau untuk undangan sekali pakai (FR-12; ADR-0033); tepat satu dari keduanya. Identitas kartu
+// hanya dipakai untuk menghitung HMAC per gedung lalu dibuang, dan token undangan hanya dipakai dalam
+// bentuk hash (CLAUDE.md aturan 6). Security code dan App Attest menyusul bersama akun (ADR-0032).
 func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		DeviceID string `json:"device_id"`
 		SiteID   string `json:"site_id"`
+		Card     *struct {
+			Tech string `json:"tech"`
+			ID   string `json:"id"`
+		} `json:"card"`
+		Invitation *string `json:"invitation"`
+		// ProvisioningKeyHash: SHA-256 rahasia enrolment dari app (ADR-0040).
+		ProvisioningKeyHash *string `json:"provisioning_key_hash"`
 	}
 	body, ok := readBody(w, r)
 	if !ok {
 		return
 	}
-	if err := json.Unmarshal(body, &req); err != nil {
+	if err := json.Unmarshal(body, &req); err != nil || (req.Card == nil) == (req.Invitation == nil) {
 		httpapi.WriteProblem(w, problem("REQ-INVALID", http.StatusBadRequest))
 		return
 	}
-	enroll := func(add func() (string, error)) (int, []byte, error) {
-		id, err := add()
+	provisioningHash, ok := parseHashField(req.ProvisioningKeyHash)
+	if !ok {
+		httpapi.WriteProblem(w, problem("REQ-INVALID", http.StatusBadRequest))
+		return
+	}
+	// requestKey masuk hash idempotency: HMAC kartu atau hash token, tidak pernah nilai mentah,
+	// karena baris idempotency tersimpan di database (aturan 6).
+	var requestKey string
+	var inTx func(ctx context.Context, tx *store.Tx) (store.CardEnrollment, error)
+	if req.Invitation != nil {
+		tokenHash, err := store.InvitationTokenHash(*req.Invitation)
+		if err != nil {
+			httpapi.WriteProblem(w, problem("REQ-INVALID", http.StatusBadRequest))
+			return
+		}
+		requestKey = "invitation:" + hex.EncodeToString(tokenHash)
+		inTx = func(ctx context.Context, tx *store.Tx) (store.CardEnrollment, error) {
+			return tx.EnrollInvitation(ctx, req.DeviceID, tokenHash, h.Now())
+		}
+	} else {
+		identity, err := registry.ParseCardIdentity(req.Card.Tech, req.Card.ID)
+		if err != nil {
+			httpapi.WriteProblem(w, problem("REQ-INVALID", http.StatusBadRequest))
+			return
+		}
+		// ID gedung dinormalisasi sekali sebelum MAC, agar impor dan enrolment selalu cocok apa pun
+		// sumber MAC-nya (review registri minor 9).
+		siteID := strings.ToLower(strings.TrimSpace(req.SiteID))
+		// Dihitung di luar transaksi database: produksi memanggil KMS.
+		cardHMAC, err := h.Registry.MAC(r.Context(), siteID, identity.MACInput())
+		if err != nil {
+			h.writeResult(w, r, 0, nil, err, "registry mac failed")
+			return
+		}
+		requestKey = siteID + "\n" + hex.EncodeToString(cardHMAC)
+		inTx = func(ctx context.Context, tx *store.Tx) (store.CardEnrollment, error) {
+			return tx.EnrollCard(ctx, req.DeviceID, siteID, cardHMAC, h.Now())
+		}
+	}
+	enroll := func(result store.CardEnrollment, err error) (int, []byte, error) {
 		var pgErr *pgconn.PgError
 		switch {
 		case errors.Is(err, store.ErrCardLimit):
 			return problemBody("ENR-LIMIT", http.StatusConflict)
+		case errors.Is(err, store.ErrDuplicateEnrollment):
+			return problemBody("ENR-DUPLICATE", http.StatusConflict)
+		case errors.Is(err, store.ErrPendingLimit):
+			return problemBody("ENR-PENDING-LIMIT", http.StatusConflict)
+		case errors.Is(err, store.ErrSiteUnsupported):
+			return problemBody("ENR-SITE-UNSUPPORTED", http.StatusNotFound)
+		case errors.Is(err, store.ErrNotRegistered):
+			return problemBody("ENR-NOT-REGISTERED", http.StatusNotFound)
+		case errors.Is(err, store.ErrInvitationInvalid):
+			// Tak dikenal, kedaluwarsa, dan terpakai dijawab identik (TC-ENR-08).
+			return problemBody("ENR-INVITATION-INVALID", http.StatusNotFound)
 		case errors.Is(err, store.ErrNotFound), errors.As(err, &pgErr) && pgErr.Code == "23503":
 			return problemBody("ENR-NOT-FOUND", http.StatusNotFound)
 		case err != nil:
 			return 0, nil, err
 		}
-		out, err := json.Marshal(map[string]string{"enrollment_id": id})
+		out, err := json.Marshal(struct {
+			EnrollmentID string   `json:"enrollment_id"`
+			Status       string   `json:"status"`
+			Channels     []string `json:"channels"` // ADR-0049: kanal efektif gedung
+		}{result.ID, result.Status, h.effectiveChannels(result.Channels)})
+		if result.Resumed {
+			return http.StatusOK, out, err // ADR-0034: instance yang belum selesai dilanjutkan
+		}
 		return http.StatusCreated, out, err
+	}
+	// ADR-0040: instance yang dikembalikan kepada perangkat ini dan masih menunggu kredensial pertama
+	// (baru, dilanjutkan, atau dipromosikan) memakai rahasia enrolment terbaru, dalam transaksi yang sama.
+	// ADR-0051: audit enrolment sudah ditulis saat inTx kembali, dan baris instance yang dikembalikan sudah
+	// dikunci enrolment, jadi langkah di bawah tidak menunggu baris sambil memegang kunci rantai audit.
+	armed := func(ctx context.Context, tx *store.Tx) (store.CardEnrollment, error) {
+		result, err := inTx(ctx, tx)
+		if err == nil && provisioningHash != nil && (result.Status == "PROVISIONING" || result.Status == "PENDING_APPROVAL") {
+			err = tx.SetProvisioningKeyHash(ctx, result.ID, provisioningHash)
+		}
+		if err == nil {
+			// ADR-0049: dibaca di transaksi yang sama agar instance yang baru dibuat ikut terlihat.
+			result.Channels, err = tx.SiteChannelsOfInstance(ctx, result.ID)
+		}
+		return result, err
+	}
+	if provisioningHash != nil {
+		requestKey += "\n" + base64.StdEncoding.EncodeToString(provisioningHash)
 	}
 	// SDD §8.5: POST mutasi menerima Idempotency-Key; dengan key, ketuk ganda tidak memakan
 	// dua jatah dari batas 8 kartu.
@@ -121,24 +212,30 @@ func (h *Handler) createEnrollment(w http.ResponseWriter, r *http.Request) {
 			httpapi.WriteProblem(w, problem("REQ-IDEMPOTENCY-KEY", http.StatusBadRequest))
 			return
 		}
-		hash := sha256.Sum256([]byte(r.URL.Path + "\n" + req.DeviceID + "\n" + req.SiteID))
+		hash := sha256.Sum256([]byte(r.URL.Path + "\n" + req.DeviceID + "\n" + requestKey))
 		status, resp, err = h.Store.Idempotent(r.Context(), key, hash[:], func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
-			return enroll(func() (string, error) { return tx.StartEnrollment(ctx, req.DeviceID, req.SiteID, h.Now()) })
+			return enroll(armed(ctx, tx))
 		})
 	} else {
-		status, resp, err = enroll(func() (string, error) { return h.Store.StartEnrollment(r.Context(), req.DeviceID, req.SiteID, h.Now()) })
+		var result store.CardEnrollment
+		txErr := h.Store.InTx(r.Context(), func(tx *store.Tx) error {
+			var err error
+			result, err = armed(r.Context(), tx)
+			return err
+		})
+		status, resp, err = enroll(result, txErr)
 	}
-	h.writeResult(w, status, resp, err, "create enrollment failed")
+	h.writeResult(w, r, status, resp, err, "create enrollment failed")
 }
 
 // writeResult menulis hasil handler; error infrastruktur menjadi 500 tanpa detail.
-func (h *Handler) writeResult(w http.ResponseWriter, status int, resp []byte, err error, logMessage string) {
+func (h *Handler) writeResult(w http.ResponseWriter, r *http.Request, status int, resp []byte, err error, logMessage string) {
 	switch {
 	case errors.Is(err, store.ErrIdempotencyConflict):
 		httpapi.WriteProblem(w, problem("REQ-IDEMPOTENCY-CONFLICT", http.StatusUnprocessableEntity))
 		return
 	case err != nil:
-		slog.Error(logMessage, "err_type", errorType(err))
+		slog.ErrorContext(r.Context(), logMessage, "err_type", errorType(err)) // ADR-0054: membawa request_id
 		httpapi.WriteProblem(w, problem("INTERNAL", http.StatusInternalServerError))
 		return
 	}
@@ -171,13 +268,27 @@ func (h *Handler) issueCredential(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.PathValue("id")
+	if encoded, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
+		if secret, err := base64.RawURLEncoding.DecodeString(encoded); err == nil && len(secret) == 32 {
+			sum := sha256.Sum256(secret)
+			req.SecretHash = sum[:]
+		}
+	}
 	// Hash atas isi yang sudah dinormalkan, bukan byte mentah: urutan kunci JSON dari klien
 	// (mis. dictionary Swift) bisa berbeda antar-retry.
-	hash := sha256.Sum256([]byte(r.URL.Path + "\n" + req.Channel + "\n" + base64.StdEncoding.EncodeToString(req.PublicKey)))
+	material := r.URL.Path + "\n" + req.Channel + "\n" + base64.StdEncoding.EncodeToString(req.PublicKey)
+	if req.SecretHash != nil {
+		material += "\n" + hex.EncodeToString(req.SecretHash)
+	}
+	if req.StatusTokenHash != nil {
+		// Hanya bila ada, agar hash permintaan klien lama tidak berubah (ADR-0037).
+		material += "\n" + base64.StdEncoding.EncodeToString(req.StatusTokenHash)
+	}
+	hash := sha256.Sum256([]byte(material))
 	status, resp, err := h.Store.Idempotent(r.Context(), key, hash[:], func(ctx context.Context, tx *store.Tx) (int, []byte, error) {
 		return h.issue(ctx, tx, id, req)
 	})
-	h.writeResult(w, status, resp, err, "issue credential failed")
+	h.writeResult(w, r, status, resp, err, "issue credential failed")
 }
 
 type provisioned struct {
@@ -194,13 +305,18 @@ type provisioned struct {
 type credentialRequest struct {
 	Channel   string
 	PublicKey []byte
+	// StatusTokenHash: SHA-256 token baca status dari app (ADR-0037), opsional untuk klien lama.
+	StatusTokenHash []byte
+	// SecretHash: SHA-256 rahasia enrolment dari header Authorization (ADR-0040); nil bila tidak ada.
+	SecretHash []byte
 }
 
 // parseCredentialRequest memvalidasi isi permintaan sebelum menyentuh database.
 func parseCredentialRequest(body []byte) (credentialRequest, *httpapi.Problem) {
 	var raw struct {
-		Channel   string `json:"channel"`
-		PublicKey string `json:"public_key"`
+		Channel         string  `json:"channel"`
+		PublicKey       string  `json:"public_key"`
+		StatusTokenHash *string `json:"status_token_hash"`
 	}
 	if err := json.Unmarshal(body, &raw); err != nil {
 		p := problem("REQ-INVALID", http.StatusBadRequest)
@@ -219,7 +335,12 @@ func parseCredentialRequest(body []byte) (credentialRequest, *httpapi.Problem) {
 		p := problem("ENR-INVALID-KEY", http.StatusBadRequest)
 		return credentialRequest{}, &p
 	}
-	return credentialRequest{Channel: raw.Channel, PublicKey: pub}, nil
+	tokenHash, ok := parseHashField(raw.StatusTokenHash)
+	if !ok {
+		p := problem("REQ-INVALID", http.StatusBadRequest)
+		return credentialRequest{}, &p
+	}
+	return credentialRequest{Channel: raw.Channel, PublicKey: pub, StatusTokenHash: tokenHash}, nil
 }
 
 // issue mengembalikan (status, body JSON); error hanya untuk kegagalan infrastruktur.
@@ -234,10 +355,24 @@ func (h *Handler) issue(ctx context.Context, tx *store.Tx, enrollmentID string, 
 	if err != nil {
 		return 0, nil, err
 	}
-	// SDD §8.2: hanya kartu yang sedang diprovisikan (atau aktif untuk kanal baru) yang
-	// boleh mendapat sertifikat.
-	if enrollment.Status != "PROVISIONING" && enrollment.Status != "ACTIVE" {
+	// ADR-0040: rahasia enrolment diperiksa sebelum status apa pun diungkap; rahasia hilang atau salah
+	// dijawab sama dengan id tak dikenal.
+	if len(enrollment.ProvisioningKeyHash) != 32 || len(req.SecretHash) != 32 ||
+		subtle.ConstantTimeCompare(enrollment.ProvisioningKeyHash, req.SecretHash) != 1 {
+		return problemBody("ENR-NOT-FOUND", http.StatusNotFound)
+	}
+	if enrollment.Status == "PENDING_APPROVAL" {
+		return problemBody("ENR-PENDING-APPROVAL", http.StatusConflict) // ADR-0032: menunggu operator
+	}
+	// Hanya kredensial pertama: kanal baru untuk kartu aktif ditolak sampai ada alur tambah kanal
+	// bertanda tangan (ADR-0040).
+	if enrollment.Status != "PROVISIONING" {
 		return problemBody("ENR-NOT-PROVISIONABLE", http.StatusConflict)
+	}
+	// ADR-0049: kanal di luar kebijakan gedung ditolak seperti kanal yang dimatikan global, dan hanya
+	// sesudah rahasia diperiksa sehingga kebijakan tidak bocor sebelum autentikasi.
+	if !slices.Contains(h.effectiveChannels(enrollment.Channels), req.Channel) {
+		return problemBody("ENR-INVALID-CHANNEL", http.StatusBadRequest)
 	}
 	exists, err := tx.HasActiveCredential(ctx, enrollment.ID, req.Channel)
 	if err != nil {
@@ -271,6 +406,11 @@ func (h *Handler) issue(ctx context.Context, tx *store.Tx, enrollmentID string, 
 		CardInstanceID: enrollment.ID, Channel: req.Channel, CredID: credID, PubKey: pub, Cert: cert, NotAfter: notAfter,
 	}); err != nil {
 		return 0, nil, err
+	}
+	if req.StatusTokenHash != nil {
+		if err := tx.InitStatusTokenHash(ctx, enrollment.ID, req.StatusTokenHash); err != nil {
+			return 0, nil, err
+		}
 	}
 	if err := tx.AppendAudit(ctx, credentialAudit("credential.provisioned", enrollment, credID, req.Channel, notAfter, notBefore)); err != nil {
 		return 0, nil, err

@@ -36,3 +36,27 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0030](0030-tampilan-riwayat-tap.md) | Detail kartu: lima tap terbaru + riwayat 30 hari | Diterima | `inline_recent_plus_all` | 0.95 |
 | [ADR-0031](0031-fokus-registri-enrolment-server.md) | Iterasi berikutnya: registri kartu fisik dan pencocokan enrolment di server | Diterima | `registry_enrolment_server` | 0.88 |
 | [ADR-0032](0032-perangkat-tambahan-menunggu-persetujuan.md) | Sebelum ada akun: perangkat pertama diprovisikan, perangkat tambahan menunggu persetujuan | Diterima (provisional — tinjau ulang saat fondasi akun dibangun) | `pending_for_additional` | 0.71 |
+| [ADR-0033](0033-fokus-enrolment-undangan.md) | Iterasi berikutnya: enrolment via undangan | Diterima | `invitation_enrolment` | 0.89 |
+| [ADR-0034](0034-lanjutkan-enrolment-belum-selesai.md) | Enrolment yang belum selesai dilanjutkan; PROVISIONING tanpa kredensial kedaluwarsa 15 menit | Diterima | `resume_plus_expiry` | 0.81 |
+| [ADR-0035](0035-undangan-berkartu-menyetujui-instance.md) | Undangan berkartu menyetujui instance yang belum selesai milik perangkat yang sama | Diterima | `promote_existing` | 0.94 |
+| [ADR-0036](0036-fokus-siklus-hidup-kartu-operator.md) | Fokus berikutnya: siklus hidup kartu oleh operator dan status kartu di app | Diterima | `operator_lifecycle_status` | 0.98 |
+| [ADR-0037](0037-token-baca-status-kartu.md) | App membaca status kartu dengan token baca status | Diterima | `status_read_token` | 0.96 |
+| [ADR-0038](0038-cegah-pembatalan-tindakan-operator.md) | Pemegang kartu tidak boleh membatalkan suspend/revoke operator (terbuka) | Diusulkan — butuh keputusan manusia (eskalasi) | — (escalate) | 0.45 |
+| [ADR-0039](0039-fokus-provisioning-aman.md) | Fokus berikutnya: provisioning kredensial hanya untuk perangkat yang memulai enrolment | Diterima | `secure_provisioning` | 0.92 |
+| [ADR-0040](0040-rahasia-enrolment-kredensial-pertama.md) | Rahasia enrolment untuk kredensial pertama; tambah kanal ke kartu aktif ditolak | Diterima | `secret_first_block_add_channel` | 0.83 |
+| [ADR-0041](0041-pengambilalihan-enrolment-belum-selesai.md) | Pengambilalihan enrolment yang belum selesai lewat id perangkat (terbuka) | Diusulkan — butuh keputusan manusia (eskalasi) | — (escalate) | 0.44 |
+| [ADR-0042](0042-fokus-setelah-provisioning-aman.md) | Fokus berikutnya setelah provisioning aman | Diterapkan (rekomendasi penulis; persetujuan umum pengguna) | `hardening_minors` (escalate 0.41) | 0.41 |
+| [ADR-0043](0043-fokus-alur-tambah-kartu.md) | Fokus berikutnya: alur Tambah Kartu produksi | Diterima | `alur_tambah_kartu` | 0.98 |
+| [ADR-0044](0044-kode-gedung-untuk-enrolment-kartu.md) | Kode gedung untuk enrolment kartu fisik | Diterima | `kode_gedung_lookup` | 0.96 |
+| [ADR-0045](0045-perangkat-dibuat-saat-enrolment.md) | Perangkat dibuat di dalam transaksi enrolment | Provisional (ditinjau M2) | `otomatis_saat_enrolment` | 0.77 |
+| [ADR-0046](0046-oracle-tebak-kartu-gerbang-pra-pilot.md) | Oracle tebak kartu pada enrolment menjadi gerbang pra-pilot (terbuka) | Tereskalasi — inti bersama diterapkan, pilihan kontrol menunggu manusia | `deteksi_per_gedung` (escalate) | 0.49 |
+| [ADR-0047](0047-batas-permintaan-menunggu-per-kartu.md) | Batas permintaan perangkat tambahan yang menunggu per kartu (terbuka sebagian) | Tereskalasi — batas 4 diterapkan, kedaluwarsa menunggu manusia | `batas_pending_per_kartu` (escalate) | 0.51 |
+| [ADR-0048](0048-fokus-bantuan-faq.md) | Fokus berikutnya: layar Bantuan dan FAQ in-app | Diterima | `bantuan_faq` | 0.99 |
+| [ADR-0049](0049-fokus-kebijakan-gedung.md) | Fokus berikutnya: kebijakan gedung (FR-55 sebagian) | Provisional (ditinjau M2) | `kebijakan_gedung` | 0.63 |
+| [ADR-0050](0050-fokus-filter-daftar-kartu.md) | Fokus berikutnya: filter kanal dan pencarian daftar kartu (FR-50) | Diterima | `filter_cli_fr50` | 1.0 |
+| [ADR-0051](0051-fokus-deadlock-enrolment-sapuan.md) | Fokus berikutnya: deadlock enrolment–sapuan per jam | Diterima | `deadlock_sapuan` | 0.96 |
+| [ADR-0052](0052-fokus-verifier-app-attest.md) | Fokus berikutnya: verifier App Attest di backend (NFR-S03, langkah pertama) | Provisional (ditinjau M2) | `app_attest_verifier` | 0.60 |
+| [ADR-0053](0053-fokus-sisa-keychain-instal-ulang.md) | Fokus berikutnya: bersihkan sisa Keychain saat instal ulang (FR-43 sebagian) | Tereskalasi — diterapkan (risiko rendah; persetujuan umum pengguna), penyambungan App Attest menunggu manusia | `instal_ulang_fr43` (escalate) | 0.39 |
+| [ADR-0054](0054-fokus-observabilitas-backend.md) | Fokus berikutnya: observabilitas backend — log akses terstruktur dan metrik (NFR-O01 sebagian) | Diterima | `observability_nfr_o01` | 0.99 |
+| [ADR-0055](0055-fokus-uji-beban-api.md) | Fokus berikutnya: uji beban API dan baseline lab (TC-PERF-05) | Diterima | `uji_beban_api` | 0.95 |
+| [ADR-0056](0056-fokus-pemindaian-secret-dependensi.md) | Fokus berikutnya: pemindaian secret dan dependensi (TC-SEC-11) | Diterima | `pemindaian_secret_dependensi` | 0.93 |

@@ -15,8 +15,18 @@
 		A1000000000000000000F002 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A1000000000000000000X001 /* Exceptions for "App" folder in "Anastrophe" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A1000000000000000000T001 /* Anastrophe */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		A1000000000000000000G001 /* App */ = {isa = PBXFileSystemSynchronizedRootGroup; path = App; sourceTree = "<group>"; };
+		A1000000000000000000G001 /* App */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (A1000000000000000000X001 /* Exceptions for "App" folder in "Anastrophe" target */, ); path = App; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -188,6 +198,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Anastrophe;
 				INFOPLIST_KEY_NFCReaderUsageDescription = "Anastrophe membaca kartu akses Anda untuk memverifikasi kepemilikan.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Anastrophe memakai Face ID agar hanya Anda yang bisa memakai kartu akses Anda.";
@@ -217,6 +228,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Anastrophe;
 				INFOPLIST_KEY_NFCReaderUsageDescription = "Anastrophe membaca kartu akses Anda untuk memverifikasi kepemilikan.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Anastrophe memakai Face ID agar hanya Anda yang bisa memakai kartu akses Anda.";

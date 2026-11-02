@@ -1,0 +1,88 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "hold_pending_approval",
+    "escaped": false,
+    "confidence": 0.45,
+    "probabilities": {
+      "hold_pending_approval": 0.53,
+      "revoke_removes_card": 0.19,
+      "explicit_registry_remove": 0,
+      "block_reenrol_code": 0.25,
+      "ask_user": 0.01,
+      "investigate": 0.01,
+      "none": 0.01
+    },
+    "contradicted_requirements": []
+  },
+  "requirements_checked": 3,
+  "checks": [
+    {
+      "candidate": "hold_pending_approval",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "hold_pending_approval",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "hold_pending_approval",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "revoke_removes_card",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "revoke_removes_card",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "revoke_removes_card",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "explicit_registry_remove",
+      "requirement": 0,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "explicit_registry_remove",
+      "requirement": 1,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "explicit_registry_remove",
+      "requirement": 2,
+      "answer": "unknown"
+    },
+    {
+      "candidate": "block_reenrol_code",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "block_reenrol_code",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "block_reenrol_code",
+      "requirement": 2,
+      "answer": "supported"
+    }
+  ],
+  "warnings": [],
+  "usage": {
+    "input_tokens": 3395,
+    "output_tokens": 593
+  }
+}

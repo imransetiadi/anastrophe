@@ -18,3 +18,15 @@ func TestHanyaDatabaseLokal(t *testing.T) {
 		}
 	}
 }
+
+func TestKartuLabDariFlag(t *testing.T) {
+	// Kartu lab didaftarkan ke registri agar enrolment lab lewat jalur kartu (ADR-0031).
+	if id, err := parseLabCard("iso14443a:04a1b2c3d4e5f6"); err != nil || id.Tech != 1 || len(id.ID) != 7 {
+		t.Fatalf("kartu lab valid ditolak: %+v %v", id, err)
+	}
+	for _, bad := range []string{"", "iso14443a", "felica:zz", "iso9999:04a1b2c3"} {
+		if _, err := parseLabCard(bad); err == nil {
+			t.Errorf("%q seharusnya ditolak", bad)
+		}
+	}
+}

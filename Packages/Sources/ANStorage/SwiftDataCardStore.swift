@@ -92,6 +92,16 @@ public actor SwiftDataCardStore: CardStore {
         try context.save()
     }
 
+    /// Atomik di dalam actor: baca, ubah, dan simpan tanpa celah bagi penulis lain.
+    public func update(id: UUID, _ mutate: @Sendable (inout Card) -> Bool) async throws -> Bool {
+        let entity = try entity(id: id)
+        var card = try entity.card()
+        guard mutate(&card) else { return false }
+        try entity.apply(card)
+        try context.save()
+        return true
+    }
+
     private func entity(id: UUID) throws -> CardEntity {
         var descriptor = FetchDescriptor<CardEntity>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1

@@ -1,0 +1,104 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "observability_nfr_o01",
+    "escaped": false,
+    "confidence": 0.99,
+    "probabilities": {
+      "observability_nfr_o01": 0.99,
+      "privacy_manifest_nfr_pr04": 0.01,
+      "laporan_fr58": 0,
+      "akses_cepat_fr24": 0,
+      "polling_test_konkurensi": 0,
+      "ask_user": 0,
+      "investigate": 0,
+      "none": 0
+    },
+    "contradicted_requirements": []
+  },
+  "requirements_checked": 3,
+  "checks": [
+    {
+      "candidate": "observability_nfr_o01",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "observability_nfr_o01",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "observability_nfr_o01",
+      "requirement": 2,
+      "answer": "supported"
+    },
+    {
+      "candidate": "privacy_manifest_nfr_pr04",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "privacy_manifest_nfr_pr04",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "privacy_manifest_nfr_pr04",
+      "requirement": 2,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "laporan_fr58",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "laporan_fr58",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "laporan_fr58",
+      "requirement": 2,
+      "answer": "unknown"
+    },
+    {
+      "candidate": "akses_cepat_fr24",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "akses_cepat_fr24",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "akses_cepat_fr24",
+      "requirement": 2,
+      "answer": "contradicted"
+    },
+    {
+      "candidate": "polling_test_konkurensi",
+      "requirement": 0,
+      "answer": "supported"
+    },
+    {
+      "candidate": "polling_test_konkurensi",
+      "requirement": 1,
+      "answer": "supported"
+    },
+    {
+      "candidate": "polling_test_konkurensi",
+      "requirement": 2,
+      "answer": "unknown"
+    }
+  ],
+  "warnings": [],
+  "usage": {
+    "input_tokens": 3828,
+    "output_tokens": 728
+  }
+}

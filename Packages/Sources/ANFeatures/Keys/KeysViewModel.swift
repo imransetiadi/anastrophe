@@ -34,8 +34,7 @@ public final class KeysViewModel {
     public var canAddCard: Bool { CardLimit.canAddCard(currentCount: cards.count) }
 
     public func load() async {
-        let loadedCards = try? await services.cards.all()
-        let stored = loadedCards ?? []
+        let stored = (try? await services.cards.all()) ?? []
         let reconciled = RestoreCheck.reconcile(stored, keys: services.keys).map(expiryFromRecord)
         for (old, new) in zip(stored, reconciled) where old != new {
             try? await services.cards.update(new)
@@ -49,10 +48,11 @@ public final class KeysViewModel {
         isLoading = false  // daftar tampil dulu (NFR-P03); riwayat menyusul
         let cutoff = Date.now.addingTimeInterval(-Self.historyRetention)
         try? await services.tapHistory.purge(before: cutoff)
-        if loadedCards != nil {
-            // Riwayat kartu yang sudah tidak ada (mis. hapus yang terputus) dibersihkan; daftar kosong
-            // karena galat baca tidak dihitung sebagai "semua kartu dihapus".
-            try? await services.tapHistory.removeAll(except: Set(reconciled.map(\.id)))
+        // Riwayat kartu yang sudah tidak ada (mis. hapus yang terputus) dibersihkan. Daftar dibaca ulang
+        // tepat sebelum menghapus agar kartu yang ditambahkan selama load() ini tidak kehilangan riwayat;
+        // galat baca berarti tidak ada yang dihapus.
+        if let current = try? await services.cards.all() {
+            try? await services.tapHistory.removeAll(except: Set(current.map(\.id)))
         }
         var loaded: [Card.ID: [TapEntry]] = [:]
         for card in reconciled {

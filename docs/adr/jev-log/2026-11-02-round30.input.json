@@ -1,0 +1,21 @@
+{
+  "tool": "jev_decide",
+  "decision": "Bagaimana perangkat app produksi terdaftar di server agar bisa melakukan enrolment kartu pertama?",
+  "candidates": [
+    "otomatis_saat_enrolment",
+    "endpoint_registrasi",
+    "operator_mendaftarkan"
+  ],
+  "requirements": [
+    "Perangkat baru bisa mendaftarkan kartu pertamanya tanpa langkah operator.",
+    "Enrolment yang ditolak (kartu tak terdaftar, gedung atau undangan tak dikenal) tidak meninggalkan baris perangkat baru di database.",
+    "Tidak menambah endpoint publik tanpa autentikasi yang bisa membuat baris database tanpa batas."
+  ],
+  "escalate_on_contradiction": true,
+  "evidence_summary": [
+    "lockDevice menolak device_id tak dikenal (ENR-NOT-FOUND) dan mengunci baris untuk batas 8.",
+    "Belum ada endpoint pembuat perangkat; hanya devseed.",
+    "Enrolment satu transaksi; Idempotent tidak meng-commit respons 4xx.",
+    "NFR-S03 App Attest menyusul; ADR-0041 terbuka; FR-40/FR-43 perilaku instal ulang."
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "action": "escalate",
+  "label": "alur-tambah-kartu-plan-close-gate",
+  "request": "Close plan 2026-11-02-alur-tambah-kartu (ADR-0043/0044/0045) including the final-review fix pass (ADR-0046/0047).",
+  "reason_codes": [
+    "confidence_below_review",
+    "safe_to_apply_below_review",
+    "review_escalated"
+  ],
+  "review": {
+    "safe_to_apply": 0.35,
+    "composite": 0.642,
+    "limiting_rubrics": [
+      "spec_match"
+    ],
+    "scores": {
+      "correctness": 1.66,
+      "spec_match": 1.62,
+      "test_gap": 1.11,
+      "blast_radius": 2.0
+    }
+  },
+  "verification": {
+    "action": "auto",
+    "verified": 8,
+    "contradicted": 0,
+    "unsupported": 0,
+    "needs_review": 0,
+    "results": [
+      {
+        "claim": "Go backend suite: 10 packages ok",
+        "verdict": "verified",
+        "confidence": 0.96
+      },
+      {
+        "claim": "Swift host 334; simulator 332 TEST SUCCEEDED on rerun; first-run failure = known flaky BLE test in unchanged module",
+        "verdict": "verified",
+        "confidence": 0.98
+      },
+      {
+        "claim": "Lookup 200 / identical 404 SITE-NOT-FOUND with no-store",
+        "verdict": "verified",
+        "confidence": 0.88
+      },
+      {
+        "claim": "New device rows only for successful enrolments; rejected leave none (with/without Idempotency-Key)",
+        "verdict": "verified",
+        "confidence": 0.89
+      },
+      {
+        "claim": "Max 4 PENDING_APPROVAL per card; 5th → 409 ENR-PENDING-LIMIT; waiting device resumes",
+        "verdict": "verified",
+        "confidence": 0.91
+      },
+      {
+        "claim": "Simulator e2e A/C/D device counts 1→2→2→3",
+        "verdict": "verified",
+        "confidence": 0.88
+      },
+      {
+        "claim": "Double tap → one enrolment; guard mutation caught",
+        "verdict": "verified",
+        "confidence": 0.94
+      },
+      {
+        "claim": "check_docs 0",
+        "verdict": "verified",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "note": "Review patch tereskalasi (spec_match); kemungkinan karena gerbang pra-pilot ADR-0046 masih terbuka dan perbaikan pembaca #3 tanpa test otomatis (uji H). Tidak diajukan ulang (ADR-0018).",
+  "usage": {
+    "input_tokens": 5956,
+    "output_tokens": 398
+  }
+}

@@ -1,0 +1,24 @@
+import ANCore
+import Foundation
+import Testing
+@testable import ANFeatures
+
+@Suite("Teks alasan enrolment (FR-13, SDD §15)")
+struct EnrollmentMessagesTests {
+    @Test func setiapAlasanPunyaTeksSendiri() {
+        let errors: [ANError] = [.enrollmentRejected(.notRegistered), .enrollmentRejected(.siteUnsupported),
+                                 .enrollmentRejected(.duplicate), .enrollmentRejected(.pendingApproval), .enrollmentRejected(.invitationInvalid), .cardLimitReached,
+                                 // Alur Tambah Kartu (ADR-0043, ADR-0044).
+                                 .enrollmentRejected(.siteCodeUnknown), .cardUnreadable, .cardReaderUnavailable, .serviceUnavailable, .channelUnavailable(.notEligible),
+                                 .enrollmentRejected(.pendingLimit), .siteChannelUnavailable, .siteChannelsNotOffered]
+        let texts = errors.compactMap { EnrollmentMessages.text(for: $0) }
+        #expect(texts.count == errors.count)
+        #expect(Set(texts).count == errors.count)
+        #expect(texts.allSatisfy { !$0.isEmpty && !$0.contains("NFC") })
+    }
+
+    @Test func galatLainTanpaTeksKhusus() {
+        #expect(EnrollmentMessages.text(for: ANError.internalError) == nil)
+        #expect(EnrollmentMessages.text(for: URLError(.timedOut)) == nil)
+    }
+}

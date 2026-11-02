@@ -1,3 +1,7 @@
 // Salin menjadi Config/Local.xcconfig (di-ignore git), lalu isi Team ID Anda.
 // Kapabilitas NFC butuh Apple Developer Program berbayar (bukan tim Personal).
 DEVELOPMENT_TEAM = XXXXXXXXXX
+
+// Alamat API backend untuk alur Tambah Kartu (wajib https). Di xcconfig "//" memulai komentar, jadi
+// tulis "https:/$()/api.contoh.id". Untuk lab lokal (http) pakai argumen -ANAPIBaseURL di skema DEBUG.
+// AN_API_BASE_URL = https:/$()/api.contoh.id

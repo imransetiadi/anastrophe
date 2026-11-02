@@ -106,6 +106,8 @@ struct CardDetailView: View {
                     if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
                     StatusBadge(status: card.displayStatus())
                 }
+                // VoiceOver membaca label dan badge sebagai satu elemen, seperti baris LabeledContent lain.
+                .accessibilityElement(children: .combine)
                 // Tanpa ini separator mengikuti teks badge, bukan tepi baris seperti baris lain.
                 .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
                 LabeledContent(localized("detail.channels"), value: channels)

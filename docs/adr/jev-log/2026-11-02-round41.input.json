@@ -1,0 +1,18 @@
+{
+ "tool": "jev_decide",
+ "decision": "Pilih fokus unit berikutnya untuk iterasi otomatis Anastrophe sesudah uji beban API (ADR-0055) ditutup.",
+ "candidates": [
+  "pemindaian_secret_dependensi",
+  "audit_aksesibilitas",
+  "privacy_manifest_teknis",
+  "minor_observabilitas"
+ ],
+ "requirements": [
+  "Dapat diselesaikan dan diverifikasi di lingkungan ini (host, simulator, PostgreSQL lokal, jaringan ke proxy Go) tanpa iPhone fisik, reader, DEVELOPMENT_TEAM, atau akun App Store Connect.",
+  "Tidak bergantung pada keputusan yang masih menunggu pengguna dan tidak menuntut keputusan semantik keamanan, privasi, atau legal baru yang wajib dieskalasi.",
+  "Memajukan test case berprioritas P0 yang belum punya hasil verifikasi di QA §11.1."
+ ],
+ "escalate_on_contradiction": true,
+ "priorities": "Tujuan pengguna: terus membangun app secara bertahap dan otomatis; JEV memutuskan, eskalasi bila confidence < 0,60. Test case/requirement P0 didahulukan dari P1/P2. Unit harus kecil-menengah, terbatas, bisa diverifikasi di lingkungan ini, dan tidak bergantung pada keputusan yang menunggu pengguna atau sumber daya yang tidak tersedia. Aturan keamanan/privasi CLAUDE.md tidak bisa ditawar (aturan 9: secret tidak pernah masuk repo). Keputusan semantik keamanan, privasi, atau legal yang tereskalasi tetap milik pengguna.",
+ "evidence_summary": "TC-SEC-11 (P0, NFR-S09), TC-UX-01–04/09 (P0, NFR-A01), dan TC-PRIV-03 (P0, NFR-PR04) belum punya hasil di QA §11.1; TC-OPS-01 sudah lulus. gitleaks 8.30.1 terpasang, govulncheck belum tetapi proxy Go terjangkau; app tanpa paket SPM pihak ketiga. Proyek Xcode tanpa target UI test. App/PrivacyInfo.xcprivacy masih placeholder; klasifikasi data punya muatan privasi/legal (UU PDP, GDPR). Minor observabilitas ADR-0054 dan rute challenge/renew yang tergabung di metrik. Panggilan pertama gagal di sisi provider (request failed) dan diulang sekali dengan masukan yang sama."
+}

@@ -45,7 +45,16 @@ struct APIClientTests {
         let transport = FakeTransport(status: 409, body: #"{"type":"ENR-LIMIT","title":"Batas kartu","status":409}"#, contentType: "application/problem+json")
         let client = APIClient(baseURL: base, transport: transport)
         await #expect(throws: ANError.cardLimitReached) {
-            try await client.submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04]), idempotencyKey: UUID())
+            try await client.submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04]), provisioningSecret: Data(repeating: 0x11, count: 32), idempotencyKey: UUID())
+        }
+    }
+
+    @Test func batasPermintaanMenungguDipetakan() async {
+        // Review akhir #2 (ADR-0047): kartu dengan terlalu banyak permintaan perangkat tambahan.
+        let transport = FakeTransport(status: 409, body: #"{"type":"ENR-PENDING-LIMIT","status":409}"#, contentType: "application/problem+json")
+        await #expect(throws: ANError.enrollmentRejected(.pendingLimit)) {
+            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "d", siteID: "s", card: CardIdentity("iso14443a:04a1b2c3d4e5f6")!,
+                                                                                   provisioningKeyHash: Data(repeating: 1, count: 32), idempotencyKey: UUID())
         }
     }
 
@@ -53,7 +62,7 @@ struct APIClientTests {
         let transport = FakeTransport(status: 403, body: #"{"type":"ENR-ATTEST-FAILED","status":403}"#, contentType: "application/problem+json; charset=utf-8")
         let client = APIClient(baseURL: base, transport: transport)
         await #expect(throws: ProblemDetails(type: "ENR-ATTEST-FAILED", title: nil, status: 403)) {
-            try await client.submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04]), idempotencyKey: UUID())
+            try await client.submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04]), provisioningSecret: Data(repeating: 0x11, count: 32), idempotencyKey: UUID())
         }
     }
 
@@ -61,7 +70,7 @@ struct APIClientTests {
         let transport = FakeTransport(body: provisionedJSON)
         let key = UUID()
         _ = try await APIClient(baseURL: base, transport: transport)
-            .submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04, 0x01]), idempotencyKey: key)
+            .submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04, 0x01]), provisioningSecret: Data(repeating: 0x11, count: 32), idempotencyKey: key)
         let request = try #require(transport.lastRequest)
         #expect(request.httpMethod == "POST")
         #expect(request.url?.path() == "/v1/enrollments/E1/credentials")
@@ -73,7 +82,7 @@ struct APIClientTests {
 
     @Test func provisionedCredentialDecode() async throws {
         let credential = try await APIClient(baseURL: base, transport: FakeTransport(body: provisionedJSON))
-            .submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04]), idempotencyKey: UUID())
+            .submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04]), provisioningSecret: Data(repeating: 0x11, count: 32), idempotencyKey: UUID())
         #expect(credential.credentialID == Data(repeating: 0xC1, count: 16))
         #expect(credential.channel == .ble)
         #expect(credential.certificate == Data(repeating: 0xCE, count: 5))
@@ -140,24 +149,128 @@ struct APIClientTests {
                 == Data("ANP1-REVOKE".utf8) + credentialID + Data(repeating: 0x4E, count: 32) + Data("6f1c2a9e-0000-4000-8000-00000000000a".utf8))
     }
 
-    @Test func createEnrollmentMengirimPerangkatDanGedung() async throws {
-        // Endpoint tracer backend R1 (pengganti sementara enrolment kartu fisik).
-        let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"6f1c2a9e-0000-4000-8000-000000000001"}"#)
+    @Test func createEnrollmentMengirimKartu() async throws {
+        // ADR-0031: enrolment membawa identitas kartu (hanya lewat TLS; server menghitung HMAC per gedung).
+        let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"6f1c2a9e-0000-4000-8000-000000000001","status":"PENDING_APPROVAL"}"#)
         let key = UUID()
-        let id = try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", siteID: "site-1", idempotencyKey: key)
-        #expect(id == "6f1c2a9e-0000-4000-8000-000000000001")
+        let card = try #require(CardIdentity("iso14443a:04A1B2C3D4E5F6"))
+        let start = try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", siteID: "site-1", card: card, provisioningKeyHash: Data(repeating: 0x22, count: 32), idempotencyKey: key)
+        #expect(start == EnrollmentStart(enrollmentID: "6f1c2a9e-0000-4000-8000-000000000001", status: .pendingApproval))
         let request = try #require(transport.lastRequest)
         #expect(request.httpMethod == "POST")
         #expect(request.value(forHTTPHeaderField: "Idempotency-Key") == key.uuidString)
         #expect(request.url?.path() == "/v1/enrollments")
-        let body = try JSONSerialization.jsonObject(with: try #require(request.httpBody)) as? [String: String]
-        #expect(body == ["device_id": "dev-1", "site_id": "site-1"])
+        let raw = try #require(request.httpBody)
+        let body = try #require(try JSONSerialization.jsonObject(with: raw) as? [String: Any])
+        #expect(body["device_id"] as? String == "dev-1")
+        #expect(body["site_id"] as? String == "site-1")
+        #expect(body["card"] as? [String: String] == ["tech": "iso14443a", "id": "04a1b2c3d4e5f6"])
+    }
+
+    @Test func createEnrollmentMengirimUndangan() async throws {
+        // ADR-0033: undangan menggantikan kartu fisik; body hanya perangkat dan token.
+        let token = String(repeating: "A", count: 42) + "w"
+        let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"e1","status":"PROVISIONING"}"#)
+        let start = try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", invitation: token, provisioningKeyHash: Data(repeating: 0x22, count: 32), idempotencyKey: UUID())
+        #expect(start == EnrollmentStart(enrollmentID: "e1", status: .provisioning))
+        let raw = try #require(transport.lastRequest?.httpBody)
+        let body = try #require(try JSONSerialization.jsonObject(with: raw) as? [String: String])
+        #expect(body == ["device_id": "dev-1", "invitation": token, "provisioning_key_hash": Data(repeating: 0x22, count: 32).base64EncodedString()])
+    }
+
+    @Test func submitCredentialKeyMengirimHashTokenStatus() async throws {
+        // ADR-0037: app hanya mengirim SHA-256 token baca status, bukan tokennya.
+        let hash = Data(repeating: 0x5A, count: 32)
+        let transport = FakeTransport(status: 200, body: provisionedJSON)
+        _ = try await APIClient(baseURL: base, transport: transport)
+            .submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04]), statusTokenHash: hash, provisioningSecret: Data(repeating: 0x11, count: 32), idempotencyKey: UUID())
+        let raw = try #require(transport.lastRequest?.httpBody)
+        let body = try #require(try JSONSerialization.jsonObject(with: raw) as? [String: String])
+        #expect(body["status_token_hash"] == hash.base64EncodedString())
+    }
+
+    @Test func renewCredentialMengirimHashTokenStatus() async throws {
+        let hash = Data(repeating: 0x5B, count: 32)
+        let transport = FakeTransport(status: 200, body: provisionedJSON)
+        _ = try await APIClient(baseURL: base, transport: transport)
+            .renewCredential(credentialID: Data(repeating: 0xC1, count: 16), nonce: Data(repeating: 1, count: 32), signature: Data(repeating: 2, count: 64), statusTokenHash: hash, idempotencyKey: UUID())
+        let raw = try #require(transport.lastRequest?.httpBody)
+        let body = try #require(try JSONSerialization.jsonObject(with: raw) as? [String: String])
+        #expect(body["status_token_hash"] == hash.base64EncodedString())
+    }
+
+    @Test func cardStatusMengirimBearerBase64URL() async throws {
+        // Token dengan byte yang menjadi "+" dan "/" di base64 standar: header wajib base64url tanpa padding.
+        let token = Data([0xFB, 0xFF, 0xBF] + [UInt8](repeating: 0xFF, count: 29))
+        let transport = FakeTransport(status: 200, body: #"{"status":"SUSPENDED"}"#)
+        let status = try await APIClient(baseURL: base, transport: transport).cardStatus(cardID: "6f1c2a9e-0000-4000-8000-000000000001", token: token)
+        #expect(status == "SUSPENDED")
+        let request = try #require(transport.lastRequest)
+        #expect(request.httpMethod == "GET")
+        #expect(request.url?.path() == "/v1/cards/6f1c2a9e-0000-4000-8000-000000000001/status")
+        let header = try #require(request.value(forHTTPHeaderField: "Authorization"))
+        #expect(header == "Bearer " + token.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: ""))
+        #expect(!header.contains("+") && !header.contains("/") && !header.contains("="))
+    }
+
+    @Test func cardStatusTidakDitemukanMenjadiProblem() async throws {
+        let transport = FakeTransport(status: 404, body: #"{"type":"CARD-NOT-FOUND","status":404}"#, contentType: "application/problem+json")
+        await #expect(throws: ProblemDetails(type: "CARD-NOT-FOUND", title: nil, status: 404)) {
+            try await APIClient(baseURL: base, transport: transport).cardStatus(cardID: "c1", token: Data(repeating: 1, count: 32))
+        }
+    }
+
+    @Test func createEnrollmentMengirimHashRahasia() async throws {
+        // ADR-0040: hanya SHA-256 rahasia enrolment yang dikirim, untuk kartu maupun undangan.
+        let hash = Data(repeating: 0x6A, count: 32)
+        let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"e1","status":"PROVISIONING"}"#)
+        let client = APIClient(baseURL: base, transport: transport)
+        _ = try await client.createEnrollment(deviceID: "dev-1", siteID: "site-1", card: CardIdentity("iso14443a:04a1b2c3d4e5f6")!, provisioningKeyHash: hash, idempotencyKey: UUID())
+        let cardRaw = try #require(transport.lastRequest?.httpBody)
+        let cardBody = try #require(try JSONSerialization.jsonObject(with: cardRaw) as? [String: Any])
+        #expect(cardBody["provisioning_key_hash"] as? String == hash.base64EncodedString())
+        _ = try await client.createEnrollment(deviceID: "dev-1", invitation: String(repeating: "A", count: 42) + "w", provisioningKeyHash: hash, idempotencyKey: UUID())
+        let invitationRaw = try #require(transport.lastRequest?.httpBody)
+        let invitationBody = try #require(try JSONSerialization.jsonObject(with: invitationRaw) as? [String: String])
+        #expect(invitationBody["provisioning_key_hash"] == hash.base64EncodedString())
+    }
+
+    @Test func submitCredentialKeyMengirimRahasiaBearer() async throws {
+        let secret = Data([0xFB, 0xFF, 0xBF] + [UInt8](repeating: 0xFF, count: 29))
+        let transport = FakeTransport(status: 200, body: provisionedJSON)
+        _ = try await APIClient(baseURL: base, transport: transport)
+            .submitCredentialKey(enrollmentID: "E1", channel: .ble, publicKey: Data([0x04]), provisioningSecret: secret, idempotencyKey: UUID())
+        let header = try #require(transport.lastRequest?.value(forHTTPHeaderField: "Authorization"))
+        #expect(header == "Bearer " + secret.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: ""))
+    }
+
+    @Test func createEnrollmentStatusTakDikenalDitolak() async throws {
+        let transport = FakeTransport(status: 201, body: #"{"enrollment_id":"e1","status":"MYSTERY"}"#)
+        let card = try #require(CardIdentity("iso14443a:04a1b2c3d4e5f6"))
+        await #expect(throws: (any Error).self) {
+            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "d", siteID: "s", card: card, provisioningKeyHash: Data(repeating: 0x22, count: 32), idempotencyKey: UUID())
+        }
+    }
+
+    @Test(arguments: [
+        ("ENR-NOT-REGISTERED", 404, ANError.enrollmentRejected(.notRegistered)),
+        ("ENR-SITE-UNSUPPORTED", 404, ANError.enrollmentRejected(.siteUnsupported)),
+        ("ENR-DUPLICATE", 409, ANError.enrollmentRejected(.duplicate)),
+        ("ENR-PENDING-APPROVAL", 409, ANError.enrollmentRejected(.pendingApproval)),
+        ("ENR-INVITATION-INVALID", 404, ANError.enrollmentRejected(.invitationInvalid)),
+    ])
+    func galatRegistriMenjadiErrorDomain(code: String, status: Int, expected: ANError) async throws {
+        let transport = FakeTransport(status: status, body: #"{"type":"\#(code)","status":\#(status)}"#, contentType: "application/problem+json")
+        let card = try #require(CardIdentity("iso14443a:04a1b2c3d4e5f6"))
+        await #expect(throws: expected) {
+            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "d", siteID: "s", card: card, provisioningKeyHash: Data(repeating: 0x22, count: 32), idempotencyKey: UUID())
+        }
     }
 
     @Test func createEnrollmentBatasKartu() async {
         let transport = FakeTransport(status: 409, body: #"{"type":"ENR-LIMIT","status":409}"#, contentType: "application/problem+json")
         await #expect(throws: ANError.cardLimitReached) {
-            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", siteID: "site-1", idempotencyKey: UUID())
+            try await APIClient(baseURL: base, transport: transport).createEnrollment(deviceID: "dev-1", siteID: "site-1", card: CardIdentity("iso14443a:04a1b2c3d4e5f6")!, provisioningKeyHash: Data(repeating: 0x22, count: 32), idempotencyKey: UUID())
         }
     }
 

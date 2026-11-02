@@ -11,12 +11,18 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 
 ## Status terkini
 
-- Branch kerja: `feat/r1-scaffold`, di-push ke GitHub private `imransetiadi/anastrophe` (origin) atas permintaan pengguna; belum di-merge.
-- Suite terakhir: Swift host 242 test (1 dilewati, tanpa gagal) dan simulator 240 test (1 dilewati). Backend Go 7 paket lulus pada iterasi hapus kartu; belum ada perubahan backend sejak itu.
+- Branch kerja: `feat/r1-scaffold`, yang juga branch bawaan (dan satu-satunya branch) di GitHub private `imransetiadi/anastrophe`. Pengguna meminta commit sesudah `1f87775` digabung lewat PR ke branch itu (2026-11-02).
+- Suite terakhir: Swift host 364 test (1 dilewati, tanpa gagal), simulator 362 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 13 paket lulus dengan PostgreSQL dan `-race` (go1.27.3), pemindai keamanan 42 test. Swift host diulang 2026-11-02: 364 test, 1 dilewati.
 - Menunggu keputusan pengguna:
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
-  - Tinjauan 5 gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap (`docs/adr/jev-log/*-gate.json`).
-  - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
+  - ADR-0038: cara mencegah pemegang kartu membatalkan suspend/revoke operator; rekomendasi `hold_pending_approval`, JEV 0,45.
+  - ADR-0041: pengambilalihan enrolment yang belum selesai lewat id perangkat + identitas kartu; rekomendasi `first_writer_wins`, JEV 0,44.
+  - ADR-0046: kontrol enumerasi identitas kartu lewat enrolment, yang menjadi **gerbang pra-pilot** bersama App Attest; rekomendasi deteksi per gedung + pembatas per perangkat yang di-attest, JEV 0,49.
+  - ADR-0047: kedaluwarsa permintaan `PENDING_APPROVAL` (batas 4 per kartu sudah diterapkan), JEV 0,51.
+  - Penyambungan App Attest (ADR-0053, seri JEV 0,47): pengikatan kunci attested ke `device_id` (terkait ADR-0041/0046), endpoint yang wajib attestation, bypass dev, dan kategori produksi.
+
+  - Tinjauan 21 gate JEV (19 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan, verifier App Attest, sisa Keychain instal ulang, observabilitas backend, uji beban API, pemindaian secret dan dependensi (`docs/adr/jev-log/*-gate.json`).
+  - Perbarui `cryptography` ke 50.* di pyenv lokal: `python3 -m pip install -r scripts/anp1/requirements.txt`. Pemindai dengan interpreter bawaan exit 1 sampai itu dilakukan.
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
 
 ### Ringkasan kemampuan
@@ -30,6 +36,492 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Audit | Rantai hash per gedung, append-only, pseudonim sejak ditulis, perintah `anastrophe-audit` | ADR-0024, ADR-0025 |
 | Hapus kartu | Bukti kepemilikan, kartu ditangguhkan, kartu tanpa kunci | ADR-0026, ADR-0027, ADR-0028, FR-31 |
 | Riwayat tap | Log lokal 30 hari: lima terbaru di detail, "Lihat semua" ke riwayat penuh, store pulih sendiri bila rusak | FR-30, ADR-0029, ADR-0030 |
+| Registri kartu | Enrolment hanya untuk kartu terdaftar (HMAC per gedung), alasan FR-13, perangkat tambahan menunggu operator, enrolment yang belum selesai dilanjutkan, CLI `anastrophe-registry` | FR-11, FR-13, FR-52, ADR-0031, ADR-0032, ADR-0034 |
+| Undangan | Token sekali pakai (32 byte acak, hanya hash yang disimpan), CLI `invite` dengan identitas kartu dari berkas atau stdin, enrolment `{device_id, invitation}`, dan undangan berkartu yang menyetujui enrolment perangkat yang masih menunggu; app mengurai tautan `/i/<token>` | FR-12, FR-53, ADR-0033, ADR-0035 |
+| Siklus hidup kartu | Operator: `list` (filter status, kanal, awalan id), `suspend`, `resume`, `revoke` (audit, denylist); app membaca status kartu dengan token baca status tanpa Face ID/passcode. Keterbatasan terbuka: pendaftaran ulang kartu fisik bisa membatalkan suspend/revoke (ADR-0038) | FR-38, FR-50 (sebagian), FR-51, ADR-0036, ADR-0037, ADR-0038 |
+| Provisioning aman | Rahasia enrolment dari app (hanya hash di server) wajib untuk kredensial pertama; tambah kanal ke kartu aktif ditolak. Risiko sisa: id perangkat + identitas kartu bisa mengambil alih enrolment yang belum selesai (ADR-0041) | FR-16, ADR-0039, ADR-0040, ADR-0041 |
+| Ketahanan | Update dijaga status, urutan kunci instance → kredensial, denylist dari sertifikat terpanjang + purge, pembaruan kartu atomik, jam monotonik yang ikut berjalan saat tidur; audit enrolment dan sapuan ditulis sesudah semua kunci baris, berurutan per rantai, dengan baris gedung `KEY SHARE` sebelum kunci rantai (tanpa deadlock 40P01); sisa Keychain instalasi lama dibersihkan saat instal ulang | ADR-0042, ADR-0051, ADR-0053 |
+| Tambah Kartu | Alur produksi di semua build: kode gedung + tempel kartu (pembaca identifier saja) atau tautan undangan, kanal otomatis, perangkat dibuat saat enrolment, batas 4 permintaan menunggu per kartu. Gerbang pra-pilot terbuka: App Attest + kontrol enumerasi kartu (ADR-0046) | FR-05, FR-10–FR-13, ADR-0043–ADR-0047 |
+| Bantuan | Tombol Bantuan di tab Kunci: FAQ sepuluh topik (ID/EN), status cara akses di iPhone ini, iPhone yang didukung, laporan diagnostik tanpa rahasia | FR-60, FR-02, FR-27, FR-63, ADR-0048 |
+| Kebijakan gedung | CLI `policy` untuk masa berlaku sertifikat dan kanal per gedung; kanal efektif gedung di lookup/enrolment dan ditegakkan saat provisioning; app memilih kanal yang diizinkan | FR-55 (sebagian), FR-05, ADR-0049 |
+| Observabilitas | Log akses terstruktur per permintaan (request id di header dan log galat, pola rute, status, durasi; tanpa path, query, body, atau IP) dan metrik teks Prometheus di listener internal; alert, on-call, dan log terpusat menunggu infrastruktur | NFR-O01 (sebagian), ADR-0054 |
+| Uji beban | Alat `anastrophe-loadtest`: skenario config, lookup, enrol, dan renew dengan kartu sintetis, hanya ke loopback, porsi ≤ 0,3 dtk dari `/metrics`, serta exit code untuk galat, laju tak tercapai, dan run terpotong. Baseline lab di QA §11.1; uji 1.000 rps menunggu lingkungan Load | TC-PERF-05 (baseline lab), ADR-0055 |
+| App Attest (verifier) | Paket backend `internal/appattest` memverifikasi attestation dan assertion menurut langkah Apple; teruji dengan contoh resmi Apple dan data iOS 27 nyata (scratch). Belum disambungkan ke endpoint, database, atau app; gerbang pra-pilot NFR-S03 masih terbuka | NFR-S03 (sebagian), ADR-0052 |
+| Pemindaian keamanan | `scripts/security/scan.py`: gitleaks atas riwayat, staged, dan produk build; govulncheck; paket Swift remote; OSV untuk alat Python. Exit 0/1/2; git gagal, clone dangkal, dan `.gitleaksignore` memberi exit 2. Backend Go ≥ 1.25 dengan toolchain go1.27.3 | TC-SEC-11, NFR-S09, ADR-0056 |
+
+## SEC-2026-11-02-1540 - Pemindaian secret dan dependensi (Selesai; PR ke GitHub atas permintaan pengguna; gate eskalasi)
+
+Fokus dari ADR-0056 (JEV 0,93, Diterima). TC-SEC-11 (P0) belum pernah dijalankan, dan aturan 9 CLAUDE.md (secret tidak pernah masuk repo) belum diperiksa otomatis.
+
+Perubahan:
+- **Pemindai `scripts/security/scan.py`** (Python stdlib) dengan `.gitleaks.toml`:
+  - secret: gitleaks ≥ 8.30 atas seluruh riwayat dan perubahan yang di-stage, serta produk build (langsung dan lewat string cetak). Allowlist sempit beralasan: nilai `P256.Signing.PrivateKey` dan path vektor ANP/1;
+  - dependensi: govulncheck v1.9.0 (kerentanan terpanggil = gagal), app iOS tanpa paket remote, dan OSV untuk alat Python (hanya nama dan versi yang dikirim);
+  - exit 0/1/2. Nilai secret tidak pernah dicetak. Git yang gagal, clone dangkal, dan `.gitleaksignore` memberi exit 2, dan `gitleaks:allow` diabaikan.
+- **Kenaikan versi dari temuan nyata:** pgx v5.9.2, x/text v0.41.0, direktif `go 1.25.0` dengan `toolchain go1.27.3` (x/crypto hilang dari graf), dan `cryptography==50.*`.
+- **Dokumen:** QA §11.1 TC-SEC-11, SDD §10.3 dan §2 (versi 2.34), README "Pemindaian keamanan", catatan sesudah review di ADR-0056, dan backlog.
+
+Bukti:
+- **Run nyata** dengan venv yang mengikuti requirements: secret di 169 commit + staged 0, build Release simulator 0 (9 berkas, 35.282 string), Go 0 terpanggil, Swift 0, Python 0 → exit 0. Interpreter pyenv pengguna exit 1 karena `cryptography` 49.0.0.
+- **Pengujian:**
+  - 42 test pemindai, mutasi 13 + 10 + 19 tertangkap;
+  - suite backend 13/13 dengan go1.27.3;
+  - Swift host 364 test (1 dilewati);
+  - test anp1 7/7, dan vektor ANP/1 yang dibangkitkan ulang identik.
+
+Review akhir (opus): "With fixes".
+- **Diperbaiki dengan test lebih dulu:**
+  - 1 Critical: git gagal → gitleaks 8.30 exit 0 dengan laporan kosong;
+  - 4 Important: aturan path dan tab di build, clone dangkal, penekanan liar, halaman OSV yang hanya berisi token;
+  - minor yang dinaikkan: exit code galat, penggabungan per OSV, dan fakta dokumen.
+- **Ditunda di backlog:** sisa minor.
+
+`jev_gate`: eskalasi (komposit 0,66, rubrik pembatas *correctness*). Satu klaim dibantah karena fungsinya dikirim sebagai ringkasan, bukan kode. Tidak diajukan ulang.
+
+Commit unit ini: `0b1198b`, `d9d11b4`, `b4974d3`, `5d99ab1`, `6dc6254`, `a8bc3aa`, dan commit ini. Obsidian: `sessions/2026-11-02-pemindaian-secret-dependensi.md`, `decisions/ADR-0056…`, `lessons/verifikasi-uji-dan-gerbang.md`, `lessons/jev-gate-butir-evidence.md`, `backlog.md`, dan MOC.
+
+Sesudah unit ini pengguna meminta commit, PR, dan merge ke GitHub, lalu semua task dihentikan. Branch bawaan GitHub adalah `feat/r1-scaffold`; tidak ada `main`.
+
+## API-2026-11-02-1425 - Uji beban API dan baseline lab (Selesai, commit lokal; gate eskalasi)
+
+Fokus dari ADR-0055 (JEV 0,95, Diterima). TC-PERF-05 belum pernah dijalankan. Backend kini punya histogram durasi per rute (ADR-0054), sehingga latensi sisi klien bisa dibandingkan dengan sisi server.
+
+Perubahan:
+- **Alat `anastrophe-loadtest` (stdlib):**
+  - `gen-cards` membuat kartu sintetis (awalan `084c54`);
+  - `run` menjalankan skenario config, lookup, enrol (enrolment + provisioning), atau renew (tantangan + perpanjangan).
+- **Laporan per langkah:** jumlah, galat, rps, p50/p95/p99, maks, dan kode status, ditambah porsi ≤ 0,3 dtk per rute dari dua cuplikan `/metrics`.
+- **Penjaga:** hanya host loopback kecuali `-allow-remote`, redirect tidak diikuti, dan CSV berisi kartu bukan sintetis ditolak.
+- **Exit code:**
+  - exit 1 bila galat mencapai `-max-galat` (bawaan 0,001) atau lebih dari 5% token `-rate` terlewat;
+  - exit 3 bila run berhenti lebih awal.
+- **Dokumen:** baseline lab di QA §11.1 (bukan bukti produksi) dan SDD §14.
+
+Bukti:
+- **Baseline lab ulang** (build `4d31e51`, 8 run, semua exit 0, 0 galat, server 100% ≤ 0,3 dtk), c=8 / c=32:
+
+  | Skenario | Laju |
+  |---|---|
+  | config | 69,7 rb / 67,6 rb rps |
+  | lookup | 40,0 rb / 37,2 rb rps |
+  | enrol | 1.114 / 869 iterasi/dtk |
+  | renew | 2.226 / 1.635 iterasi/dtk |
+
+- **Jejak database:** 40.086 instance ber-hash token dan 157.416 baris idempotency, cocok dengan laporan.
+- **Suite dan mutasi:** Go 13 paket lulus dengan `-race`; mutasi pada perbaikan 15/15 tertangkap.
+
+Review akhir (opus): "with fixes".
+- **Important, diperbaiki:**
+  - redirect diikuti, sehingga penjaga loopback bisa terlewati;
+  - enrol tidak menempuh jalur app;
+  - kekurangan laju `-rate` tidak terlihat.
+- **Minor yang dinaikkan dan diperbaiki:**
+  - `-prepare 0` berputar tanpa henti;
+  - kegagalan `/metrics` diam-diam;
+  - batas galat `>`;
+  - run terpotong tidak terlihat;
+  - path `-cards` relatif di README;
+  - sebab perlambatan c=32 yang ditulis sebagai fakta.
+- **Cacat dari baseline pertama:** kartu dipakai ulang antar-run, pekerja berputar saat pool habis, dan persiapan renew 409. Ketiganya diperbaiki di `1d7d800`.
+- **Ditunda di backlog:** sisa minor alat dan titik panas, yaitu rute challenge/renew yang tergabung dan enrolment yang melambat pada c=32.
+
+`jev_gate`: eskalasi (komposit 0,81, rubrik pembatas *test_gap*). Klaim suite lemah karena log suite hanya ada di kolom `tests`, dan kalimatnya mencakup perbaikan dokumen yang tidak punya test. Tidak diajukan ulang.
+
+Commit unit ini: `d7fa8e5`, `ba90dfe`, `78f7ea9`, `8b701df`, `1d7d800`, `dc44e23`, `4d31e51`, dan commit ini. Obsidian: `sessions/2026-11-02-uji-beban-api.md`, `decisions/ADR-0055…`, `lessons/jev-gate-butir-evidence.md`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
+
+## API-2026-11-02-1005 - Observabilitas backend: log akses dan metrik (Selesai, commit lokal; gate eskalasi)
+
+Fokus dari ADR-0054 (JEV 0,99, Diterima). Sebelumnya backend hanya menulis log galat, tanpa jejak per permintaan atau angka latensi.
+
+Perubahan:
+- **Log akses per permintaan** (`http request`): request id, pola rute ServeMux, status, `duration_ms`, dan `bytes`.
+  - Request id 8 byte acak, dikirim di header `X-Request-ID`; header klien diabaikan.
+  - Path mentah, query, body, header, dan IP tidak dicatat.
+  - Pola rute ditangkap lewat context, karena `withDeadline` menyalin request; ini juga berlaku saat handler panic.
+- **Korelasi galat:** log galat handler `enroll` (`writeResult` kini menerima request) dan log panic memakai `slog.ErrorContext`, sehingga membawa `request_id` yang sama (`WithRequestID`).
+- **Metrik (stdlib, format teks Prometheus 0.0.4):**
+  - permintaan per rute/status, histogram durasi dengan bucket 0,3 dtk, dan in-flight;
+  - `/metrics` hanya di listener internal `ANASTROPHE_METRICS_ADDR`; `ANASTROPHE_LOG_FORMAT=json` memilih log JSON.
+
+Bukti:
+- Mutasi 19/19 tertangkap.
+- Go 11 paket lulus dengan `-race`.
+- Uji asap biner dengan PostgreSQL lab: log JSON, nilai query tidak muncul, `/metrics` publik 404, SIGTERM keluar bersih.
+
+Review akhir (opus): "with fixes".
+- **Important, diperbaiki:** scrape yang macet sebelumnya menahan kunci yang diambil setiap permintaan, sehingga seluruh API bisa membeku. Kini metrik dirender sebelum ditulis, listener metrik punya timeout, dan shutdown mendahulukan server publik.
+- **Temuan di luar unit:** `*.pem` di `.gitignore` membuat PEM root Apple dari ADR-0052 tidak pernah ter-commit, sehingga clone baru gagal build. Diperbaiki di `032e27a` dan diverifikasi dengan clone baru.
+- **Ditunda di backlog:** sisa minor.
+
+`jev_gate`: eskalasi (komposit 0,53). Dua klaim dinilai "contradicted" dengan confidence rendah karena caveat minor yang ditunda. Tidak diajukan ulang.
+
+Commit unit ini: `55c39a7`, `b2243cd`, `a80ba00`, `ba88798`, `032e27a`, `e9bca1f`, dan commit ini. Obsidian: `sessions/2026-11-02-observabilitas-backend.md`, `decisions/ADR-0054…`, `lessons/verifikasi-uji-dan-gerbang.md`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
+
+## APP-2026-11-02-0930 - Pembersihan sisa Keychain saat instal ulang (Selesai, commit lokal; gate eskalasi)
+
+Fokus dari ADR-0053. JEV memberi 0,39 (eskalasi) dengan dua kandidat seri. Unit ini diterapkan karena berisiko rendah dan tanpa semantik keamanan baru; dasarnya persetujuan umum pengguna, dengan pola ADR-0042. Penyambungan App Attest, yaitu kandidat seri, masuk daftar keputusan pengguna.
+
+Masalahnya: sesudah instal ulang, item Keychain service `app.anastrophe` tertinggal (blob kunci, record, token status, counter), padahal kartu SwiftData sudah hilang.
+
+Perubahan:
+- **`SecretStore.deleteAll()`:** satu `SecItemDelete` dengan kelas + service; Keychain kosong bukan galat (O-K01, I-18).
+- **`KeychainDeviceIdentityStore.purgeLeftoversIfFreshInstall(hasCards:)`:** menghapus sisa bila penanda tidak ada dan tidak ada kartu. Penanda hanya dibuat sesudah penghapusan berhasil.
+- **`AppServices.prepareInstall()`:** dipanggil di `makeServices()` sebelum UI menerima layanan. Store yang gagal dibaca dianggap berisi kartu.
+
+Bukti:
+- Host 364 test (1 dilewati) dan simulator 362 test lulus; build Debug sukses.
+- Mutasi 11/11 bermakna tertangkap. Mutasi literal "a" yang ekuivalen dengan nama service test diganti.
+
+Review akhir (opus): siap merge dengan perbaikan; tidak ada jalur yang menghapus kunci kartu yang masih ada.
+- **Diperbaiki:** `FakeKeychain` yang mengabaikan kelas item dinaikkan menjadi Important lalu diperbaiki (RED→GREEN).
+- **Bukti platform:** klaim di SDD kini merujuk E42/E43 dan diverifikasi `jev_verify` 5/5.
+- **Kata-kata:** "dicoba lagi" dikoreksi.
+- **Ditunda di backlog:** sisa minor.
+
+`jev_gate`: eskalasi (safe_to_apply 0,65, komposit 0,72, pembatas `test_gap`; 9 klaim verified, 2 perlu tinjauan). Tidak diajukan ulang.
+
+Commit unit ini: `f5f8301`, `cb47ed0`, `9afd822`, `118ad21`, `e4fa6bb`, `0103e2a`, dan commit ini. Obsidian: `sessions/2026-11-02-sisa-instal-ulang.md`, `decisions/ADR-0053…`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
+
+## API-2026-11-02-0857 - Verifier App Attest di backend (Selesai, commit lokal; gate eskalasi)
+
+Fokus dari ADR-0052 (JEV 0,60, Provisional). Ini langkah pertama NFR-S03, gerbang pra-pilot. Paket `backend/internal/appattest` memverifikasi attestation dan assertion App Attest menurut langkah Apple, tetapi belum disambungkan ke endpoint, database, atau app.
+
+Riset (E35–E41, O-AA01–O-AA08):
+- Apple menerbitkan contoh attestation resmi, tetapi contoh itu tidak konsisten dengan teksnya: nonce hanya cocok bila challenge tidak di-hash, hash kunci yang tertulis salah, dan versinya "1" bukan "1.0".
+- Tiga assertion iOS 27 nyata membuktikan tanda tangan dibuat atas `SHA256(nonce)` (hash ganda).
+- Byte flags authData tidak konsisten antarversi, jadi pengurai tidak memakainya.
+
+Perubahan:
+- **Decoder CBOR minimal:** paling banyak 128 item per objek.
+- **Pengurai authData:** tidak bergantung pada flags.
+- **`VerifyAttestation`:** rantai ke root Apple tertanam dengan sidik jari dipin, credCert bukan CA, nonce, key id, RP ID, counter, aaguid, credentialId, dan kebijakan kategori opsional. `clientDataHash` diberikan pemanggil.
+- **`VerifyAssertion`:** counter harus naik dan digest `SHA256(nonce)`.
+- **Contoh resmi Apple:** disimpan sebagai data uji. Data pihak ketiga tidak masuk repo.
+
+Bukti:
+- Contoh Apple lulus, dan setiap penyimpangan ditolak dengan alasan yang tepat.
+- Verifier lulus terhadap attestation dan dua assertion iOS 27.0.1 nyata, serta assertion block/buzz (scratch).
+- Mutasi 28/28 tertangkap.
+- Fuzz tiga target tanpa crash.
+- Go 11 paket lulus; `check_docs` 0 masalah.
+
+Review akhir (opus): "ready to merge — Yes". Amplifikasi alokasi CBOR (±8,7 MB dari 64 KiB) dinaikkan menjadi Important dan diperbaiki dengan batas 128 item (±10 KB). Minor untuk unit penyambungan dicatat di backlog: challenge sekali pakai, receipt belum terautentikasi, `Categories` wajib di produksi, platform non-iOS, dan `Verifier` nilai nol.
+
+`jev_gate`: eskalasi (safe_to_apply 0,59, pembatas `blast_radius` dengan confidence 0,16; 9 klaim verified, 0 contradicted). Tidak diajukan ulang.
+
+Catatan proses: commit `582a850` sempat lolos dengan `check_docs` 1 masalah karena status pipeline diambil dari `tail`. Masalahnya diperbaiki di `c137330`, dan sejak itu commit dijaga dengan exit code.
+
+Commit unit ini: `582a850`, `c137330`, `56997af`, `337de87`, `6bbe1f7`, `e38f20d`, `c8441c5`, dan commit ini. Obsidian: `sessions/2026-11-02-verifier-app-attest.md`, `decisions/ADR-0052…`, `lessons/verifikasi-uji-dan-gerbang.md`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
+
+## API-2026-11-02-0647 - Deadlock enrolment–sapuan per jam (Selesai, commit lokal; gate eskalasi)
+
+Fokus dari ADR-0051 (JEV 0,96). Enrolment kartu dan undangan sesekali gagal 500 karena deadlock PostgreSQL 40P01 dengan sapuan per jam. Penyebabnya, enrolment memegang kunci rantai audit gedung sambil menunggu baris instance yang dipegang sapuan.
+
+Perubahan:
+- **Penahanan audit:** `Tx` bisa menahan event audit (`deferAudits`/`flushAudits`/`withDeferredAudits`). `EnrollCard`, `EnrollInvitation`, dan `AbandonStaleEnrollments` menulis audit di akhir pemanggilan store, berurutan stabil per rantai. Isi, hash, dan `seq` audit tidak berubah.
+- **Jalur galat:** event tetap ditulis saat enrolment gagal, jadi ikut ter-commit atau di-rollback bersama perubahannya.
+- **Lanjutan `PENDING_APPROVAL`:** di jalur kartu, instance ini kini dikunci di dalam enrolment (dijaga status, diulang sekali). Pemasangan rahasia enrolment sesudahnya tidak lagi menunggu baris sambil memegang kunci rantai, yang sebelumnya bisa membentuk siklus dengan `DecideEnrollment`.
+- **Review akhir (opus, "With fixes"):** `AppendAudit` kini mengunci baris gedung `FOR KEY SHARE` sebelum kunci rantai. Tanpa itu, `policy`/`site-code` yang memegang `sites FOR UPDATE` bisa deadlock dengan enrolment. Masalah ini sudah ada sebelumnya, dan reviewer mereproduksinya dengan `UpdateSitePolicy`/`RotateSiteJoinCode` asli.
+
+Bukti:
+- 10 test baru di `deadlock_test.go` dengan pola deterministik: transaksi lain menahan baris, polling `pg_stat_activity`, lalu `pg_try_advisory_lock` dari koneksi lain.
+- 10 mutasi tertangkap.
+- Probe operator: 40P01 tanpa perbaikan, lulus dengan perbaikan.
+- Go 10 paket lulus; 5× `-race` lulus; `check_docs` 0 masalah.
+- `jev_gate`: eskalasi (safe_to_apply 0,53, pembatas `test_gap`; 9 klaim verified), tidak diajukan ulang.
+
+Minor ditunda di backlog:
+- penolakan bersamaan kini membuat permintaan baru (201);
+- celah test jalur galat `withDeferredAudits`;
+- test urutan sapuan ±69/70;
+- lanjutan `PENDING_APPROVAL` jalur undangan (tak terjangkau);
+- sisa tabrakan `hashtext`.
+
+Commit unit ini: `2dcba48`, `d2499f4`, `0a6b18b`, `ba6282c`, dan commit ini. Obsidian: `sessions/2026-11-02-deadlock-enrolment-sapuan.md`, `decisions/ADR-0051…`, `lessons/kunci-implisit-foreign-key.md`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
+
+## API-2026-11-02-0613 - Filter kanal dan pencarian daftar kartu (Selesai, commit lokal; gate review)
+
+Fokus dari ADR-0050 (JEV 1,0). `anastrophe-registry list` kini punya `--channel ble|nfcHCE` (kredensial ACTIVE/SUSPENDED) dan `--id <awalan id card instance>`, digabung AND dengan `--status`.
+
+Rincian:
+- Awalan id divalidasi lalu dibandingkan dengan `left()`, sehingga tanpa pola `LIKE` dari masukan.
+- Keluaran tanpa identitas kartu atau kontak.
+- FR-50 masih sebagian: pencarian nama atau nomor kartu menunggu portal dan akun.
+
+Review akhir (opus) memberi verdict "With fixes". Dua celah test (kartu SUSPENDED dan AND dengan status) ditutup oleh `TestFilterDaftarStatusSuspendedDanAND`, yang terbukti menangkap dua mutasi yang lolos sebelumnya. Minor lain di backlog.
+
+Bukti: Go 10 paket lulus; `check_docs` 0 masalah. `jev_gate`: review (composite 0,86).
+
+Commit unit ini: `15efce0`, `e308e21`, `4651dbe`, `02daca4`, dan commit ini. Obsidian: `sessions/2026-11-02-filter-daftar-kartu.md`, `decisions/ADR-0050…`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
+
+## API-2026-11-02-0559 - Kebijakan gedung: masa berlaku dan kanal per gedung (Selesai, commit lokal; gate review)
+
+Fokus dari ADR-0049 (JEV 0,63, Provisional). Ini irisan FR-55 yang bisa dibangun sekarang; persetujuan opsional (FR-17) dan perpanjangan tidak disentuh.
+
+Isi pekerjaan:
+- **CLI `anastrophe-registry policy`:** baca/ubah masa berlaku (1–30 hari) dan kanal (`ble`, `nfcHCE`, `semua`), audit, dan peringatan bila tidak ada kanal efektif.
+- **Store:** pembaruan JSONB di SQL (`zones_bitmap` 64-bit aman), dan pembacaan aman untuk nilai yang bukan array.
+- **Kanal efektif gedung:** dikirim di lookup kode gedung dan respons enrolment. Provisioning menolak kanal terlarang hanya sesudah rahasia enrolment diperiksa.
+- **App:** pemeriksaan sebelum enrolment (jalur kartu), pemilihan ulang sesudah enrolment, pesan netral bila penyebabnya bukan iPhone, dan "Coba lagi" yang mencari ulang kode gedung.
+
+Review akhir (opus) memberi verdict "With fixes":
+- `policy.channels` bukan array → 500, diperbaiki;
+- Minor 1–3 dinaikkan dan diperbaiki;
+- test masa berlaku lewat `UpdateSitePolicy` ditambahkan;
+- sisa minor di [backlog](docs/agentmemory/backlog.md).
+
+Bukti:
+- Go 10 paket lulus; Swift host 354 test, simulator 352 test.
+- Mutasi tertangkap.
+- E2e lab: `nfcHCE` saja → pesan tanpa card instance; `semua` → kartu `ble` aktif 3,0 hari.
+- `check_docs` 0 masalah.
+
+`jev_gate`: review (composite 0,79, `test_gap`).
+
+Commit unit ini: `c34516a`, `3dd7289`, `07509f5`, `8c99c8f`, `bb6c899`, `f0b2a95`, `bd4b0fa`, dan commit ini. Obsidian: `sessions/2026-11-02-kebijakan-gedung.md`, `decisions/ADR-0049…`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
+
+## APP-2026-11-02-0518 - Layar Bantuan dan FAQ in-app (Selesai, commit lokal; gate tereskalasi)
+
+Fokus dari ADR-0048 (JEV 0,99). Setelah alur Tambah Kartu ada, FAQ menjadi P0 murni app berikutnya yang tidak terblokir: FR-60, FR-02, FR-27, ditambah FR-63 (P1).
+
+Isi pekerjaan:
+- **Pintu masuk:** tombol "Bantuan" di tab Kunci untuk semua build.
+- **`HelpTopic`:** sepuluh topik FAQ ID/EN sesuai perilaku R1:
+  - perpanjangan saat kartu dipakai dengan internet;
+  - hapus kartu di iPhone lama sebelum menambah di iPhone baru;
+  - perangkat tambahan perlu persetujuan;
+  - layar terkunci butuh buka app + Face ID;
+  - tanpa menjanjikan fitur yang belum ada.
+- **Status cara akses** di iPhone ini; build tanpa emulasi tidak menyalahkan iPhone atau wilayah.
+- **iPhone yang didukung.**
+- **`DiagnosticsReport`** lewat `ShareLink`:
+  - tanpa id, token, nama kartu, zona, atau host layanan;
+  - penyimpanan gagal → "kartu: tidak terbaca".
+
+Review akhir (opus) memberi verdict "With fixes"; 3 Important diperbaiki:
+- jawaban offline;
+- laporan saat penyimpanan gagal;
+- panduan ganti iPhone.
+
+Minor 6 dinaikkan dan diperbaiki. Sisa minor di [backlog](docs/agentmemory/backlog.md).
+
+Bukti:
+- Swift host 345 test, simulator 343 test; build Debug dan Release sukses.
+- Screenshot ID/EN/AX5.
+- Mutasi tertangkap.
+- `jev_verify` 5/5 klaim platform FAQ.
+- `check_docs` 0 masalah.
+
+`jev_gate` tereskalasi (composite 0,83, `safe_to_apply` 0,73).
+
+Commit unit ini: `84ebff0`, `d1a15e6`, `6915b5b`, `aa5af43`, `dd94518`, `d479f9d`, dan commit ini. Obsidian: `sessions/2026-11-02-bantuan-faq.md`, `decisions/ADR-0048…`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
+
+## APP-2026-11-02-0445 - Alur Tambah Kartu produksi (Selesai, commit lokal; gate tereskalasi; gerbang pra-pilot terbuka)
+
+Fokus dari ADR-0043 (JEV 0,98): build Release belum punya cara menambah kartu, karena tombolnya hanya di DEBUG dan membuka Lab. Keputusan pendukung:
+- kode gedung untuk jalur kartu fisik (ADR-0044, 0,96);
+- baris perangkat dibuat di transaksi enrolment (ADR-0045, 0,77 Provisional).
+
+Isi pekerjaan:
+- **Backend:**
+  - migrasi 0013 `sites.join_code`;
+  - `GET /v1/sites/lookup` (404 `SITE-NOT-FOUND` identik, `no-store`);
+  - CLI `site-code` dan `join_code` di devseed;
+  - `ensureDevice` di transaksi enrolment kartu dan undangan.
+- **App:**
+  - `SiteJoinCode`, `lookupSite`, dan `KeychainDeviceIdentityStore` (dibuat ulang setelah instal ulang);
+  - `BackendConfiguration` (Info.plist `ANAPIBaseURL`, https);
+  - `CardProvisioner` produksi (kanal otomatis N-HCE > B, tanpa enrolment bila tidak ada kanal);
+  - pembaca Core NFC yang hanya membaca identifier, sesudah `connect`;
+  - `AddCardModel`/`AddCardView`, tombol "Tambah kartu akses" di semua build, dan `onOpenURL` yang hanya mengisi field;
+  - teks ID/EN.
+- **E2e:** argumen lab `-ANAPIBaseURL`, `-ANLabCardReader`, `-ANLabAddCode`, `-ANLabOpenURL`.
+
+Review akhir (opus) memberi verdict "With fixes": 0 Critical, 3 Important.
+
+- **Diperbaiki:**
+  - #2 banjir permintaan menunggu: batas 4 per kartu (`ENR-PENDING-LIMIT`, ADR-0047, tereskalasi 0,51; diterapkan sebagai inti bersama dua kandidat teratas);
+  - #3 identifier setelah `connect` (tanpa test otomatis; uji H);
+  - #7 gedung tanpa registri ditawari undangan (dinaikkan dari minor).
+- **#1 oracle tebakan identitas kartu:** dicatat sebagai gerbang pra-pilot (ADR-0046, tereskalasi 0,49). Backend tidak boleh dibuka untuk pilot sebelum App Attest dan kontrol enumerasi ada.
+- **Minor lain:** di [backlog](docs/agentmemory/backlog.md).
+
+Bukti:
+- Go 10 paket lulus; Swift host 334 test; simulator 332 test (flaky BLE yang dikenal gagal sekali, lulus saat diulang; modul BLE tidak berubah).
+- Build Debug dan Release sukses.
+- Mutasi tertangkap: aturan Bluetooth, guard ketuk ganda (setelah test diperkuat), batas pending.
+- E2e simulator:
+  - kode gedung + pembaca palsu → kartu aktif, perangkat 1→2;
+  - instal ulang + kartu tak terdaftar → pesan + tawaran undangan, perangkat tetap 2;
+  - undangan → kartu aktif, perangkat 3;
+  - teks ID dan "Layanan belum tersedia" benar.
+- `check_docs` 0 masalah.
+
+`jev_gate` tereskalasi (composite 0,64, `spec_match`); 8/8 klaim terverifikasi.
+
+Commit unit ini: `a34c090`, `c375487`, `c270989`, `ffddcc1`, `bfa90dd`, `fba0e33`, `a0505a3`, `5794516`, `c512bdc`, `9ea64a0`, dan commit ini. Obsidian: `sessions/2026-11-02-alur-tambah-kartu.md`, `decisions/ADR-0043…0045`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
+
+## API-2026-11-02-0207 - Perbaikan minor tertunda dari tiga review terakhir (Selesai, commit lokal; gate tereskalasi)
+
+Fokus dari ADR-0042. JEV mengeskalasi pilihan fokus (0,41); rekomendasi penulis diterapkan atas dasar tujuan iterasi berkelanjutan dan persetujuan umum pengguna, dan pengguna bisa membatalkannya. ADR-0038 dan ADR-0041 tidak disentuh.
+
+Isi pekerjaan:
+- **Store:**
+  - Update kini dijaga status: hash rahasia hanya untuk instance yang menunggu, dan resume diulang sekali bila sapuan menandai instance `ABANDONED` di tengah transaksi.
+  - Perpanjangan mengunci instance sebelum kredensial (dibuktikan dengan test deterministik `NOWAIT`).
+  - Revoke operator menulis audit `credential.revoked` per kredensial.
+  - Migrasi 0012 `max_not_after`: denylist bertahan sampai sertifikat terpanjang yang pernah diterbitkan habis (`GREATEST`), lalu dibuang sapuan per jam.
+- **CLI:** `invite` mencetak id undangan, dan `--link-base` harus tepat `https://<domain>/i/`.
+- **Test:** idempotency rahasia, hash, dan token undangan; alur persetujuan operator lewat HTTP; peta rahasia fixture dijaga mutex.
+- **App:**
+  - `CardStore.update(id:mutate:)` atomik dan dipakai penyegar status.
+  - Penyegar melewati kartu Dicabut dan membatasi frekuensi dengan `ContinuousClock`, yang ikut berjalan saat ponsel tidur.
+  - Perpanjangan menyimpan `serverCardID` dari challenge.
+  - Parameter rahasia enrolment di `APIClient` kini wajib.
+
+Review akhir (opus): 0 Critical, 0 Important; kelima Review Focus terpenuhi. Fix pass:
+- `GREATEST` untuk masa berlaku denylist.
+- Path `/i/` untuk `--link-base`.
+- `ContinuousClock` untuk penyegar (dinaikkan dari minor karena kartu ditangguhkan bisa tetap tampil Aktif setelah ponsel tidur).
+- Sinkron SDD dan backlog.
+- Minor lain dan deadlock enrolment–sapuan yang sudah ada sebelumnya dicatat di [backlog](docs/agentmemory/backlog.md).
+
+Bukti:
+- Go 10 paket lulus; Swift host 288 test, simulator 286 test; `check_docs` 0 masalah.
+- RED terlihat untuk setiap perbaikan, dan uji mutasi tertangkap.
+
+`jev_gate` tereskalasi (composite 0,73, `spec_match`); 7 klaim terverifikasi.
+
+Commit unit ini: `77f6149`, `79ad48e`, `543576b`, `8f12f03`, `6bfe802`, `cc31e88`, dan commit ini. Obsidian: `sessions/2026-11-02-perbaikan-minor.md`, `decisions/ADR-0042…`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
+
+## API-2026-11-02-0123 - Provisioning kredensial yang aman (Selesai dengan risiko sisa terbuka, commit lokal; I1 dan gate tereskalasi)
+
+Fokus dari ADR-0039 (JEV 0,92), untuk menutup celah prioritas tinggi dari review siklus hidup: kredensial bisa diterbitkan lewat id instance yang dibocorkan `:challenge`. Mekanisme dari ADR-0040: ronde 24 tereskalasi (0,43), lalu ronde 25 dengan bukti baru (app tidak pernah menambah kanal) menghasilkan 0,83.
+
+Isi pekerjaan:
+- **Server (migrasi 0011):** `provisioning_key_hash` (SHA-256 saja) dipasang dalam transaksi enrolment untuk instance yang dikembalikan kepada perangkat. Jalur tanpa Idempotency-Key kini memakai `Store.InTx`.
+  - Provisioning wajib `Authorization: Bearer <rahasia>`. Rahasia hilang, rusak, atau salah dijawab 404 `ENR-NOT-FOUND` yang identik dengan id tak dikenal, dan diperiksa sebelum status diungkap.
+  - Provisioning hanya untuk `PROVISIONING`; hash dihapus setelah kredensial pertama, dan tambah kanal ke kartu aktif ditolak.
+- **App:** `ProvisioningSecret` hanya ada di memori. Hash dikirim saat enrolment (kartu maupun undangan), dan bearer dikirim saat kredensial pertama.
+- **Test:** fixture Go kini bertindak sebagai klien yang benar. `allTablesText` mendekode kolom `bytea`, sehingga semua test kebocoran bisa melihat teks yang bocor ke body idempotency.
+
+Review akhir (opus): siap merge setelah perbaikan; 0 Critical.
+- **I2 (test kebocoran buta base64/bytea):** diperbaiki dan dibuktikan dengan mutasi: dulu lolos, kini tertangkap.
+- **I1 (pengambilalihan instance yang belum selesai lewat id perangkat + identitas kartu):** JEV 0,44, jadi dieskalasi sebagai **ADR-0041**. Rekomendasi: `first_writer_wins`. Dokumen kini menyatakan risiko sisa ini dan backlog membukanya lagi sebagai prioritas tinggi.
+- **M3 dan M5:** koreksi dokumen dan komentar. Minor lain ditunda di backlog.
+
+Bukti:
+- Go 10 paket lulus; Swift host 284 test, simulator 282 test; `check_docs` 0 masalah.
+- Lab simulator: app memprovisikan normal dan hash terhapus. Id instance dari `:challenge` tanpa rahasia maupun dengan rahasia palsu dijawab 404 identik dengan id tak dikenal; jumlah kredensial tetap 1, dan log API tanpa bearer.
+
+`jev_gate` tereskalasi (composite 0,74, `safe_to_apply` 0,36); 7 klaim terverifikasi.
+
+Commit unit ini: `16a61bb`, `61a0d97`, `4f8da9b`, `cf0e73c`, `6edc450`, dan commit ini. Obsidian: `sessions/2026-11-02-provisioning-aman.md`, `decisions/ADR-0039…`, `ADR-0040…`, `ADR-0041…`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
+
+## API-2026-11-02-0044 - Siklus hidup kartu oleh operator dan status kartu di app (Selesai dengan keterbatasan terbuka, commit lokal; C1 dan gate tereskalasi)
+
+Fokus dari ADR-0036 (JEV 0,98). Mekanisme status dari ADR-0037 (JEV 0,96): token baca status yang dibuat app, dan server hanya menyimpan hash-nya.
+
+Isi pekerjaan:
+- **Store dan migrasi 0010:** `status_token_hash` dan `denylist_entries`.
+  - `SuspendCard`, `ResumeCard`, `RevokeCardInstance`: instance dikunci dan status asal diperiksa; kredensial mengikuti status; audit `card.*`; alasan pencabutan berupa kode.
+  - Hapus kartu dan pencabutan operator memakai helper yang sama, jadi keduanya mengisi denylist.
+- **HTTP:** `status_token_hash` opsional di provisioning (hanya dipasang bila belum ada) dan di `:renew` (boleh mengganti). `GET /v1/cards/{id}/status` dengan bearer token, dan semua kegagalan dijawab 404 `CARD-NOT-FOUND` yang identik. `:renew` memeriksa status setelah bukti kepemilikan.
+- **CLI:** `list`, `suspend`, `resume`, `revoke --reason <kode>`, dengan peringatan ADR-0038 setelah suspend/revoke.
+- **App:** token di Keychain `afterFirstUnlockThisDeviceOnly`. `CardStatusRefresher` berjalan saat layar Kunci dimuat dan saat app kembali aktif, paling sering sekali per menit:
+  - Ditangguhkan, Aktif, atau Dicabut mengikuti server.
+  - "Perlu dipindahkan" tidak ditimpa, dan galat jaringan mempertahankan status.
+  - Token yang ditolak server dihapus agar perpanjangan berikutnya memasang token baru.
+
+Review akhir (opus): siap merge setelah perbaikan.
+- **C1 (pemegang kartu bisa membatalkan suspend/revoke dengan mendaftar ulang kartu fisik):** JEV 0,45, jadi dieskalasi sebagai **ADR-0038**. Rekomendasi: `hold_pending_approval`. FR-51 belum dinyatakan terpenuhi.
+- **Diperbaiki dengan test RED → GREEN:**
+  - I1: hash token bisa ditimpa lewat provisioning tanpa autentikasi.
+  - I2: ID QA ganda; `check_docs.py` kini mendeteksinya.
+  - M2: `:renew` membocorkan penangguhan.
+
+Bukti:
+- Go 10 paket lulus, `go vet` bersih.
+- Swift host 281 test, simulator 279 test.
+- `check_docs` 0 masalah.
+- Lab simulator: `suspend` lalu buka ulang app → Suspended; `resume` → Active; `revoke --reason hilang` → Revoked. Kredensial `REVOKED`, satu baris denylist (`expires_at` = `not_after`), audit lengkap, dan log API tanpa token.
+
+`jev_gate` tereskalasi (composite 0,74, `test_gap`); 9 klaim terverifikasi. Celah pra-ada yang ditemukan reviewer: kredensial bisa diterbitkan lewat id instance yang didapat dari `:challenge`. Celah ini tercatat di SDD dan menjadi prioritas tinggi di [backlog](docs/agentmemory/backlog.md).
+
+Commit unit ini: `f1f0611`, `203161e`, `f06f6cc`, `d02e59e`, `2ab4477`, `613c278`, dan commit ini. Obsidian: `sessions/2026-11-02-siklus-hidup-kartu.md`, `decisions/ADR-0036…`, `ADR-0037…`, `ADR-0038…`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
+
+## API-2026-11-01-2348 - Enrolment via undangan dan perbaikan review akhirnya (Selesai, commit lokal; gate tereskalasi)
+
+Fokus dari ADR-0033 (JEV 0,89). Temuan review I1 diputuskan JEV sebagai ADR-0035 (`promote_existing`, 0,94, Diterima).
+
+Isi pekerjaan:
+- **Store dan migrasi 0009:** tabel `invitations` (hash SHA-256 token, gedung, kartu opsional, zona, masa berlaku) dan `card_instances.invitation_id`. Pemakaian tunggal dikunci `FOR UPDATE`; undangan dianggap terpakai selama punya instance yang tidak `ABANDONED`.
+- **HTTP:** `POST /v1/enrollments` menerima tepat satu dari `card` atau `invitation`. Undangan tak dikenal, kedaluwarsa, terpakai, atau yang kartunya keluar dari registri dijawab identik 404 `ENR-INVITATION-INVALID`. Hash idempotency memakai hash token.
+- **CLI `anastrophe-registry invite`:** token dicetak sekali. Identitas kartu dibaca dari `--card-file <berkas>|-`, bukan argumen. `--zones` hanya untuk undangan tanpa kartu. `--contact` ditunda sampai FR-03.
+- **App:** `InvitationLink.token(from:)` (`https://<host>/i/<token>`), `createEnrollment(deviceID:invitation:)`, teks ID/EN "Undangan tidak berlaku atau sudah dipakai.", dan argumen lab `-ANLabInvite`.
+- **ADR-0035:** perangkat yang masih `PENDING_APPROVAL`/`PROVISIONING` untuk kartu yang sama melanjutkan instance-nya lewat undangan berkartu, dengan audit `enrollment.approved` yang memuat id undangan. Tidak ada instance baru.
+
+Review akhir (opus): siap merge setelah perbaikan; 0 Critical. Diperbaiki dengan test RED → GREEN dan uji mutasi:
+- I1 (jalan buntu, ADR-0035)
+- I2 (kartu `REMOVED`)
+- I3 (identitas kartu dan kontak di argumen CLI, aturan 6)
+- I4 (batas 8 kartu tanpa test, aturan 8)
+- M1 (token lab berawalan `-`)
+- M5 (`--zones` diabaikan diam-diam)
+- M8 (audit tanpa id undangan, bagian dari ADR-0035)
+
+Bukti:
+- Go `ANASTROPHE_REQUIRE_PG=1 go test ./...` 10 paket lulus, `go vet` bersih.
+- Swift host 260 test, simulator 258 test.
+- `check_docs` 0 masalah.
+- Lab simulator: undangan tanpa kartu fisik → `ACTIVE` dengan 1 kredensial. Token terpakai → teks undangan tak berlaku, dan responsnya identik dengan token acak. Perangkat yang menunggu persetujuan menebus undangan berkartu dari stdin, lalu instance yang sama menjadi `ACTIVE`. Token dan identitas kartu tidak muncul di log API maupun dump database.
+
+`jev_gate` tereskalasi (composite 0,70, `test_gap`); 10 klaim terverifikasi, 2 perlu tinjauan. Minor tertunda (M2, M3, M4, M6, M7, M9, M12) dicatat di [backlog](docs/agentmemory/backlog.md).
+
+Commit unit ini: `792695e`, `8b9da67`, `1334464`, `53195f5`, dan commit ini. Obsidian: `sessions/2026-11-01-undangan.md`, `decisions/ADR-0035…`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
+
+## API-2026-11-01-2257 - Registri kartu fisik dan enrolment berbasis kartu, beserta perbaikan review (Selesai, commit lokal; gate tereskalasi)
+
+Fokus dari ADR-0031 (JEV 0,88), dengan aturan perangkat tambahan ADR-0032 (JEV 0,71, provisional).
+
+Isi pekerjaan:
+- **Paket `internal/registry`:** identitas kartu kanonik per teknologi, normalisasi kontak, dan MAC per gedung (HKDF dev; KMS menyusul).
+- **Migrasi 0007:** `physical_cards` yang hanya menyimpan HMAC.
+- **`POST /v1/enrollments`:** mewajibkan kartu, dengan galat `ENR-NOT-REGISTERED`, `ENR-SITE-UNSUPPORTED`, dan `ENR-DUPLICATE`, serta provisioning `PENDING_APPROVAL` → 409. Hash idempotency memakai HMAC.
+- **CLI `anastrophe-registry`:** perintah `import`, `approve`, dan `reject`; devseed mendaftarkan kartu lab.
+- **App:** `CardIdentity` dengan deskripsi disamarkan, `EnrollmentStart`, teks FR-13 dalam ID/EN, dan argumen `-ANLabCard`.
+
+Review akhir: "with fixes". Semua perbaikan berikut dikerjakan:
+- **C1:** perpanjangan sempat memakai zona kebijakan gedung, bukan zona kartu (*fail-open*). Kini satu helper zona dipakai bersama penerbitan dan perpanjangan.
+- **I1 (ADR-0034, JEV 0,81):** perangkat yang sama melanjutkan enrolment yang belum selesai, dan `PROVISIONING` tanpa kredensial menjadi `ABANDONED` setelah 15 menit (migrasi 0008, sapuan per jam).
+- **I2:** test kebocoran tidak lagi menggantung.
+- **I3:** impor CSV menerima BOM dan membatalkan impor saat tanda kutip rusak.
+- **Minor:** perangkat penuh tanpa oracle registri, pemindaian seluruh tabel, normalisasi ID gedung, urutan impor tanpa deadlock, hex tanpa tanda `+`/`-`, `--operator` sebagai pegangan buram, CSV di-ignore, devseed `-new-device` tanpa kunci, serta drift SDD dan GLOSSARY.
+
+Bukti:
+- Go 10 paket lulus; host 253 test dan simulator 251 test (1 dilewati).
+- Uji mutasi tertangkap untuk kunci baris kartu, penandaan terbengkalai, urutan batas, hash idempotency, dan kebocoran CLI.
+- Lab simulator end-to-end dua kali. Yang terakhir: perangkat 2 `PENDING_APPROVAL` → disetujui operator → app diluncurkan ulang → instance yang sama dilanjutkan → `ACTIVE` dengan kredensial; log API tanpa identitas kartu.
+- `jev_gate` tereskalasi (composite 0,55). Klaim 1 terlalu luas karena perangkat penuh sengaja menerima `ENR-LIMIT`.
+
+Juga: ADR-0033 (JEV 0,89) memilih fokus berikutnya, enrolment via undangan. Spesifikasi dan rencananya sudah ditulis. Backlog minor diverifikasi ulang terhadap kode: sebagian besar catatan lama ternyata sudah selesai.
+
+Commit unit ini: `8398997`, `d30efd2`, `24eecbd`, `fc22ebd`, `694b34e`, `6b2d943`, `f221d58`, `6d8a3f1`, `2eaa044`, `e6ff15d`, dan commit ini. Obsidian: `sessions/2026-11-01-registri-kartu.md`, `decisions/ADR-0033…`, `decisions/ADR-0034…`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
+
+## IOS-2026-11-01-1902 - Minor riwayat tap selesai: review akhir dan perbaikannya (Selesai, commit lokal; gate tereskalasi)
+
+Review akhir oleh subagent baru atas `947ae3f..97e8216`: siap merge, tanpa Critical/Important, lima minor. Kelimanya dikerjakan:
+- **Minor 1, dinaikkan ke Important:** pembersihan entri yatim memakai cuplikan kartu yang basi, sehingga riwayat kartu yang baru ditambahkan selama `load()` bisa terhapus. Kini daftar kartu dibaca ulang tepat sebelum menghapus. Test `kartuBaruSaatMuatTidakKehilanganRiwayat`: RED lalu GREEN.
+- **Minor 2:** kontrak `CardStore.all()` (semua kartu atau gagal) dan `removeAll(except:)` ditulis di doc comment, dengan test penjaga `barisKartuTakTerbacaMembuatAllGagal`.
+- **Minor 3:** dua test bergerbang diberi batas waktu satu menit. Mutasi membuktikan test gagal setelah 64 detik, bukan menggantung.
+- **Minor 4:** baris Status digabung untuk VoiceOver. Baru diverifikasi lewat kode.
+- **Minor 5:** test hapus kartu memakai kartu kedua yang benar-benar ada di store.
+
+Suite: host 244 test (1 dilewati), simulator 242 (`TEST SUCCEEDED`). Dokumen: SDD 2.8 (§5.3 pembersihan riwayat) dan QA TC-MGT-01 beserta jumlah test.
+
+`jev_gate`: semua klaim terverifikasi (0 *contradicted*, 0 *unsupported*), tetapi tereskalasi (composite 0,73, safe_to_apply 0,46); masuk daftar tinjauan README sebagai gate keenam.
+
+Commit unit ini: `e6b0544`, `f899544`, `33e1103`, `97e8216`, dan commit ini. Obsidian: `sessions/2026-11-01-minor-riwayat-tap-dan-registri.md` dan MOC. Berikutnya: rencana implementasi registri kartu fisik (ADR-0031/0032).
 
 ## DOC-2026-11-01-1856 - ADR-0001 dikembalikan ke keputusan asli (Selesai)
 

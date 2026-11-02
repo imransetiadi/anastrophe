@@ -1,0 +1,21 @@
+{
+  "tool": "jev_decide",
+  "decision": "Mitigasi apa yang diterapkan sekarang untuk temuan review akhir #2: satu identitas kartu dengan device_id acak membuat baris perangkat, instance PENDING_APPROVAL, dan audit tanpa batas?",
+  "candidates": [
+    "batas_pending_per_kartu",
+    "kedaluwarsa_pending",
+    "batas_dan_kedaluwarsa",
+    "catat_saja"
+  ],
+  "requirements": [
+    "Membatasi jumlah baris perangkat dan permintaan menunggu yang bisa dibuat dari satu identitas kartu, juga saat lonjakan.",
+    "Tidak menghalangi perangkat tambahan sah dalam jumlah wajar (hingga batas anggota default 4).",
+    "Bisa diverifikasi dengan test otomatis sekarang."
+  ],
+  "escalate_on_contradiction": true,
+  "evidence_summary": [
+    "Probe reviewer: 25 POST → 25 baris perangkat, 24 PENDING_APPROVAL, 25 audit.",
+    "PENDING_APPROVAL tidak kedaluwarsa; audit append-only; CLI list tanpa info perangkat.",
+    "Kartu dikunci FOR UPDATE di transaksi enrolment; batas anggota default 4 (FR-36)."
+  ]
+}

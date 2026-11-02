@@ -11,8 +11,12 @@ public struct KeysView: View {
     @State private var path: [Card.ID] = []
     @State private var presentation: PresentationController
     @State private var showsLab = false
+    /// Layar Bantuan (ADR-0048).
+    @State private var showsHelp = false
     @State private var deleteMessage: String?
     @State private var deleting: Card.ID?
+    /// Alur Tambah Kartu (FR-10): dari tombol atau dari tautan undangan yang dibuka sistem.
+    @State private var addCard: AddCardRequest?
     #if DEBUG
     @State private var labMessage: String?
     #endif
@@ -51,8 +55,19 @@ public struct KeysView: View {
                     }
                 }
                 .toolbar {
-                    #if DEBUG
                     ToolbarItem(placement: .primaryAction) {
+                        Button { addCard = AddCardRequest(entry: .start) } label: {
+                            Label(localized("keys.add"), systemImage: "plus")
+                        }
+                        .disabled(!model.canAddCard || services.storageFailed)
+                    }
+                    ToolbarItem(placement: Self.leadingPlacement) {
+                        Button { showsHelp = true } label: {
+                            Label(localized("keys.help"), systemImage: "questionmark.circle")
+                        }
+                    }
+                    #if DEBUG
+                    ToolbarItem(placement: Self.leadingPlacement) {
                         Button(localized("keys.lab")) { showsLab = true }
                     }
                     #endif
@@ -60,6 +75,8 @@ public struct KeysView: View {
         }
         .task {
             await model.load()
+            // FR-38 (ADR-0037): status dari server tanpa prompt; daftar dimuat ulang hanya bila berubah.
+            if await services.refreshCardStatuses() { await model.load() }
             #if DEBUG
             // Daftar tampil dulu; alur lab berjalan sesudahnya agar host lambat tidak menahan layar.
             if let message = await services.runPendingLabBackendProvisioning() {
@@ -74,8 +91,29 @@ public struct KeysView: View {
                 labMessage = message
                 await model.load()
             }
+            if let url = services.pendingLabOpenURL {
+                services.pendingLabOpenURL = nil
+                addCard = AddCardEntry.entry(for: url).map { AddCardRequest(entry: $0, labAutoSubmit: true) }
+            } else if let code = services.pendingLabAddCode {
+                services.pendingLabAddCode = nil
+                addCard = AddCardRequest(entry: .start, labAutoCode: code)
+            }
             #endif
             openDemoScreen()
+        }
+        .onOpenURL { url in
+            // Tautan undangan https://<host>/i/<token> (FR-12). Tidak menyela presentasi yang sedang berjalan.
+            guard let entry = AddCardEntry.entry(for: url), presentation.request == nil else { return }
+            addCard = AddCardRequest(entry: entry)
+        }
+        .sheet(isPresented: $showsHelp) {
+            HelpView(services: services)
+        }
+        .sheet(item: $addCard) { request in
+            AddCardView(services: services, entry: request.entry, reader: services.makeCardReader(),
+                        labAutoCode: request.labAutoCode, labAutoSubmit: request.labAutoSubmit) {
+                Task { await model.load() }
+            }
         }
         .alert(deleteMessage ?? "", isPresented: Binding(get: { deleteMessage != nil }, set: { if !$0 { deleteMessage = nil } })) {
             Button(localized("present.done"), role: .cancel) {}
@@ -84,7 +122,12 @@ public struct KeysView: View {
             Task { await model.load() }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await model.load() } }
+            if phase == .active {
+                Task {
+                    await model.load()
+                    if await services.refreshCardStatuses() { await model.load() }
+                }
+            }
         }
         .sheet(item: $presentation.request, onDismiss: {
             Task {
@@ -120,12 +163,10 @@ public struct KeysView: View {
             } description: {
                 Text(localized("keys.empty.message"))
             } actions: {
-                #if DEBUG
-                Button(localized("keys.add")) { showsLab = true }
+                Button(localized("keys.add")) { addCard = AddCardRequest(entry: .start) }
                     .buttonStyle(ANPrimaryButtonStyle())
                     .disabled(!model.canAddCard)
                     .padding(.horizontal)
-                #endif
             }
         } else {
             List(model.cards) { card in
@@ -135,6 +176,14 @@ public struct KeysView: View {
             }
             .scrollContentBackground(.hidden)
         }
+    }
+
+    private static var leadingPlacement: ToolbarItemPlacement {
+        #if os(iOS)
+        .topBarLeading
+        #else
+        .automatic
+        #endif
     }
 
     #if DEBUG
@@ -185,6 +234,7 @@ public struct KeysView: View {
         #if DEBUG
         switch services.demoScreen {
         case "lab": showsLab = true
+        case "help": showsHelp = true
         case "detail": if let first = model.cards.first { path = [first.id] }
         case "presentation", "bluetooth-denied": if let first = model.cards.first(where: { model.presentability(of: $0).canPresent }) { use(first) }
         default: break

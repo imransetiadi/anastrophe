@@ -1,0 +1,88 @@
+{
+ "tool": "jev_decide",
+ "model": "jev-1.14.0",
+ "provider": "typesafe",
+ "recommendation": {
+  "selected": "pemindaian_secret_dependensi",
+  "escaped": false,
+  "confidence": 0.93,
+  "probabilities": {
+   "pemindaian_secret_dependensi": 0.94,
+   "audit_aksesibilitas": 0.04,
+   "privacy_manifest_teknis": 0,
+   "minor_observabilitas": 0.01,
+   "ask_user": 0.01,
+   "investigate": 0,
+   "none": 0
+  },
+  "contradicted_requirements": []
+ },
+ "requirements_checked": 3,
+ "checks": [
+  {
+   "candidate": "pemindaian_secret_dependensi",
+   "requirement": 0,
+   "answer": "supported"
+  },
+  {
+   "candidate": "pemindaian_secret_dependensi",
+   "requirement": 1,
+   "answer": "supported"
+  },
+  {
+   "candidate": "pemindaian_secret_dependensi",
+   "requirement": 2,
+   "answer": "supported"
+  },
+  {
+   "candidate": "audit_aksesibilitas",
+   "requirement": 0,
+   "answer": "supported"
+  },
+  {
+   "candidate": "audit_aksesibilitas",
+   "requirement": 1,
+   "answer": "supported"
+  },
+  {
+   "candidate": "audit_aksesibilitas",
+   "requirement": 2,
+   "answer": "supported"
+  },
+  {
+   "candidate": "privacy_manifest_teknis",
+   "requirement": 0,
+   "answer": "supported"
+  },
+  {
+   "candidate": "privacy_manifest_teknis",
+   "requirement": 1,
+   "answer": "contradicted"
+  },
+  {
+   "candidate": "privacy_manifest_teknis",
+   "requirement": 2,
+   "answer": "contradicted"
+  },
+  {
+   "candidate": "minor_observabilitas",
+   "requirement": 0,
+   "answer": "supported"
+  },
+  {
+   "candidate": "minor_observabilitas",
+   "requirement": 1,
+   "answer": "supported"
+  },
+  {
+   "candidate": "minor_observabilitas",
+   "requirement": 2,
+   "answer": "contradicted"
+  }
+ ],
+ "warnings": [],
+ "usage": {
+  "input_tokens": 4314,
+  "output_tokens": 596
+ }
+}

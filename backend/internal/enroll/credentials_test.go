@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -22,6 +23,7 @@ import (
 
 	"github.com/imransetiadi/anastrophe/backend/internal/certs"
 	"github.com/imransetiadi/anastrophe/backend/internal/httpapi"
+	"github.com/imransetiadi/anastrophe/backend/internal/registry"
 	"github.com/imransetiadi/anastrophe/backend/internal/store"
 	"github.com/imransetiadi/anastrophe/backend/internal/testpg"
 )
@@ -56,6 +58,13 @@ type fixture struct {
 	siteID   string
 	deviceID string
 	groupID  []byte
+	mac      *registry.DevMAC
+	nextCard *int
+	// secrets: rahasia enrolment per id instance (ADR-0040). Fixture berperan sebagai klien yang
+	// benar: do() mengirim hash saat enrolment dan rahasia saat provisioning.
+	secrets map[string][]byte
+	// secretsMu menjaga secrets dari enrolment bersamaan lewat do() (review akhir provisioning M6).
+	secretsMu *sync.Mutex
 }
 
 func newFixture(t *testing.T) fixture {
@@ -99,23 +108,76 @@ func newFixtureWithPool(t *testing.T, poolParams string) fixture {
 	deviceID, _ := s.CreateDevice(ctx)
 	caKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	signer := certs.NewSoftwareSigner(caKey)
+	mac, err := registry.NewDevMAC(testRegistryKey)
+	if err != nil {
+		t.Fatal(err)
+	}
 	h := &Handler{
 		Store:           s,
 		Signers:         func(string) (certs.Signer, error) { return signer, nil },
 		Now:             func() time.Time { return time.Unix(1_794_000_000, 0) },
 		Validity:        7 * 24 * time.Hour,
 		EnabledChannels: []string{"ble", "nfcHCE"},
+		Registry:        mac,
 	}
-	return fixture{
-		dsn:      dsn,
-		h:        h,
-		handler:  httpapi.New(httpapi.Config{}, httpapi.Deps{Routes: h.Register}),
-		store:    s,
-		signer:   signer,
-		siteID:   siteID,
-		deviceID: deviceID,
-		groupID:  groupID,
+	f := fixture{
+		mac:       mac,
+		nextCard:  new(int),
+		secrets:   map[string][]byte{},
+		secretsMu: &sync.Mutex{},
+		dsn:       dsn,
+		h:         h,
+		handler:   httpapi.New(httpapi.Config{}, httpapi.Deps{Routes: h.Register}),
+		store:     s,
+		signer:    signer,
+		siteID:    siteID,
+		deviceID:  deviceID,
+		groupID:   groupID,
 	}
+	var cards []store.PhysicalCard
+	for i := range labCards {
+		cards = append(cards, store.PhysicalCard{CardHMAC: f.cardHMAC(t, labCardHex(i))})
+	}
+	if _, _, err := s.UpsertPhysicalCards(ctx, siteID, "uji", cards, 0, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
+// testRegistryKey adalah kunci master registri dev untuk test (bukan rahasia).
+const testRegistryKey = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+
+// labCards = jumlah kartu lab terdaftar di fixture (cukup untuk test batas 8 kartu).
+const labCards = 16
+
+func labCardHex(i int) string { return fmt.Sprintf("040000000000%02x", i) }
+
+// registerCard mendaftarkan kartu ke registri gedung fixture; hanya HMAC yang disimpan.
+func (f fixture) registerCard(t *testing.T, idHex string, zones uint64) {
+	t.Helper()
+	if _, _, err := f.store.UpsertPhysicalCards(context.Background(), f.siteID, "uji", []store.PhysicalCard{{CardHMAC: f.cardHMAC(t, idHex), ZonesBitmap: zones}}, 0, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (f fixture) cardHMAC(t *testing.T, idHex string) []byte {
+	t.Helper()
+	identity, err := registry.ParseCardIdentity("iso14443a", idHex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum, err := f.mac.MAC(context.Background(), f.siteID, identity.MACInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sum
+}
+
+// cardBody memberi body enrolment dengan kartu lab berikutnya yang belum dipakai fixture.
+func (f fixture) cardBody() map[string]any {
+	i := *f.nextCard
+	*f.nextCard = i + 1
+	return map[string]any{"device_id": f.deviceID, "site_id": f.siteID, "card": map[string]string{"tech": "iso14443a", "id": labCardHex(i)}}
 }
 
 func (f fixture) handlerConfig(t *testing.T, channels []string) {
@@ -125,15 +187,106 @@ func (f fixture) handlerConfig(t *testing.T, channels []string) {
 
 func (f fixture) do(t *testing.T, method, path, idempotencyKey string, body any) *httptest.ResponseRecorder {
 	t.Helper()
+	var secret []byte
+	if method == http.MethodPost && path == "/v1/enrollments" {
+		body, secret = withProvisioningHash(t, body, idempotencyKey)
+	}
+	rec := f.request(t, method, path, idempotencyKey, body, f.provisioningHeaders(method, path))
+	if secret != nil && rec.Code < 300 {
+		var out struct {
+			EnrollmentID string `json:"enrollment_id"`
+		}
+		if json.Unmarshal(rec.Body.Bytes(), &out) == nil && out.EnrollmentID != "" {
+			f.secretsMu.Lock()
+			f.secrets[out.EnrollmentID] = secret
+			f.secretsMu.Unlock()
+		}
+	}
+	return rec
+}
+
+// provisioningHeaders membawa rahasia enrolment instance untuk provisioning (ADR-0040).
+func (f fixture) provisioningHeaders(method, path string) map[string]string {
+	headers := map[string]string{}
+	if id, ok := strings.CutPrefix(path, "/v1/enrollments/"); ok && method == http.MethodPost {
+		f.secretsMu.Lock()
+		secret := f.secrets[strings.TrimSuffix(id, "/credentials")]
+		f.secretsMu.Unlock()
+		if strings.HasSuffix(id, "/credentials") && secret != nil {
+			headers["Authorization"] = "Bearer " + base64.RawURLEncoding.EncodeToString(secret)
+		}
+	}
+	return headers
+}
+
+// armProvisioning memasang rahasia enrolment untuk instance yang dibuat langsung lewat store.
+func (f fixture) armProvisioning(t *testing.T, id string) {
+	t.Helper()
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(secret)
+	if err := f.store.InTx(context.Background(), func(tx *store.Tx) error { return tx.SetProvisioningKeyHash(context.Background(), id, sum[:]) }); err != nil {
+		t.Fatal(err)
+	}
+	f.secretsMu.Lock()
+	f.secrets[id] = secret
+	f.secretsMu.Unlock()
+}
+
+// request mengirim permintaan apa adanya, tanpa perilaku klien otomatis do().
+func (f fixture) request(t *testing.T, method, path, idempotencyKey string, body any, headers map[string]string) *httptest.ResponseRecorder {
+	t.Helper()
 	raw, _ := json.Marshal(body)
 	req := httptest.NewRequest(method, path, bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
 	if idempotencyKey != "" {
 		req.Header.Set("Idempotency-Key", idempotencyKey)
 	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
 	rec := httptest.NewRecorder()
 	f.handler.ServeHTTP(rec, req)
 	return rec
+}
+
+// withProvisioningHash menambahkan hash rahasia enrolment ke body enrolment berbentuk map yang belum
+// membawanya (ADR-0040). Dengan Idempotency-Key, rahasia diturunkan dari key agar retry membawa body
+// yang sama, seperti klien sungguhan.
+func withProvisioningHash(t *testing.T, body any, idempotencyKey string) (any, []byte) {
+	t.Helper()
+	secret := make([]byte, 32)
+	if idempotencyKey != "" {
+		sum := sha256.Sum256([]byte("fixture-secret\n" + idempotencyKey))
+		secret = sum[:]
+	} else if _, err := rand.Read(secret); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(secret)
+	hash := base64.StdEncoding.EncodeToString(sum[:])
+	switch b := body.(type) {
+	case map[string]any:
+		if _, set := b["provisioning_key_hash"]; set {
+			return body, nil
+		}
+		out := map[string]any{"provisioning_key_hash": hash}
+		for k, v := range b {
+			out[k] = v
+		}
+		return out, secret
+	case map[string]string:
+		if _, set := b["provisioning_key_hash"]; set {
+			return body, nil
+		}
+		out := map[string]string{"provisioning_key_hash": hash}
+		for k, v := range b {
+			out[k] = v
+		}
+		return out, secret
+	}
+	return body, nil
 }
 
 func (f fixture) doRaw(t *testing.T, path, idempotencyKey, body string) *httptest.ResponseRecorder {
@@ -141,6 +294,9 @@ func (f fixture) doRaw(t *testing.T, path, idempotencyKey, body string) *httptes
 	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", idempotencyKey)
+	for k, v := range f.provisioningHeaders(http.MethodPost, path) {
+		req.Header.Set(k, v)
+	}
 	rec := httptest.NewRecorder()
 	f.handler.ServeHTTP(rec, req)
 	return rec
@@ -148,7 +304,7 @@ func (f fixture) doRaw(t *testing.T, path, idempotencyKey, body string) *httptes
 
 func (f fixture) enroll(t *testing.T) string {
 	t.Helper()
-	rec := f.do(t, http.MethodPost, "/v1/enrollments", "", map[string]string{"device_id": f.deviceID, "site_id": f.siteID})
+	rec := f.do(t, http.MethodPost, "/v1/enrollments", "", f.cardBody())
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("enrol: %d %s", rec.Code, rec.Body)
 	}
@@ -308,13 +464,17 @@ func TestTidakDeadlockSaatPermintaanMelebihiPool(t *testing.T) {
 func TestStatusKartuTidakBolehDiprovisikan(t *testing.T) {
 	// Temuan review I2: kartu ditangguhkan/dicabut tidak mendapat sertifikat baru (SDD §8.2).
 	f := newFixture(t)
-	for _, status := range []string{"PENDING_APPROVAL", "SUSPENDED", "REVOKED", "DELETED"} {
+	for _, status := range []string{"PENDING_APPROVAL", "SUSPENDED", "REVOKED", "DELETED", "REJECTED"} {
 		id := f.enroll(t)
 		if err := f.store.SetCardInstanceStatus(context.Background(), id, status); err != nil {
 			t.Fatal(err)
 		}
+		want := "ENR-NOT-PROVISIONABLE"
+		if status == "PENDING_APPROVAL" {
+			want = "ENR-PENDING-APPROVAL" // ADR-0032: menunggu operator
+		}
 		rec := f.do(t, http.MethodPost, "/v1/enrollments/"+id+"/credentials", "status-"+status, map[string]string{"channel": "ble", "public_key": base64.StdEncoding.EncodeToString(phoneKey(t))})
-		if rec.Code != http.StatusConflict || problemType(t, rec) != "ENR-NOT-PROVISIONABLE" {
+		if rec.Code != http.StatusConflict || problemType(t, rec) != want {
 			t.Fatalf("%s: status %d: %s", status, rec.Code, rec.Body)
 		}
 		if n, _ := f.store.CredentialCount(context.Background(), id); n != 0 {
@@ -325,6 +485,8 @@ func TestStatusKartuTidakBolehDiprovisikan(t *testing.T) {
 
 func TestSatuKredensialPerKanal(t *testing.T) {
 	// Temuan review I2: kunci lain untuk kanal yang sama tidak boleh mendapat sertifikat kedua.
+	// ADR-0040: rahasia enrolment hanya untuk kredensial pertama, jadi kanal mana pun sesudahnya
+	// ditolak seperti id tak dikenal.
 	f := newFixture(t)
 	id := f.enroll(t)
 	path := "/v1/enrollments/" + id + "/credentials"
@@ -332,14 +494,14 @@ func TestSatuKredensialPerKanal(t *testing.T) {
 		t.Fatalf("pertama: %d %s", rec.Code, rec.Body)
 	}
 	rec := f.do(t, http.MethodPost, path, "c-2", map[string]string{"channel": "ble", "public_key": base64.StdEncoding.EncodeToString(phoneKey(t))})
-	if rec.Code != http.StatusConflict || problemType(t, rec) != "ENR-CHANNEL-EXISTS" {
+	if rec.Code != http.StatusNotFound || problemType(t, rec) != "ENR-NOT-FOUND" {
 		t.Fatalf("kedua: %d %s", rec.Code, rec.Body)
 	}
-	if rec := f.do(t, http.MethodPost, path, "c-3", map[string]string{"channel": "nfcHCE", "public_key": base64.StdEncoding.EncodeToString(phoneKey(t))}); rec.Code != http.StatusOK {
-		t.Fatalf("kanal lain harus boleh: %d %s", rec.Code, rec.Body)
+	if rec := f.do(t, http.MethodPost, path, "c-3", map[string]string{"channel": "nfcHCE", "public_key": base64.StdEncoding.EncodeToString(phoneKey(t))}); rec.Code != http.StatusNotFound {
+		t.Fatalf("kanal lain untuk kartu aktif: %d %s", rec.Code, rec.Body)
 	}
-	if n, _ := f.store.CredentialCount(context.Background(), id); n != 2 {
-		t.Fatalf("kredensial = %d, ingin 2", n)
+	if n, _ := f.store.CredentialCount(context.Background(), id); n != 1 {
+		t.Fatalf("kredensial = %d, ingin 1", n)
 	}
 }
 
@@ -417,16 +579,18 @@ func TestZonaTanpaKebijakanTertutup(t *testing.T) {
 	}
 }
 
-func TestZonaDariKebijakanTermasukBit63(t *testing.T) {
+func TestZonaKartuTermasukBit63(t *testing.T) {
+	// Zona dari kartu terdaftar (ADR-0031); bit 63 tetap utuh, nama zona hanya untuk bit yang menyala.
 	f := newFixture(t)
-	if err := f.store.SetSitePolicy(context.Background(), f.siteID, []byte(`{"zones":["Lobi","Parkir"],"zones_bitmap":9223372036854775809}`)); err != nil {
+	if err := f.store.SetSitePolicy(context.Background(), f.siteID, []byte(`{"zones":["Lobi","Parkir"],"zones_bitmap":3}`)); err != nil {
 		t.Fatal(err)
 	}
+	f.registerCard(t, labCardHex(*f.nextCard), 1<<63|1)
 	rec, cert := provision(t, f, "zona-63")
 	if rec.Code != http.StatusOK || cert.Zones != 1<<63|1 {
 		t.Fatalf("status %d, zones %d", rec.Code, cert.Zones)
 	}
-	if !strings.Contains(rec.Body.String(), `"zones":["Lobi","Parkir"]`) {
+	if !strings.Contains(rec.Body.String(), `"zones":["Lobi"]`) {
 		t.Fatalf("zones: %s", rec.Body)
 	}
 }
@@ -457,7 +621,7 @@ func TestKanalDimatikanDitolak(t *testing.T) {
 func TestEnrolmentIdempotencyKeySama(t *testing.T) {
 	// Minor 5: ketuk ganda "Tambah kartu" tidak boleh memakan dua jatah dari 8 kartu.
 	f := newFixture(t)
-	body := map[string]string{"device_id": f.deviceID, "site_id": f.siteID}
+	body := f.cardBody()
 	first := f.do(t, http.MethodPost, "/v1/enrollments", "enrol-1", body)
 	second := f.do(t, http.MethodPost, "/v1/enrollments", "enrol-1", body)
 	if first.Code != http.StatusCreated || first.Body.String() != second.Body.String() {
@@ -502,7 +666,7 @@ func TestBatasKartuMenjadiENRLIMIT(t *testing.T) {
 	for i := 0; i < 8; i++ {
 		f.enroll(t)
 	}
-	rec := f.do(t, http.MethodPost, "/v1/enrollments", "", map[string]string{"device_id": f.deviceID, "site_id": f.siteID})
+	rec := f.do(t, http.MethodPost, "/v1/enrollments", "", f.cardBody())
 	if rec.Code != http.StatusConflict || problemType(t, rec) != "ENR-LIMIT" {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
 	}

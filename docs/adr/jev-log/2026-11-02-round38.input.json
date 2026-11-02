@@ -1,0 +1,19 @@
+{
+  "tool": "jev_decide",
+  "decision": "Pilih fokus unit berikutnya untuk iterasi otomatis Anastrophe sesudah verifier App Attest di backend (ADR-0052) ditutup.",
+  "candidates": [
+    "instal_ulang_fr43",
+    "app_attest_penyambungan",
+    "laporan_fr58",
+    "akses_cepat_fr24",
+    "polling_test_konkurensi"
+  ],
+  "requirements": [
+    "Dapat diselesaikan dan diverifikasi penuh di lingkungan ini (host, simulator, PostgreSQL) tanpa iPhone fisik, reader, atau DEVELOPMENT_TEAM.",
+    "Tidak bergantung pada keputusan yang masih menunggu pengguna (ADR-0017, ADR-0022, ADR-0038, ADR-0041, ADR-0046, ADR-0047) dan tidak menuntut keputusan semantik keamanan baru yang wajib dieskalasi.",
+    "Menutup sebagian requirement P0 atau gerbang pra-pilot."
+  ],
+  "escalate_on_contradiction": true,
+  "priorities": "Tujuan pengguna: terus membangun app secara bertahap dan otomatis; JEV memutuskan, eskalasi bila < 0,60. Requirement P0 dan gerbang pra-pilot didahulukan dari P1/P2. Unit tidak boleh bergantung pada keputusan yang menunggu pengguna atau sumber daya yang tidak tersedia, dan harus bisa diverifikasi penuh di host/simulator/PostgreSQL. Utamakan unit kecil-menengah yang terbatas dengan uji penerimaan jelas. Aturan keamanan/privasi CLAUDE.md tidak bisa ditawar. Keputusan semantik keamanan yang tereskalasi tetap milik pengguna; unit yang menuntut banyak keputusan semantik keamanan baru kurang disukai.",
+  "evidence_summary": "FR-43 (P0): sisa Keychain instal ulang (cred.key.*, cred.record.*, status-token.*, counter) tidak dihapus; satu service Keychain; KeychainAPI bisa dipalsukan. Penyambungan App Attest: verifier ada; endpoint challenge, penyimpanan kunci+counter, kebijakan wajib/kategori/clientData/bypass dev belum; simulator tidak bisa attest; ADR-0046 menunggu pengguna. FR-58/FR-24 P1. Test konkurensi 300 ms."
+}

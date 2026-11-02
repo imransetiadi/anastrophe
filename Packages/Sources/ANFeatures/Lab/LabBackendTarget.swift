@@ -10,21 +10,33 @@ struct LabBackendTarget: Equatable, Sendable {
     let baseURL: URL
     let deviceID: String
     let siteID: String
+    /// Kartu fisik yang terdaftar di registri gedung lab (ADR-0031).
+    let card: CardIdentity
+    /// Token undangan (ADR-0033); bila ada, enrolment memakainya sebagai pengganti kartu.
+    let invitation: String?
 
-    /// Isian form lab; nil bila URL bukan http(s) dengan host atau salah satu ID kosong.
-    init?(url: String, deviceID: String, siteID: String) {
+    /// Kartu lab bawaan, sama dengan default `anastrophe-devseed -lab-card`.
+    static let defaultCard = CardIdentity("iso14443a:04a1b2c3d4e5f6")!
+
+    /// Isian form lab; nil bila URL bukan http(s) dengan host, salah satu ID kosong, atau token undangan
+    /// tidak berbentuk sah.
+    init?(url: String, deviceID: String, siteID: String, card: CardIdentity = LabBackendTarget.defaultCard, invitation: String? = nil) {
         func trimmed(_ value: String) -> String { value.trimmingCharacters(in: .whitespacesAndNewlines) }
         guard let baseURL = URL(string: trimmed(url)),
               ["http", "https"].contains(baseURL.scheme?.lowercased() ?? ""),
               baseURL.host() != nil,
-              !trimmed(deviceID).isEmpty, !trimmed(siteID).isEmpty
+              !trimmed(deviceID).isEmpty, !trimmed(siteID).isEmpty,
+              invitation.map({ InvitationLink.isValidToken(trimmed($0)) }) ?? true
         else { return nil }
         self.baseURL = baseURL
         self.deviceID = trimmed(deviceID)
         self.siteID = trimmed(siteID)
+        self.card = card
+        self.invitation = invitation.map(trimmed)
     }
 
-    /// `-ANLabBackend <url> -ANLabDevice <id> -ANLabSite <id>`; nil bila salah satu tidak ada.
+    /// `-ANLabBackend <url> -ANLabDevice <id> -ANLabSite <id> [-ANLabCard <tech>:<hex>] [-ANLabInvite <token>]`;
+    /// nil bila salah satu tidak ada, atau kartu maupun undangan tidak valid.
     init?(arguments: [String]) {
         func value(_ flag: String) -> String? {
             guard let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1),
@@ -33,7 +45,19 @@ struct LabBackendTarget: Equatable, Sendable {
             return arguments[index + 1]
         }
         guard let url = value("-ANLabBackend"), let device = value("-ANLabDevice"), let site = value("-ANLabSite") else { return nil }
-        self.init(url: url, deviceID: device, siteID: site)
+        var card = Self.defaultCard
+        if arguments.contains("-ANLabCard") {
+            guard let text = value("-ANLabCard"), let parsed = CardIdentity(text) else { return nil }
+            card = parsed
+        }
+        var invitation: String?
+        if let index = arguments.firstIndex(of: "-ANLabInvite") {
+            // Token base64url bisa diawali "-" (review akhir M1), jadi nilainya tidak disaring seperti
+            // argumen lain; bentuknya diperiksa `InvitationLink.isValidToken`.
+            guard arguments.indices.contains(index + 1) else { return nil }
+            invitation = arguments[index + 1]
+        }
+        self.init(url: url, deviceID: device, siteID: site, card: card, invitation: invitation)
     }
 }
 
@@ -53,6 +77,14 @@ extension AppServices {
         pendingLabBackend = LabBackendTarget(arguments: arguments)
         pendingLabRenewal = arguments.contains("-ANLabRenew")
         pendingLabDelete = arguments.contains("-ANLabDelete")
+        // Alur Tambah Kartu (ADR-0043): pembaca palsu di simulator, tautan undangan, dan kode gedung.
+        func value(_ flag: String) -> String? {
+            guard let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1) else { return nil }
+            return arguments[index + 1]
+        }
+        labCardIdentity = value("-ANLabCardReader").flatMap(CardIdentity.init)
+        pendingLabOpenURL = value("-ANLabOpenURL").flatMap { URL(string: $0) }
+        pendingLabAddCode = value("-ANLabAddCode")
     }
 
     /// Hapus kartu pertama dari `-ANLabDelete`, sekali per peluncuran; nil bila tidak diminta.
@@ -61,7 +93,7 @@ extension AppServices {
         pendingLabDelete = false
         guard let card = try? await cards.all().first else { return nil }
         do {
-            try await CardRemover(keys: keys, records: records, cards: cards, transport: transport)
+            try await CardRemover(keys: keys, records: records, cards: cards, statusTokens: statusTokens, transport: transport)
                 .remove(card: card, context: AuthorizedContext(laContext: LAContext()))
             return localized("lab.deleted")
         } catch let problem as ProblemDetails {
@@ -86,7 +118,7 @@ extension AppServices {
             return localized("lab.renew_failed")
         }
         do {
-            _ = try await CredentialRenewer(keys: keys, records: records, cards: cards, transport: transport)
+            _ = try await CredentialRenewer(keys: keys, records: records, cards: cards, statusTokens: statusTokens, transport: transport)
                 .renew(card: card, channel: channel, context: AuthorizedContext(laContext: LAContext()))
             return localized("lab.renewed")
         } catch let problem as ProblemDetails {
@@ -113,14 +145,16 @@ extension AppServices {
         do {
             _ = try await LabProvisioning.provisionViaBackend(
                 api: APIClient(baseURL: target.baseURL, transport: transport),
-                deviceID: target.deviceID, siteID: target.siteID, channel: channel,
-                keys: keys, records: records, cards: cards
+                deviceID: target.deviceID, siteID: target.siteID, card: target.card, invitation: target.invitation, channel: channel,
+                keys: keys, records: records, cards: cards, statusTokens: statusTokens
             )
             return localized("lab.imported")
         } catch ANError.cardLimitReached {
             return localized("lab.limit")
         } catch ANError.channelUnavailable {
             return localized("lab.backend.channel_disabled")
+        } catch ANError.enrollmentRejected(let reason) {
+            return EnrollmentMessages.text(for: ANError.enrollmentRejected(reason)) ?? localized("lab.backend.failed")
         } catch let problem as ProblemDetails {
             return "\(localized("lab.backend.failed")) (\(problem.type))"
         } catch let error as URLError {

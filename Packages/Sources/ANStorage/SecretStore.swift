@@ -22,6 +22,8 @@ public protocol SecretStore: Sendable {
     func set(_ data: Data, for key: String, accessibility: SecretAccessibility) throws
     func get(_ key: String) throws -> Data?
     func delete(_ key: String) throws
+    /// Menghapus semua item app di store ini (instal ulang, ADR-0053).
+    func deleteAll() throws
 }
 
 /// Kebijakan kunci kredensial in-app (ADR-0009, SDD §5.3): Secure Enclave,
@@ -52,6 +54,7 @@ public final class InMemorySecretStore: SecretStore, @unchecked Sendable {
 
     public func get(_ key: String) throws -> Data? { lock.withLock { items[key]?.data } }
     public func delete(_ key: String) throws { _ = lock.withLock { items.removeValue(forKey: key) } }
+    public func deleteAll() throws { lock.withLock { items.removeAll() } }
 
     /// Jumlah item tersimpan, untuk memeriksa kunci yatim di test.
     public var storedKeyCount: Int { lock.withLock { items.count } }
@@ -119,6 +122,13 @@ public struct KeychainSecretStore: SecretStore {
 
     public func delete(_ key: String) throws {
         let status = keychain.delete(query(key))
+        if status != errSecItemNotFound { try check(status) }
+    }
+
+    /// Satu `SecItemDelete` dengan kelas + service tanpa account: semua item service ini terhapus, service lain
+    /// tidak tersentuh (ADR-0053). Keychain yang sudah kosong bukan galat.
+    public func deleteAll() throws {
+        let status = keychain.delete([kSecClass: kSecClassGenericPassword, kSecAttrService: service])
         if status != errSecItemNotFound { try check(status) }
     }
 
