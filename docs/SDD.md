@@ -42,6 +42,7 @@
 | 2.26 | 2026-11-02 | CLI `list` dengan filter kanal (`--channel`, kredensial ACTIVE/SUSPENDED) dan pencarian awalan id card instance (`--id`), digabung AND, tanpa pola `LIKE` dari masukan (FR-50, ADR-0050). |
 | 2.27 | 2026-11-02 | Urutan kunci audit (ADR-0051): enrolment kartu/undangan dan sapuan per jam menulis audit di akhir pemanggilan store sesudah semua kunci baris, berurutan stabil per rantai; lanjutan `PENDING_APPROVAL` dikunci di dalam enrolment; menghilangkan deadlock 40P01 enrolment–sapuan (§8.1, §8.4.1). |
 | 2.28 | 2026-11-02 | Review akhir deadlock: `AppendAudit` mengunci baris gedung (`FOR KEY SHARE`) sebelum kunci rantai, sehingga `policy`/`site-code` yang memegang `sites FOR UPDATE` tidak lagi bisa deadlock dengan enrolment; catatan sisa tabrakan `hashtext` (§8.1). |
+| 2.29 | 2026-11-02 | Verifier App Attest di server (ADR-0052): langkah attestation dan assertion Apple, konvensi `clientDataHash` dari pemanggil, digest assertion `SHA256(nonce)`, ekstensi kategori/versi; belum disambungkan ke endpoint (§10.4). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -830,6 +831,35 @@ Update firmware bertanda tangan (A/B partition), alarm tamper, heartbeat 60 dtk,
 ### 10.3 Secure SDLC & insiden
 
 SAST, pemindaian dependensi & secret, review kode wajib, pentest eksternal sebelum pilot & GA, review kriptografi ANP/1, bug bounty pasca-GA. Untuk N-SE dan W: kebijakan pengungkapan kerentanan tertulis, dan notifikasi ke Apple "tanpa penundaan" untuk kerentanan yang dieksploitasi (E03). Respons P1 ≤ 15 menit.
+
+
+### 10.4 App Attest (NFR-S03)
+
+Verifier server (ADR-0052) ada di `backend/internal/appattest` dan **belum disambungkan** ke endpoint, database, atau app. Gerbang pra-pilot NFR-S03 masih terbuka.
+
+- **Attestation (O-AA01):** objek CBOR `apple-appattest`. Pemeriksaannya:
+  - rantai `x5c` ke Apple App Attestation Root CA yang tertanam (SHA-256 DER dipin, E38); credCert harus sertifikat akhir;
+  - kunci P-256;
+  - `nonce = SHA256(authData ‖ clientDataHash)` sama dengan ekstensi credCert `1.2.840.113635.100.8.2`;
+  - key identifier = `SHA256(titik)`;
+  - RP ID = `SHA256("<TeamID>.<BundleID>")`;
+  - counter 0, `aaguid` sesuai lingkungan, dan `credentialId` = key identifier.
+
+  Hasilnya kunci publik (titik 65 byte), receipt, dan ekstensi.
+- **`clientDataHash`:** diberikan pemanggil. App Anastrophe kelak mengirim `SHA256(challenge)` (O-AA03). Contoh resmi Apple memakai challenge mentah (O-AA05), jadi verifier tidak meng-hash challenge sendiri.
+- **Assertion (O-AA02):** RP ID; counter > counter tersimpan; tanda tangan ECDSA atas `SHA256(nonce)` dengan `nonce = SHA256(authenticatorData ‖ SHA256(clientData))` (hash ganda, O-AA06). Challenge di dalam `clientData` diperiksa pemanggil.
+- **Ekstensi `apple_validation_category_01`/`apple_bundle_version_01` (I-16, I-17):** diurai bila ada; bentuk yang salah ditolak. Kebijakan kategori bersifat opsional dan hanya berlaku untuk kategori yang ada, karena iOS 26 mungkin belum menulisnya.
+- **Galat dan masukan:**
+  - semua kegagalan `ErrInvalid`, dengan alasan untuk log; endpoint kelak menjawab seragam;
+  - attestation ≤ 64 KiB, assertion ≤ 4 KiB;
+  - decoder CBOR minimal tanpa tag atau panjang tak tentu; fuzz tanpa panic.
+- **Belum dikerjakan:**
+  - endpoint challenge/attest;
+  - penyimpanan kunci dan counter per perangkat;
+  - kebijakan endpoint dan kategori;
+  - bypass untuk dev;
+  - receipt dan metrik risiko (U15);
+  - uji H dengan App ID Anastrophe (U14).
 
 ## 11. Privasi & kepatuhan
 
