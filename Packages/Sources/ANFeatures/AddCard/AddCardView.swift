@@ -137,17 +137,11 @@ struct AddCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(localized("add.code.label"))
                 .font(.headline)
-            TextField(localized("add.code.label"), text: $model.codeInput, prompt: Text(verbatim: "XXXX-XXXX"))
-                .font(.title3.monospaced())
-                .textFieldStyle(.roundedBorder)
-                .autocorrectionDisabled()
-                #if os(iOS)
-                .textInputAutocapitalization(.characters)
-                .keyboardType(.asciiCapable)
-                #endif
-                .submitLabel(.continue)
-                .onSubmit { Task { await model.submitCode() } }
-                .accessibilityIdentifier("add.code.field")
+            // Field ≥ 44 pt (design system §4): monospace, kapital semua, keyboard ASCII, Return "Lanjut".
+            ANTextField(localized("add.code.label"), text: $model.codeInput, prompt: "XXXX-XXXX", kind: .code,
+                        identifier: "add.code.field") {
+                Task { await model.submitCode() }
+            }
             Text(localized("add.code.help"))
                 .font(.footnote)
                 .foregroundStyle(ANColor.mutedForeground)
@@ -182,16 +176,11 @@ struct AddCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(localized("add.link.label"))
                 .font(.headline)
-            TextField(localized("add.link.label"), text: $model.linkInput, prompt: Text(verbatim: "https://…/i/…"))
-                .textFieldStyle(.roundedBorder)
-                .autocorrectionDisabled()
-                #if os(iOS)
-                .textInputAutocapitalization(.never)
-                .keyboardType(.URL)
-                #endif
-                .submitLabel(.go)
-                .onSubmit { Task { await model.submitInvitation() } }
-                .accessibilityIdentifier("add.link.field")
+            // Field ≥ 44 pt (design system §4): tanpa kapital, keyboard URL, Return "Buka".
+            ANTextField(localized("add.link.label"), text: $model.linkInput, prompt: "https://…/i/…", kind: .url,
+                        identifier: "add.link.field") {
+                Task { await model.submitInvitation() }
+            }
             Text(localized("add.link.help"))
                 .font(.footnote)
                 .foregroundStyle(ANColor.mutedForeground)
@@ -303,10 +292,10 @@ struct AddCardView: View {
         .disabled(model.isBusy)
     }
 
+    /// Tombol teks sekunder; area ketuk 44 pt ada di dalam gaya, bukan bingkai di luar tombol.
     private func secondaryButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(title, action: action)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .foregroundStyle(ANColor.secondary)
+            .buttonStyle(ANSecondaryButtonStyle())
             .disabled(model.isBusy)
     }
 

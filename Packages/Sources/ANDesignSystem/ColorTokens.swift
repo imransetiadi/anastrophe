@@ -66,7 +66,8 @@ private extension NSColor {
 }
 #endif
 
-/// Tombol aksi utama (satu per layar). Minimal 44 pt, ikut Dynamic Type.
+/// Tombol aksi utama (satu per layar). Minimal 44 pt (50 pt dengan `.controlSize(.large)`, lihat `ANTouchTarget`), ikut
+/// Dynamic Type. Gaya tombol lain ada di `ControlStyles.swift`.
 public struct ANPrimaryButtonStyle: ButtonStyle {
     public init() {}
 
@@ -78,12 +79,13 @@ public struct ANPrimaryButtonStyle: ButtonStyle {
     private struct PrimaryButtonBody: View {
         let configuration: ButtonStyleConfiguration
         @Environment(\.isEnabled) private var isEnabled
+        @Environment(\.controlSize) private var controlSize
 
         var body: some View {
             configuration.label
                 .font(.headline)
                 .padding(.horizontal, 24)
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .frame(maxWidth: .infinity, minHeight: ANTouchTarget.minHeight(for: controlSize))
                 .foregroundStyle(ANColor.onAccent)
                 .background(ANColor.accent.opacity(configuration.isPressed ? 0.8 : 1), in: .rect(cornerRadius: 12))
                 .opacity(isEnabled ? 1 : 0.4)

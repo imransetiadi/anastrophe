@@ -12,6 +12,7 @@ struct HelpView: View {
 
     var body: some View {
         NavigationStack {
+            // Semua baris memakai permukaan token `card` (design system §3), juga di mode gelap.
             List {
                 Section(localized("help.section.channels")) {
                     channelRow(localized("channel.tap"), systemImage: "iphone.radiowaves.left.and.right", availability: availability[.nfcHCE])
@@ -22,15 +23,18 @@ struct HelpView: View {
                         DisclosureGroup {
                             Text(topic.answer)
                                 .padding(.vertical, 4)
+                                .listRowBackground(ANColor.card)
                         } label: {
                             Text(topic.question)
                                 .font(.headline)
                         }
                         .accessibilityIdentifier("help.faq.\(topic.rawValue)")
+                        .listRowBackground(ANColor.card)
                     }
                 }
                 Section {
                     Label(localized("help.devices.list"), systemImage: "iphone")
+                        .listRowBackground(ANColor.card)
                 } header: {
                     Text(localized("help.section.devices"))
                 } footer: {
@@ -41,8 +45,10 @@ struct HelpView: View {
                         ShareLink(item: report) {
                             Label(localized("help.diagnostics.share"), systemImage: "square.and.arrow.up")
                         }
+                        .listRowBackground(ANColor.card)
                     } else {
                         ProgressView()
+                            .listRowBackground(ANColor.card)
                     }
                 } header: {
                     Text(localized("help.section.diagnostics"))
@@ -51,6 +57,7 @@ struct HelpView: View {
                 }
                 Section(localized("help.section.support")) {
                     Label(localized("help.support.text"), systemImage: "building.2")
+                        .listRowBackground(ANColor.card)
                 }
             }
             .scrollContentBackground(.hidden)
@@ -79,5 +86,6 @@ struct HelpView: View {
             Label(name, systemImage: systemImage)
         }
         .accessibilityElement(children: .combine)
+        .listRowBackground(ANColor.card)
     }
 }

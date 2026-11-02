@@ -181,6 +181,8 @@ public struct KeysView: View {
                 NavigationLink(value: card.id) {
                     CardRow(card: card, presentability: model.presentability(of: card)) { use(card) }
                 }
+                // Permukaan baris memakai token `card` (design system §3), juga di mode gelap.
+                .listRowBackground(ANColor.card)
             }
             .scrollContentBackground(.hidden)
             .accessibilityIdentifier("keys.list")
