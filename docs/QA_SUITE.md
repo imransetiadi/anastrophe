@@ -240,6 +240,7 @@ Format ID: `TC-<AREA>-<NN>`. **Prio:** P0/P1/P2. **Tipe:** U unit · I integrasi
 | TC-DEV-10 | Peringatan perlu online | Sisa < 24 jam, perangkat offline | Peringatan "Perlu terhubung ke internet"; status "Perlu diperbarui" | FR-45, FR-38 | P0 | E | N, B |
 | TC-DEV-11 | Sertifikat kedaluwarsa | Offline > 7 hari, tap | Ditolak `CRED-EXPIRED`; setelah online → diperpanjang → grant | FR-45, NFR-R04 | P0 | H | N, B |
 | TC-DEV-12 | Satu kredensial per kartu per iPhone | Coba enrolment ganda kartu sama di iPhone sama | Ditolak/idempoten | FR-46 | P1 | I | Semua |
+| TC-DEV-13 | Sisa Keychain dibersihkan saat instal ulang | Instal ulang (penanda instalasi hilang, store kartu kosong) dengan item Keychain lama tersisa | Semua item service app (blob kunci, record, token, counter, device id) terhapus sebelum layanan dipakai; kartu yang masih ada atau store yang gagal dibaca tidak pernah dibersihkan; penanda dibuat hanya bila penghapusan berhasil | FR-43 | P0 | U | N, B |
 
 ### 5.9 Portal admin (ADM)
 
@@ -669,7 +670,7 @@ Jadwal mengikuti milestone PRD §13; uji pilot mencakup 2 lokasi (ADR-0011).
 | FR-40 | TC-DEV-01, TC-UPG-01, TC-ENR-23 |
 | FR-41 | TC-DEV-02, TC-PRSW-09 |
 | FR-42 | TC-DEV-03, TC-DEV-04, TC-DEV-05, TC-PRSW-07 |
-| FR-43 | TC-DEV-05, TC-DEV-06, TC-ENR-23 |
+| FR-43 | TC-DEV-05, TC-DEV-06, TC-ENR-23, TC-DEV-13 |
 | FR-44 | TC-DEV-07, TC-DEV-08 |
 | FR-45 | TC-DEV-09, TC-DEV-10, TC-DEV-11 |
 | FR-46 | TC-DEV-12, TC-PRSW-06 |

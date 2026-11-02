@@ -56,3 +56,4 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0050](0050-fokus-filter-daftar-kartu.md) | Fokus berikutnya: filter kanal dan pencarian daftar kartu (FR-50) | Diterima | `filter_cli_fr50` | 1.0 |
 | [ADR-0051](0051-fokus-deadlock-enrolment-sapuan.md) | Fokus berikutnya: deadlock enrolment–sapuan per jam | Diterima | `deadlock_sapuan` | 0.96 |
 | [ADR-0052](0052-fokus-verifier-app-attest.md) | Fokus berikutnya: verifier App Attest di backend (NFR-S03, langkah pertama) | Provisional (ditinjau M2) | `app_attest_verifier` | 0.60 |
+| [ADR-0053](0053-fokus-sisa-keychain-instal-ulang.md) | Fokus berikutnya: bersihkan sisa Keychain saat instal ulang (FR-43 sebagian) | Tereskalasi — diterapkan (risiko rendah; persetujuan umum pengguna), penyambungan App Attest menunggu manusia | `instal_ulang_fr43` (escalate) | 0.39 |
