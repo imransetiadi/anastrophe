@@ -22,7 +22,7 @@ FR-43 menyatakan instal ulang membuat kredensial N/B tidak dapat dipakai, jadi m
 2. **`KeychainDeviceIdentityStore.purgeLeftoversIfFreshInstall(hasCards:) throws -> Bool`:**
    - Bila penanda instalasi tidak ada dan `hasCards` false: `deleteAll()`, lalu buat penanda (dikecualikan dari backup), lalu kembalikan true.
    - Bila penanda ada, atau kartu masih ada: tidak melakukan apa-apa dan mengembalikan false. Dengan begitu `deviceID()` tetap berperilaku seperti ADR-0045.
-   - Bila penghapusan gagal: galat diteruskan dan penanda tidak dibuat, sehingga dicoba lagi di peluncuran berikutnya.
+   - Bila penghapusan gagal: galat diteruskan dan penanda tidak dibuat, sehingga dicoba lagi di peluncuran berikutnya selama belum ada enrolment (`deviceID()` membuat penanda).
 3. **`AppServices.prepareInstall() async`:**
    - membaca store kartu; bila pembacaan gagal, store dianggap berisi kartu;
    - memanggil pembersihan; galat pembersihan tidak menghentikan app.

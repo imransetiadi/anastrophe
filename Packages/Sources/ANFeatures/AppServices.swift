@@ -158,7 +158,8 @@ public final class AppServices {
 
     /// FR-43 (ADR-0053): pada peluncuran pertama sesudah instal ulang, sisa Keychain instalasi lama dihapus
     /// sebelum layanan dipakai. Store kartu yang gagal dibaca dianggap berisi kartu, jadi tidak ada yang
-    /// dihapus; galat penghapusan tidak menghentikan app dan dicoba lagi di peluncuran berikutnya.
+    /// dihapus. Galat penghapusan tidak menghentikan app; pembersihan dicoba lagi di peluncuran berikutnya
+    /// selama belum ada enrolment (`deviceID()` membuat penanda saat enrolment).
     public func prepareInstall() async {
         let hasCards: Bool
         do {

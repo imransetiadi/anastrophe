@@ -17,6 +17,7 @@
 | 2.0 | 2026-11-01 | Menambahkan E11–E30: `CredentialSession` (SecureElementCredential), Apple Wallet Access Program Guide, Aliro 1.0, OSDP Transparent Mode, HID Mobile Access (BLE), Core Bluetooth background, daftar perangkat iOS 26/27, App Review 5.1.1(v), ketersediaan Apple Pay. Cek ulang live: Indonesia **masih** tidak eligible. Q9–Q14 baru; I-08–I-14; U07–U13. |
 | 2.1 | 2026-11-01 | E31 + O-A24 (artefak SDK iOS 27.2); E32 + O-B05–O-B06: batas iklan peripheral CoreBluetooth untuk reader uji BLE (ADR-0022); E33 + O-A25–O-A27 + I-15: autentikasi untuk perpanjangan sertifikat; E34 + O-B07: ATS dan alamat IP (lab di iPhone fisik). |
 | 2.2 | 2026-11-02 | E35–E41 + O-AA01–O-AA08 + I-16–I-17 + U14–U15: verifikasi App Attest di server (langkah Apple, contoh attestation resmi beserta inkonsistensinya, konvensi digest assertion dari assertion iOS 27 nyata, nilai kategori validasi) untuk ADR-0052. |
+| 2.3 | 2026-11-02 | E42–E43 + O-K01–O-K02 + I-18 + U16: semantik `SecItemDelete` dan bertahannya item Keychain sesudah app dihapus, untuk pembersihan instal ulang (ADR-0053). |
 
 ---
 
@@ -105,6 +106,8 @@ Skill REA dibuat untuk menjawab pertanyaan "fitur ini bekerja bagaimana?" dan me
 | E39 | Apple open source — XNU `osfmk/kern/cs_blobs.h` (`CS_VALIDATION_CATEGORY_*`) | https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/kern/cs_blobs.h | 2026-11-02 | Resmi Apple (open source) / tinggi |
 | E40 | `jewei/app-attest-php` (MIT): fixture attestation + dua assertion iOS 27.0.1 (termakan), assertion iOS 27 dari block/buzz (Apache-2.0), contoh Apple 2024 | https://github.com/jewei/app-attest-php/tree/main/spec | 2026-11-02 (SHA-256 berkas termakan `c65797c5…87d1ad`, block/buzz `b012352f…bef96`) | Komunitas, data perangkat nyata / sedang |
 | E41 | Apple Developer Forums — "App Attest Validation Guide sample appears internally inconsistent" | https://developer.apple.com/forums/thread/842509 | 2026-11-02 (hasil pencarian) | Komunitas / rendah |
+| E42 | Apple — `SecItemDelete(_:)` (Security) | https://developer.apple.com/documentation/security/secitemdelete(_:) | 2026-11-02 (JSON dokumentasi) | Resmi Apple / tinggi |
+| E43 | Apple Developer Forums — "iOS autodelete Keychain items after uninstall?" (thread 36442) dan "iOS 10.3 Beta 2 autodeletes keychain items after application uninstall?" (thread 72271), termasuk balasan DTS | https://developer.apple.com/forums/thread/36442 ; https://developer.apple.com/forums/thread/72271 | 2026-11-02 (hasil pencarian) | Komunitas + DTS / sedang-rendah |
 
 ---
 
@@ -222,6 +225,8 @@ Skill REA dibuat untuk menjawab pertanyaan "fitur ini bekerja bagaimana?" dan me
 | O-D02 | (E15) iOS 26 menghapus dukungan **iPhone XS, XS Max, XR**. |
 | O-P01 | (E16) App yang mendukung pembuatan akun **wajib** menyediakan inisiasi **penghapusan akun di dalam app** (termasuk akun yang dibuat otomatis atau via web). |
 | O-P02 | (E27) Daftar negara Apple Pay (27 Okt 2026) **tidak memuat Indonesia**; Filipina diluncurkan Agustus 2026. |
+| O-K01 | (E42) `SecItemDelete` secara bawaan menghapus **semua** item yang cocok dengan query; perilaku ini hanya berubah bila query memakai `kSecMatchItemList`. Fungsi ini memblokir thread pemanggil, sehingga Apple menyarankan memanggilnya dari queue latar atau fungsi `async`. |
+| O-K02 | (E43) Menurut balasan DTS, item Keychain bertahan lebih lama dari app yang menghapusnya. iOS 10.3 beta 2 sempat menghapus item Keychain saat app di-uninstall, tetapi perilaku itu tidak ikut rilis publik. Apple tidak mendokumentasikan bahwa item tetap bertahan sebagai jaminan. |
 
 ### 4.7 App Attest (verifikasi di server)
 
@@ -259,6 +264,7 @@ Skill REA dibuat untuk menjawab pertanyaan "fitur ini bekerja bagaimana?" dan me
 | I-15 | `BGAppRefreshTask` berjalan tanpa UI foreground, sehingga operasi kunci `.userPresence` yang butuh UI autentikasi tidak bisa diselesaikan di sana. Jadi perpanjangan sertifikat di background **tidak dapat** membuat tanda tangan kunci kredensial (ADR-0009). Tanda tangan tetap bisa dibuat tanpa prompt kedua dengan memakai ulang `LAContext` yang baru diautentikasi untuk tap. | O-A25, O-A26, O-A27 | Sedang: belum diuji di perangkat |
 | I-16 | Byte flags authData tidak bisa dipakai untuk menemukan ekstensi. Urai berurutan: attestation = header 37 byte + `aaguid` + panjang `credentialId` + `credentialId` + kunci COSE + peta ekstensi opsional; assertion = header 37 byte + peta ekstensi opsional. | O-AA04, O-AA06, O-AA08 | Tinggi |
 | I-17 | iOS 26 (minimum, ADR-0006) mungkin belum menulis ekstensi kategori/versi. Verifier harus menerima ketiadaannya, dan kebijakan kategori hanya berlaku bila ekstensi ada. Ekstensi tidak bisa dihapus penyerang karena authData terikat ke nonce yang ditandatangani Apple (attestation) atau ke tanda tangan kunci (assertion). | O-AA01, O-AA06, O-AA08 | Sedang |
+| I-18 | Pembersihan instal ulang harus benar di kedua kemungkinan: item tersisa (perilaku teramati) atau sudah dihapus sistem. Keychain kosong diperlakukan sebagai sukses, bukan galat. | O-K01, O-K02 | Tinggi |
 
 ---
 
@@ -281,6 +287,7 @@ Skill REA dibuat untuk menjawab pertanyaan "fitur ini bekerja bagaimana?" dan me
 | U13 | Kebijakan Apple terhadap **dua jalur sekaligus** dalam satu app (pass Wallet + kredensial in-app untuk kartu yang sama). | Apple (App Review/ABR). | Sedang | Terbuka |
 | U14 | Perilaku App Attest di iOS 26.x (ada tidaknya ekstensi) dan validasi dengan App ID Anastrophe: perlu capture attestation + assertion dari build bertanda tangan (uji H) sebelum verifier disambungkan ke endpoint. | iPhone fisik + `DEVELOPMENT_TEAM` + capability App Attest. | **Tinggi** (gerbang pra-pilot NFR-S03) | Terbuka |
 | U15 | Validasi receipt App Attest dan metrik risiko penipuan (server-to-server ke Apple). | Apple (kredensial server) + jaringan. | Sedang | Terbuka (di luar ADR-0052) |
+| U16 | Apakah item Keychain tetap bertahan sesudah app dihapus di iOS 26/27 (dasar pembersihan ADR-0053). | iPhone fisik (TC-DEV-06, TC-DEV-13). | Rendah — pembersihan benar di kedua kasus (I-18) | Terbuka |
 
 ---
 

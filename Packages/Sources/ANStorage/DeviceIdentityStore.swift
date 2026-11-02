@@ -32,7 +32,7 @@ public final class KeychainDeviceIdentityStore: DeviceIdentityStore, @unchecked 
     /// Keychain app dari instalasi lama (blob kunci, record, token status, counter, device id) dihapus, lalu
     /// penanda dibuat. Bila kartu masih ada (pembaruan dari build tanpa penanda), tidak ada yang dihapus dan
     /// `deviceID()` menangani penanda seperti biasa. Penanda hanya dibuat sesudah penghapusan berhasil, agar
-    /// sisa dicoba dibersihkan lagi di peluncuran berikutnya.
+    /// sisa dicoba dibersihkan lagi di peluncuran berikutnya selama `deviceID()` belum membuat penanda.
     public func purgeLeftoversIfFreshInstall(hasCards: Bool) throws -> Bool {
         try lock.withLock {
             guard !hasCards, !FileManager.default.fileExists(atPath: installMarker.path(percentEncoded: false)) else {

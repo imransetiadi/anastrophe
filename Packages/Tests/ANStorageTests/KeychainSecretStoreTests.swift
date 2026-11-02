@@ -40,6 +40,9 @@ final class FakeKeychain: KeychainAPI, @unchecked Sendable {
     func delete(_ query: [CFString: Any]) -> OSStatus {
         lock.withLock {
             if failDeletes { return errSecIO }
+            // Store hanya menyimpan generic password; kelas lain tidak cocok dengan item apa pun (review akhir
+            // ADR-0053: kelas yang salah membuat pembersihan diam-diam tidak menghapus apa-apa).
+            guard (query[kSecClass] as? String) == (kSecClassGenericPassword as String) else { return errSecItemNotFound }
             guard query[kSecAttrAccount] == nil else {
                 return items.removeValue(forKey: key(query)) == nil ? errSecItemNotFound : errSecSuccess
             }
