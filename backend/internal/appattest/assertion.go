@@ -10,7 +10,7 @@ import (
 	"math/big"
 )
 
-// MaxAssertionSize membatasi objek assertion sebelum diurai (assertion iOS 27 ±160 byte, O-AA06).
+// MaxAssertionSize membatasi objek assertion sebelum diurai (assertion iOS 27 nyata 202–204 byte, O-AA06).
 const MaxAssertionSize = 4 << 10
 
 // Assertion adalah hasil assertion yang lolos verifikasi. Counter disimpan pemanggil sebagai

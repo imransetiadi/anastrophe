@@ -52,6 +52,9 @@ func TestDecodeCBORMenolak(t *testing.T) {
 		"array_lebih_dari_data": {0x9a, 0x00, 0x01, 0x00, 0x00},
 		"map_lebih_dari_data":   {0xba, 0x00, 0x01, 0x00, 0x00},
 		"info_cadangan":         {0x1c},
+		// Review akhir ADR-0052: banyak item kecil yang sah memperbesar alokasi (±133× masukan); dibatasi.
+		"terlalu_banyak_item":   append([]byte{0x99, 0x01, 0x00}, bytes.Repeat([]byte{0xa0}, 256)...),
+		"item_bersarang_banyak": append([]byte{0x82, 0x98, 0x80}, bytes.Repeat([]byte{0x80}, 129)...),
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := decodeCBOR(data); err == nil {

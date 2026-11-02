@@ -9,14 +9,20 @@ import (
 // maxCBORDepth membatasi sarang array/map; objek App Attest paling dalam tiga tingkat.
 const maxCBORDepth = 8
 
+// maxCBORItems membatasi jumlah item per objek (attestation contoh Apple ±13, kunci COSE 11). Tanpa batas
+// ini, banyak item kecil yang sah di dalam 64 KiB memperbesar alokasi ±133× (review akhir ADR-0052).
+const maxCBORItems = 128
+
 var errCBOR = errors.New("cbor tidak valid")
 
 // decodeCBOR mengurai tepat satu item CBOR (RFC 8949) dari subset yang dipakai App Attest: uint, negint,
 // byte string, teks, array, dan map berkunci teks atau integer (kunci integer dinormalkan ke int64). Tag,
-// float, simple value, panjang tak tentu, kunci duplikat, sarang lebih dari maxCBORDepth, dan sisa byte
-// ditolak. Encoding bukan-terpendek diterima: integritas objek dijaga tanda tangan, bukan bentuk CBOR.
+// float, simple value, panjang tak tentu, kunci duplikat, sarang lebih dari maxCBORDepth, lebih dari
+// maxCBORItems item, dan sisa byte ditolak. Encoding bukan-terpendek diterima: integritas objek dijaga tanda
+// tangan, bukan bentuk CBOR.
 func decodeCBOR(data []byte) (any, error) {
-	v, rest, err := cborItem(data, 0)
+	budget := maxCBORItems
+	v, rest, err := cborItem(data, 0, &budget)
 	if err != nil {
 		return nil, err
 	}
@@ -27,10 +33,14 @@ func decodeCBOR(data []byte) (any, error) {
 }
 
 // cborPrefix mengurai satu item di awal data dan mengembalikan sisanya (kunci COSE di authData).
-func cborPrefix(data []byte) (any, []byte, error) { return cborItem(data, 0) }
+func cborPrefix(data []byte) (any, []byte, error) {
+	budget := maxCBORItems
+	return cborItem(data, 0, &budget)
+}
 
-func cborItem(data []byte, depth int) (any, []byte, error) {
-	if len(data) == 0 || depth > maxCBORDepth {
+func cborItem(data []byte, depth int, budget *int) (any, []byte, error) {
+	*budget--
+	if len(data) == 0 || depth > maxCBORDepth || *budget < 0 {
 		return nil, nil, errCBOR
 	}
 	major, info := data[0]>>5, data[0]&0x1f
@@ -77,7 +87,7 @@ func cborItem(data []byte, depth int) (any, []byte, error) {
 		}
 		items := make([]any, 0, min(n, 16))
 		for i := uint64(0); i < n; i++ {
-			v, rest, err := cborItem(data, depth+1)
+			v, rest, err := cborItem(data, depth+1, budget)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -90,7 +100,7 @@ func cborItem(data []byte, depth int) (any, []byte, error) {
 		}
 		m := make(map[any]any, min(n, 16))
 		for i := uint64(0); i < n; i++ {
-			k, rest, err := cborItem(data, depth+1)
+			k, rest, err := cborItem(data, depth+1, budget)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -107,7 +117,7 @@ func cborItem(data []byte, depth int) (any, []byte, error) {
 			if _, duplicate := m[k]; duplicate {
 				return nil, nil, errCBOR
 			}
-			v, rest, err := cborItem(rest, depth+1)
+			v, rest, err := cborItem(rest, depth+1, budget)
 			if err != nil {
 				return nil, nil, err
 			}

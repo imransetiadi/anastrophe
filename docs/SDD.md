@@ -852,7 +852,7 @@ Verifier server (ADR-0052) ada di `backend/internal/appattest` dan **belum disam
 - **Galat dan masukan:**
   - semua kegagalan `ErrInvalid`, dengan alasan untuk log; endpoint kelak menjawab seragam;
   - attestation ≤ 64 KiB, assertion ≤ 4 KiB;
-  - decoder CBOR minimal tanpa tag atau panjang tak tentu; fuzz tanpa panic.
+  - decoder CBOR minimal tanpa tag atau panjang tak tentu, paling banyak 128 item per objek agar alokasi tidak teramplifikasi; fuzz tanpa panic.
 - **Belum dikerjakan:**
   - endpoint challenge/attest;
   - penyimpanan kunci dan counter per perangkat;
