@@ -21,6 +21,8 @@ node_modules/
 *.p8
 *.p12
 *.pem
+# Pengecualian: sertifikat root publik Apple App Attestation yang di-embed verifier (ADR-0052); bukan secret.
+!backend/internal/appattest/apple_app_attestation_root_ca.pem
 *.mobileprovision
 
 # Konfigurasi build per developer & kunci CA lab (rencana R1)
