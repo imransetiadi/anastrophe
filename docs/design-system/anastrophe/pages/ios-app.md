@@ -23,7 +23,7 @@ Uji hingga ukuran aksesibilitas terbesar (AX5) tanpa teks terpotong (NFR-A01).
 
 ## 3. Warna (token → Asset Catalog, light/dark)
 
-Semua pasangan di bawah sudah dihitung dan lolos **WCAG AA ≥ 4,5:1**.
+Semua pasangan di bawah sudah dihitung dan lolos **WCAG AA ≥ 4,5:1**. Rasio dihitung terhadap `background`, kecuali `onAccent` yang dihitung terhadap `accent`. Nilai dan rasio tabel ini diuji terhadap kode oleh `ANDesignSystemTests` (TC-UX-03), termasuk teks di atas `card`.
 
 | Token | Light | Dark | Pemakaian |
 |---|---|---|---|
@@ -33,7 +33,8 @@ Semua pasangan di bawah sudah dihitung dan lolos **WCAG AA ≥ 4,5:1**.
 | `mutedForeground` | `#475569` | `#94A3B8` | Teks sekunder (7,2:1 / 7,9:1) |
 | `primary` | `#0F172A` | `#E2E8F0` | Navigasi, ikon utama |
 | `secondary` | `#1E3A8A` | `#93C5FD` | Tautan, info (9,9:1 / 11,2:1) |
-| `accent` (CTA) | `#A16207` + teks putih | `#EAB308` + teks `#020617` | Tombol utama (4,9:1 / 10,5:1) |
+| `accent` (CTA) | `#A16207` | `#EAB308` | Tombol utama; teks di atasnya memakai `onAccent` |
+| `onAccent` | `#FFFFFF` | `#020617` | Teks di atas `accent` (4,9:1 / 10,5:1) |
 | `success` | `#15803D` | `#4ADE80` | Akses diberikan (4,8:1 / 11,6:1) |
 | `warning` | `#B45309` | `#FBBF24` | "Perlu diperbarui" (4,8:1 / 12,1:1) |
 | `destructive` | `#DC2626` | `#F87171` | Hapus/cabut/gagal (4,6:1 / 7,3:1) |
