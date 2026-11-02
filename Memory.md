@@ -21,7 +21,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
   - ADR-0047: kedaluwarsa permintaan `PENDING_APPROVAL` (batas 4 per kartu sudah diterapkan), JEV 0,51.
   - Penyambungan App Attest (ADR-0053, seri JEV 0,47): pengikatan kunci attested ke `device_id` (terkait ADR-0041/0046), endpoint yang wajib attestation, bypass dev, dan kategori produksi.
 
-  - Tinjauan 18 gate JEV (16 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan, verifier App Attest, sisa Keychain instal ulang (`docs/adr/jev-log/*-gate.json`).
+  - Tinjauan 19 gate JEV (17 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan, verifier App Attest, sisa Keychain instal ulang, observabilitas backend (`docs/adr/jev-log/*-gate.json`).
   - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
 
@@ -44,7 +44,36 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Tambah Kartu | Alur produksi di semua build: kode gedung + tempel kartu (pembaca identifier saja) atau tautan undangan, kanal otomatis, perangkat dibuat saat enrolment, batas 4 permintaan menunggu per kartu. Gerbang pra-pilot terbuka: App Attest + kontrol enumerasi kartu (ADR-0046) | FR-05, FR-10–FR-13, ADR-0043–ADR-0047 |
 | Bantuan | Tombol Bantuan di tab Kunci: FAQ sepuluh topik (ID/EN), status cara akses di iPhone ini, iPhone yang didukung, laporan diagnostik tanpa rahasia | FR-60, FR-02, FR-27, FR-63, ADR-0048 |
 | Kebijakan gedung | CLI `policy` untuk masa berlaku sertifikat dan kanal per gedung; kanal efektif gedung di lookup/enrolment dan ditegakkan saat provisioning; app memilih kanal yang diizinkan | FR-55 (sebagian), FR-05, ADR-0049 |
+| Observabilitas | Log akses terstruktur per permintaan (request id di header dan log galat, pola rute, status, durasi; tanpa path, query, body, atau IP) dan metrik teks Prometheus di listener internal; alert, on-call, dan log terpusat menunggu infrastruktur | NFR-O01 (sebagian), ADR-0054 |
 | App Attest (verifier) | Paket backend `internal/appattest` memverifikasi attestation dan assertion menurut langkah Apple; teruji dengan contoh resmi Apple dan data iOS 27 nyata (scratch). Belum disambungkan ke endpoint, database, atau app; gerbang pra-pilot NFR-S03 masih terbuka | NFR-S03 (sebagian), ADR-0052 |
+
+## API-2026-11-02-1005 - Observabilitas backend: log akses dan metrik (Selesai, commit lokal; gate eskalasi)
+
+Fokus dari ADR-0054 (JEV 0,99, Diterima). Sebelumnya backend hanya menulis log galat, tanpa jejak per permintaan atau angka latensi.
+
+Perubahan:
+- **Log akses per permintaan** (`http request`): request id, pola rute ServeMux, status, `duration_ms`, dan `bytes`.
+  - Request id 8 byte acak, dikirim di header `X-Request-ID`; header klien diabaikan.
+  - Path mentah, query, body, header, dan IP tidak dicatat.
+  - Pola rute ditangkap lewat context, karena `withDeadline` menyalin request; ini juga berlaku saat handler panic.
+- **Korelasi galat:** log galat handler `enroll` (`writeResult` kini menerima request) dan log panic memakai `slog.ErrorContext`, sehingga membawa `request_id` yang sama (`WithRequestID`).
+- **Metrik (stdlib, format teks Prometheus 0.0.4):**
+  - permintaan per rute/status, histogram durasi dengan bucket 0,3 dtk, dan in-flight;
+  - `/metrics` hanya di listener internal `ANASTROPHE_METRICS_ADDR`; `ANASTROPHE_LOG_FORMAT=json` memilih log JSON.
+
+Bukti:
+- Mutasi 19/19 tertangkap.
+- Go 11 paket lulus dengan `-race`.
+- Uji asap biner dengan PostgreSQL lab: log JSON, nilai query tidak muncul, `/metrics` publik 404, SIGTERM keluar bersih.
+
+Review akhir (opus): "with fixes".
+- **Important, diperbaiki:** scrape yang macet sebelumnya menahan kunci yang diambil setiap permintaan, sehingga seluruh API bisa membeku. Kini metrik dirender sebelum ditulis, listener metrik punya timeout, dan shutdown mendahulukan server publik.
+- **Temuan di luar unit:** `*.pem` di `.gitignore` membuat PEM root Apple dari ADR-0052 tidak pernah ter-commit, sehingga clone baru gagal build. Diperbaiki di `032e27a` dan diverifikasi dengan clone baru.
+- **Ditunda di backlog:** sisa minor.
+
+`jev_gate`: eskalasi (komposit 0,53). Dua klaim dinilai "contradicted" dengan confidence rendah karena caveat minor yang ditunda. Tidak diajukan ulang.
+
+Commit unit ini: `55c39a7`, `b2243cd`, `a80ba00`, `ba88798`, `032e27a`, `e9bca1f`, dan commit ini. Obsidian: `sessions/2026-11-02-observabilitas-backend.md`, `decisions/ADR-0054…`, `lessons/verifikasi-uji-dan-gerbang.md`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
 
 ## APP-2026-11-02-0930 - Pembersihan sisa Keychain saat instal ulang (Selesai, commit lokal; gate eskalasi)
 

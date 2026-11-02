@@ -1,0 +1,107 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "action": "escalate",
+  "label": "observabilitas-backend-plan-close-gate",
+  "request": "Close plan 2026-11-02-observabilitas-backend (ADR-0054, NFR-O01 partial): structured per-request access logs with request id and no personal data, request-id correlation for handler error logs, and Prometheus-text metrics on an internal listener; including the final-review fix pass (scrape lock, timeouts, shutdown order) and the committed Apple root PEM fix.",
+  "evidence_ids": [
+    "access-log-tests",
+    "metrics-tests",
+    "scrape-fix",
+    "pem-fix",
+    "suite-smoke",
+    "mutations",
+    "review-ledger"
+  ],
+  "reason_codes": [
+    "confidence_below_review",
+    "safe_to_apply_below_review",
+    "review_escalated",
+    "claims_contradicted",
+    "claim_confidence_low",
+    "claim_confidence_below_auto_accept"
+  ],
+  "review": {
+    "action": "escalate",
+    "safe_to_apply": 0.37,
+    "composite": 0.533,
+    "limiting_rubrics": [
+      "correctness"
+    ],
+    "scores": {
+      "correctness": 0.89,
+      "spec_match": 1.72,
+      "test_gap": 0.79,
+      "blast_radius": 1.92
+    },
+    "confidence": {
+      "correctness": 0.0,
+      "spec_match": 0.56,
+      "test_gap": 0.24,
+      "blast_radius": 0.9
+    }
+  },
+  "verification": {
+    "action": "escalate",
+    "verified": 6,
+    "contradicted": 2,
+    "unsupported": 0,
+    "needs_review": 3,
+    "results": [
+      {
+        "claim": "Setiap permintaan yang sampai ke handler aplikasi menghasilkan satu log akses berisi request id yang sama dengan header X-Request-ID, pola rute ServeMux, status, durasi, dan ukuran; id di path, nilai query, body, dan alamat IP tidak muncul di log, termasuk pada jalur panic.",
+        "verdict": "contradicted",
+        "confidence": 0.66,
+        "action": "review"
+      },
+      {
+        "claim": "Log galat handler enroll dan log panic membawa request_id yang sama dengan header X-Request-ID.",
+        "verdict": "contradicted",
+        "confidence": 0.52,
+        "action": "review"
+      },
+      {
+        "claim": "Metrik dihitung per pola rute dan status (rute tak dikenal tercatat sebagai \"/\"), histogram durasi kumulatif dengan bucket 0,3 detik, dan /metrics hanya dilayani listener internal sementara port publik menjawab 404.",
+        "verdict": "verified",
+        "confidence": 0.46,
+        "action": "escalate"
+      },
+      {
+        "claim": "Scrape metrik yang macet tidak lagi memblokir permintaan publik, listener metrik punya WriteTimeout dan IdleTimeout, dan shutdown mendahulukan server publik.",
+        "verdict": "verified",
+        "confidence": 0.88,
+        "action": "auto"
+      },
+      {
+        "claim": "Sertifikat root Apple yang di-embed verifier App Attest kini ter-commit, sehingga clone baru lulus go vet dan test appattest.",
+        "verdict": "verified",
+        "confidence": 0.92,
+        "action": "auto"
+      },
+      {
+        "claim": "Suite Go 11 paket lulus dengan -race, go vet bersih, check_docs 0 masalah, dan uji asap biner nyata lulus.",
+        "verdict": "verified",
+        "confidence": 0.82,
+        "action": "auto"
+      },
+      {
+        "claim": "Mutasi tertangkap 19/19.",
+        "verdict": "verified",
+        "confidence": 0.97,
+        "action": "auto"
+      },
+      {
+        "claim": "Review akhir independen menyatakan siap merge dengan perbaikan; satu temuan Important diperbaiki dengan test RED→GREEN dan Minor lain ditunda dan dicatat.",
+        "verdict": "verified",
+        "confidence": 0.82,
+        "action": "auto"
+      }
+    ]
+  },
+  "note": "Tidak diajukan ulang (ADR-0018); masuk daftar gate yang menunggu tinjauan pengguna. Dua klaim 'contradicted' (confidence 0,66 dan 0,52) bertumpu pada caveat minor yang ditunda di evidence: panic sesudah tulis parsial tercatat 200, celah CONNECT laten, dan wiring request_id produksi yang belum dipin test (reviewer memverifikasinya lewat uji asap biner dengan database dimatikan, tetapi bukti itu tidak disertakan).",
+  "usage": {
+    "input_tokens": 5128,
+    "output_tokens": 404
+  }
+}

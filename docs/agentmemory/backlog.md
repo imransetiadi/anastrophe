@@ -121,5 +121,13 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
     - `.task` bisa membuat `AppServices` kedua sesudah scene tersambung ulang;
     - proteksi SQLite bawaan Core Data mungkin menimpa klaim `.complete` di SDD §5.3;
     - deteksi restore di SDD tidak cocok dengan store kartu yang dikecualikan dari backup.
+- **Observabilitas backend (minor review akhir, ADR-0054):**
+  - **Test wiring produksi:** wiring `request_id` produksi (`loggerFromEnv` + `WithRequestID`) belum dipin test end-to-end. Reviewer memverifikasinya lewat uji asap.
+  - **CONNECT:** redirect trailing-slash pada CONNECT bisa menjadikan path mentah sebagai pola. Ini laten sampai ada rute subtree; perlakukan CONNECT sebagai `/` atau batasi jumlah rute di `Metrics`.
+  - **Panic sesudah header:** panic sesudah header ditulis tercatat sebagai 200. Tandai `panicked` di recoverer agar terhitung 500.
+  - **413:** 413 tidak lagi menutup koneksi, karena `statusRecorder` menyembunyikan `requestTooLarge`. Set `Connection: close` di `readBody` saat `MaxBytesError`.
+  - **Rekomendasi:**
+    - `ErrorLog` `http.Server` ke slog level Warn, karena log net/http sendiri bisa memuat IP saat panic lolos middleware;
+    - `ANASTROPHE_LOG_FORMAT` tidak peka huruf besar, atau tolak nilai tak dikenal.
 - **Test flaky:** `BLETapTests.autentikasiBatalMembatalkanPemindaian` sesekali gagal (pembatalan pemindaian bergantung waktu); lulus 6/6 saat diulang.
 - **Riwayat tap:** judul baris "Ditolak · alasan" dirakit di kode (M8; dikerjakan saat bahasa ketiga ditambahkan); VoiceOver baris Status belum diperiksa dengan Accessibility Inspector.
