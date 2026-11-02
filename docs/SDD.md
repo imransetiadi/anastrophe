@@ -44,6 +44,7 @@
 | 2.28 | 2026-11-02 | Review akhir deadlock: `AppendAudit` mengunci baris gedung (`FOR KEY SHARE`) sebelum kunci rantai, sehingga `policy`/`site-code` yang memegang `sites FOR UPDATE` tidak lagi bisa deadlock dengan enrolment; catatan sisa tabrakan `hashtext` (§8.1). |
 | 2.29 | 2026-11-02 | Verifier App Attest di server (ADR-0052): langkah attestation dan assertion Apple, konvensi `clientDataHash` dari pemanggil, digest assertion `SHA256(nonce)`, ekstensi kategori/versi; belum disambungkan ke endpoint (§10.4). |
 | 2.30 | 2026-11-02 | Instal ulang (ADR-0053): sisa Keychain service app dari instalasi lama dihapus pada peluncuran pertama tanpa penanda instalasi dan tanpa kartu lokal, sebelum layanan dipakai (§5.3). |
+| 2.31 | 2026-11-02 | Observabilitas backend R1 (ADR-0054): log akses terstruktur dengan request id tanpa data pribadi dan metrik teks Prometheus di listener internal; OpenTelemetry menjadi target lanjutan (§13). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -888,7 +889,11 @@ Tidak ada GPS, tidak ada tracking lintas app (ATT tidak dipakai). Privacy Manife
 ## 13. Observabilitas
 
 - **App:** MetricKit + crash reporting tanpa PII; event analitik opt-in (PRD §10).
-- **Backend:** OpenTelemetry (trace, metrik, log). SLO: API app p95 ≤ 300 ms; endpoint Apple p90 < 2,2 dtk (O-W15); propagasi revoke ≤ 60 dtk.
+- **Backend:**
+  - **Implementasi R1 (ADR-0054, stdlib tanpa dependensi):** setiap permintaan mendapat request id (header `X-Request-ID`; header klien diabaikan) dan satu baris log akses `http request`. Isinya pola rute ServeMux, status, `duration_ms`, dan `bytes`, tanpa path mentah, query, body, header, atau alamat IP (aturan 6). Log galat handler dan panic membawa `request_id` yang sama.
+  - **Metrik R1:** `/metrics` (format teks Prometheus 0.0.4) hanya di listener internal `ANASTROPHE_METRICS_ADDR`. Isinya `anastrophe_http_requests_total{route,status}`, histogram `anastrophe_http_request_duration_seconds{route}` (bucket 0,005–10 dtk, termasuk 0,3 dtk), dan `anastrophe_http_requests_in_flight`. `ANASTROPHE_LOG_FORMAT=json` memilih log JSON untuk pengumpul log terpusat.
+  - **Target lanjutan:** OpenTelemetry untuk trace; metrik teks Prometheus bisa dibaca kolektor OpenTelemetry.
+  - **SLO:** API app p95 ≤ 300 ms; endpoint Apple p90 < 2,2 dtk (O-W15); propagasi revoke ≤ 60 dtk.
 - **Reader/gateway:** heartbeat, `last_sync_at`, alarm tamper; alert bila > 2× interval sinkron.
 - **Alert:** P1 ≤ 15 menit, on-call terjadwal.
 
