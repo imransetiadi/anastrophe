@@ -1,0 +1,19 @@
+{
+  "tool": "jev_decide",
+  "decision": "Pilih fokus unit berikutnya untuk iterasi otomatis Anastrophe sesudah pembersihan sisa Keychain instal ulang (ADR-0053) ditutup.",
+  "candidates": [
+    "observability_nfr_o01",
+    "privacy_manifest_nfr_pr04",
+    "laporan_fr58",
+    "akses_cepat_fr24",
+    "polling_test_konkurensi"
+  ],
+  "requirements": [
+    "Dapat diselesaikan dan diverifikasi penuh di lingkungan ini (host, simulator, PostgreSQL) tanpa iPhone fisik, reader, atau DEVELOPMENT_TEAM.",
+    "Tidak bergantung pada keputusan yang masih menunggu pengguna dan tidak menuntut keputusan semantik keamanan atau legal baru yang wajib dieskalasi.",
+    "Memajukan requirement atau NFR berprioritas P0."
+  ],
+  "escalate_on_contradiction": true,
+  "priorities": "Tujuan pengguna: terus membangun app secara bertahap dan otomatis; JEV memutuskan, eskalasi bila < 0,60. Requirement/NFR P0 didahulukan dari P1/P2. Unit tidak boleh bergantung pada keputusan yang menunggu pengguna atau sumber daya yang tidak tersedia, harus bisa diverifikasi penuh, kecil-menengah dan terbatas. Aturan keamanan/privasi CLAUDE.md tidak bisa ditawar (tanpa identitas kartu/kontak di log). Keputusan semantik keamanan atau legal yang tereskalasi tetap milik pengguna.",
+  "evidence_summary": "NFR-O01 (P0): backend hanya log galat; tanpa log akses, request id, atau metrik; stdlib cukup; metrik di port internal. NFR-PR04 (P0): PrivacyInfo.xcprivacy kosong; app tanpa API required-reason yang dikenal (ContinuousClock saja); data yang dikumpulkan menunggu dokumen legal. FR-58/FR-24 P1. Test konkurensi 300 ms."
+}

@@ -345,6 +345,7 @@ Format ID: `TC-<AREA>-<NN>`. **Prio:** P0/P1/P2. **Tipe:** U unit · I integrasi
 | TC-DR-03 | Reader terputus 8 hari | Kredensial yang dicabut pada hari ke-1 ditolak paling lambat saat sertifikat kedaluwarsa (≤ 7 hari) | NFR-R04 | P0 | D |
 | TC-DR-04 | Ketersediaan | Pemantauan uptime bulanan ≥ 99,9% (R1) / 99,99% (R2) | NFR-R02 | P1 | D |
 | TC-DR-05 | Enrolment bersamaan dengan sapuan per jam atau perintah operator | Enrolment kartu/undangan tidak memegang kunci rantai audit gedung selama menunggu baris instance atau baris gedung (`policy`, `site-code`); tanpa deadlock 40P01; audit tertulis tepat sekali dan berurutan per rantai | NFR-R02 | P1 | I |
+| TC-OPS-01 | Log akses dan metrik backend | Setiap permintaan tercatat (request id, pola rute, status, durasi, ukuran) tanpa path mentah, query, body, header, IP, atau identitas; request id di header `X-Request-ID` dan di log galat; metrik per rute/status dan histogram durasi (batas 0,3 dtk) hanya di listener internal | NFR-O01, NFR-P05 | P0 | I |
 
 ### 5.15 Aksesibilitas, lokalisasi, UX (UX)
 
@@ -702,7 +703,7 @@ Jadwal mengikuti milestone PRD §13; uji pilot mencakup 2 lokasi (ADR-0011).
 | NFR-P02 | TC-PERF-02 |
 | NFR-P03 | TC-PERF-03 |
 | NFR-P04 | TC-PERF-04, TC-PRSB-01 |
-| NFR-P05 | TC-PERF-05, TC-PERF-06 |
+| NFR-P05 | TC-PERF-05, TC-PERF-06, TC-OPS-01 |
 | NFR-R01 | TC-PERF-07 |
 | NFR-R02 | TC-PERF-05, TC-DR-02, TC-DR-04, TC-DR-05 |
 | NFR-R03 | TC-DR-01 |
@@ -721,7 +722,7 @@ Jadwal mengikuti milestone PRD §13; uji pilot mencakup 2 lokasi (ADR-0011).
 | NFR-PR02 | TC-ENR-01, TC-ADM-04, TC-PRIV-01 |
 | NFR-PR03 | TC-PRIV-02, TC-PRIV-07 |
 | NFR-PR04 | TC-ACC-04, TC-PRIV-03, TC-SEC-07 |
-| NFR-O01 | TC-PRIV-07 |
+| NFR-O01 | TC-PRIV-07, TC-OPS-01 |
 | NFR-O02 | TC-PERF-05 |
 | NFR-CP01 | TC-ELG-05 |
 | NFR-CP02 | TC-PROTO-09, TC-PROTO-10, TC-RDR-07, TC-UPG-03 |
