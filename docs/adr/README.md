@@ -59,3 +59,4 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0053](0053-fokus-sisa-keychain-instal-ulang.md) | Fokus berikutnya: bersihkan sisa Keychain saat instal ulang (FR-43 sebagian) | Tereskalasi — diterapkan (risiko rendah; persetujuan umum pengguna), penyambungan App Attest menunggu manusia | `instal_ulang_fr43` (escalate) | 0.39 |
 | [ADR-0054](0054-fokus-observabilitas-backend.md) | Fokus berikutnya: observabilitas backend — log akses terstruktur dan metrik (NFR-O01 sebagian) | Diterima | `observability_nfr_o01` | 0.99 |
 | [ADR-0055](0055-fokus-uji-beban-api.md) | Fokus berikutnya: uji beban API dan baseline lab (TC-PERF-05) | Diterima | `uji_beban_api` | 0.95 |
+| [ADR-0056](0056-fokus-pemindaian-secret-dependensi.md) | Fokus berikutnya: pemindaian secret dan dependensi (TC-SEC-11) | Diterima | `pemindaian_secret_dependensi` | 0.93 |
