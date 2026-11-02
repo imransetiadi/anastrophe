@@ -47,6 +47,7 @@
 | 2.31 | 2026-11-02 | Observabilitas backend R1 (ADR-0054): log akses terstruktur dengan request id tanpa data pribadi dan metrik teks Prometheus di listener internal; OpenTelemetry menjadi target lanjutan (§13). |
 | 2.32 | 2026-11-02 | Uji beban API (ADR-0055): alat `anastrophe-loadtest` (stdlib, kartu sintetis, penjaga loopback, porsi SLO dari `/metrics`) dan baseline lab (§14). |
 | 2.33 | 2026-11-02 | Perbaikan review akhir uji beban (ADR-0055): redirect tidak diikuti, enrol mengikuti jalur app (`Idempotency-Key`, `status_token_hash`), token laju terlewat dan run terpotong terlihat; baseline lab diukur ulang (§14). |
+| 2.34 | 2026-11-02 | Pemindaian secret dan dependensi (ADR-0056, §10.3): gitleaks + govulncheck + OSV lewat `scripts/security/scan.py`; backend Go ≥ 1.25 dengan toolchain go1.27.3 (§2). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -184,7 +185,7 @@ flowchart TB
 | Reader referensi | NFC (ISO 14443-4 PCD) + BLE peripheral + SE (kunci reader group) + MCU; output OSDP v2.2/Wiegand | ADR-0016 |
 | Edge Gateway | Menjalankan ANP/1 untuk reader OSDP Transparent Mode; cache offline | Linux + TPM; I-12 |
 
-Backend: Go 1.24+ (ADR-0020, provisional), PostgreSQL 16, Redis (rate-limit), HSM/KMS cloud. Region dan residensi data mengikuti regulasi (UU PDP untuk data WNI); topologi R1 di ADR-0014.
+Backend: Go 1.25+ dengan toolchain go1.27.3 (ADR-0020, provisional; versi minimum dan toolchain dari ADR-0056), PostgreSQL 16, Redis (rate-limit), HSM/KMS cloud. Region dan residensi data mengikuti regulasi (UU PDP untuk data WNI); topologi R1 di ADR-0014.
 
 ## 4. Model kanal
 
@@ -837,6 +838,19 @@ Update firmware bertanda tangan (A/B partition), alarm tamper, heartbeat 60 dtk,
 ### 10.3 Secure SDLC & insiden
 
 SAST, pemindaian dependensi & secret, review kode wajib, pentest eksternal sebelum pilot & GA, review kriptografi ANP/1, bug bounty pasca-GA. Untuk N-SE dan W: kebijakan pengungkapan kerentanan tertulis, dan notifikasi ke Apple "tanpa penundaan" untuk kerentanan yang dieksploitasi (E03). Respons P1 ≤ 15 menit.
+
+**Pemindaian secret dan dependensi (ADR-0056, TC-SEC-11):** `python3 scripts/security/scan.py` menjalankan pemeriksaan berikut.
+
+- **Secret:** gitleaks ≥ 8.30 atas seluruh riwayat git dan perubahan yang di-stage, serta produk build bila `--build` diberikan (string cetak setiap berkas, termasuk biner).
+  - Konfigurasi `.gitleaks.toml` memakai aturan bawaan dengan dua allowlist sempit yang beralasan: nilai persis `P256.Signing.PrivateKey` (anotasi tipe) dan path persis vektor uji ANP/1.
+  - gitleaks selalu `--redact`, dan laporan hanya memuat aturan, berkas, baris, dan commit.
+- **Dependensi:**
+  - govulncheck v1.9.0 untuk backend: kerentanan yang terpanggil sampai fungsi menggagalkan run; tingkat modul atau paket menjadi informasi;
+  - app iOS harus tetap tanpa paket remote;
+  - dependensi alat Python yang terpasang diperiksa ke OSV.
+- **Exit code:** 0 bersih, 1 ada temuan, 2 alat, jaringan, atau keluaran alat gagal.
+- **Toolchain:** backend menuntut Go ≥ 1.25 dengan toolchain go1.27.3, agar stdlib yang dipakai sudah ditambal.
+- **Tindak lanjut:** CI dan hook pre-commit menunggu (backlog). Hasil pertama ada di QA §11.1.
 
 
 ### 10.4 App Attest (NFR-S03)

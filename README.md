@@ -135,6 +135,19 @@ python3 scripts/docs/check_docs.py .        # traceability FR/NFR → TC, ID, ta
 python3 scripts/docs/check_mermaid.py . /tmp/mmd <path-mmdc> <puppeteer.json>   # render semua diagram
 ```
 
+## Pemindaian keamanan
+
+Pemeriksaan secret dan dependensi (TC-SEC-11, ADR-0056). Butuh gitleaks ≥ 8.30 serta akses ke proxy Go dan `api.osv.dev`; ke OSV hanya dikirim nama dan versi paket.
+
+```bash
+python3 scripts/security/scan.py                 # secret (seluruh riwayat git + staged) dan dependensi
+python3 scripts/security/scan.py --build build/DerivedDataScan/Build/Products/Release-iphonesimulator/Anastrophe.app   # ditambah produk build
+python3 -m unittest discover -s scripts/security  # test pemindai
+python3 -m pip install -r scripts/anp1/requirements.txt   # advisori Python diperiksa pada versi yang terpasang
+```
+
+Exit 0 berarti bersih, 1 ada temuan, dan 2 berarti alat, jaringan, atau keluaran alat gagal (tidak pernah dianggap lulus). Nilai secret tidak pernah dicetak. Allowlist di `.gitleaks.toml` harus sempit dan beralasan. Hook pre-commit tidak dipasang otomatis; bila mau, jalankan `gitleaks git --staged --redact .` sebelum commit.
+
 ## Langkah berikutnya
 
 1. Putuskan ADR-0017 (entitas); ini tidak menghalangi rencana [R1 tracer bullet](docs/superpowers/plans/2026-11-01-r1-tracer-bullet.md) sisi app, tetapi menghalangi entitlement NFC.

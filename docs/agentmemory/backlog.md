@@ -143,5 +143,11 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
     - memori recorder tumbuh tanpa batas pada uji rendam (simpan histogram, bukan semua sampel);
     - laporan mentah baseline hanya tersimpan lokal;
     - koreksi coordinated omission: ukur latensi dari jadwal token (open-loop), agar latensi dekat titik jenuh tidak terlalu optimistis.
+- **Pemindaian keamanan (ADR-0056):**
+  - **Lingkungan lokal:** perbarui `cryptography` ke 50.* di interpreter pyenv (`python3 -m pip install -r scripts/anp1/requirements.txt`). Pemindai dengan interpreter bawaan tetap exit 1 sampai itu dilakukan.
+  - **CI dan hook:** jalankan `scripts/security/scan.py` sebagai langkah CI begitu CI ada. Hook pre-commit (`gitleaks git --staged --redact .`) bersifat opsional dan tidak dipasang otomatis.
+  - **Alias OSV:** satu CVE bisa tercetak dua kali (GHSA dan PYSEC). Kelompokkan menurut `aliases` agar jumlah advisori tidak berlipat.
+  - **Keparahan Go:** govulncheck tidak memberi skor, jadi kebijakannya "terpanggil = gagal". Tinjau ulang bila ada sumber keparahan yang andal.
+  - **Masih terbuka:** audit `.ipa` bertanda tangan (TC-SEC-07), MASVS (TC-SEC-06), SAST, dan pentest eksternal (TC-SEC-12).
 - **Test flaky:** `BLETapTests.autentikasiBatalMembatalkanPemindaian` sesekali gagal (pembatalan pemindaian bergantung waktu); lulus 6/6 saat diulang.
 - **Riwayat tap:** judul baris "Ditolak · alasan" dirakit di kode (M8; dikerjakan saat bahasa ketiga ditambahkan); VoiceOver baris Status belum diperiksa dengan Accessibility Inspector.
