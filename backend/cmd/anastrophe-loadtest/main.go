@@ -1,7 +1,7 @@
 // Command anastrophe-loadtest menjalankan uji beban API Anastrophe (TC-PERF-05, ADR-0055). Hasil di laptop
 // adalah baseline lab, bukan bukti produksi.
 //
-//	go -C backend run ./cmd/anastrophe-loadtest gen-cards -n 5000 > kartu-beban.csv
+//	go -C backend run ./cmd/anastrophe-loadtest gen-cards -n 5000 [-offset 0] > kartu-beban.csv
 //	go -C backend run ./cmd/anastrophe-registry import --site <uuid> --file kartu-beban.csv --operator lab
 //	go -C backend run ./cmd/anastrophe-loadtest run -base http://127.0.0.1:8080 -scenario enrol \
 //	    -site <uuid> -cards kartu-beban.csv -duration 20s -concurrency 8 -metrics http://127.0.0.1:9090/metrics
@@ -30,7 +30,7 @@ import (
 
 func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
 
-const usage = "pemakaian: anastrophe-loadtest gen-cards [-n N] | run -base <url> -scenario config|lookup|enrol|renew [-duration 20s] [-concurrency 8] [-rate 0] [-site <uuid>] [-code <kode>] [-cards <csv>] [-prepare 100] [-metrics <url>] [-max-galat 0.001] [-allow-remote]"
+const usage = "pemakaian: anastrophe-loadtest gen-cards [-n N] [-offset N] | run -base <url> -scenario config|lookup|enrol|renew [-duration 20s] [-concurrency 8] [-rate 0] [-site <uuid>] [-code <kode>] [-cards <csv>] [-prepare 100] [-metrics <url>] [-max-galat 0.001] [-allow-remote]"
 
 func run(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -42,10 +42,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fs := flag.NewFlagSet("gen-cards", flag.ContinueOnError)
 		fs.SetOutput(stderr)
 		n := fs.Int("n", 1000, "jumlah kartu sintetis")
+		offset := fs.Int("offset", 0, "nomor kartu pertama; run berurutan butuh rentang terpisah")
 		if err := fs.Parse(args[1:]); err != nil {
 			return 2
 		}
-		if err := loadtest.GenerateCards(stdout, *n); err != nil {
+		if err := loadtest.GenerateCards(stdout, *n, *offset); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}

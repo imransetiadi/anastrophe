@@ -4,6 +4,7 @@ package loadtest
 
 import (
 	"context"
+	"errors"
 	"math"
 	"sort"
 	"sync"
@@ -13,6 +14,10 @@ import (
 // Step menjalankan satu permintaan HTTP dan mengembalikan statusnya (0 bila tidak ada respons). Galat berarti
 // langkah gagal, termasuk status yang tidak diharapkan skenario.
 type Step func(ctx context.Context) (int, error)
+
+// ErrStop dikembalikan Iteration bila run tidak bisa berlanjut (mis. pool kartu habis): Runner berhenti
+// memulai iterasi baru, alih-alih berputar tanpa henti.
+var ErrStop = errors.New("loadtest: run dihentikan")
 
 // Iteration adalah satu putaran skenario. Setiap langkah dicatat lewat rec.Measure; galat yang dikembalikan
 // tidak dihitung ulang oleh Runner, jadi galat di luar langkah (mis. pool habis) dicatat sendiri oleh skenario.
@@ -104,7 +109,9 @@ type Runner struct {
 func (r Runner) Run(ctx context.Context, it Iteration) (*Recorder, time.Duration) {
 	rec := NewRecorder()
 	stop := make(chan struct{})
-	timer := time.AfterFunc(r.Duration, func() { close(stop) })
+	var stopOnce sync.Once
+	halt := func() { stopOnce.Do(func() { close(stop) }) }
+	timer := time.AfterFunc(r.Duration, halt)
 	defer timer.Stop()
 	var tokens chan struct{}
 	if r.Rate > 0 {
@@ -154,7 +161,10 @@ func (r Runner) Run(ctx context.Context, it Iteration) (*Recorder, time.Duration
 					default:
 					}
 				}
-				_ = it(ctx, rec)
+				if err := it(ctx, rec); errors.Is(err, ErrStop) {
+					halt()
+					return
+				}
 			}
 		}()
 	}

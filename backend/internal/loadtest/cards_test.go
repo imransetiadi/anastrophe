@@ -9,7 +9,7 @@ import (
 
 func TestKartuSintetis(t *testing.T) {
 	var buf bytes.Buffer
-	if err := GenerateCards(&buf, 5); err != nil {
+	if err := GenerateCards(&buf, 5, 0); err != nil {
 		t.Fatal(err)
 	}
 	rows, err := csv.NewReader(bytes.NewReader(buf.Bytes())).ReadAll()
@@ -45,5 +45,20 @@ func TestLoadCardsMenolakKartuBukanSintetis(t *testing.T) {
 	in := "tech,card_id,holder_contact,zones\niso14443a,04a1b2c3d4e5f6,,\n"
 	if _, err := LoadCards(strings.NewReader(in)); err == nil {
 		t.Fatal("kartu bukan sintetis diterima")
+	}
+}
+
+func TestKartuSintetisOffset(t *testing.T) {
+	// Run berurutan butuh rentang kartu terpisah: kartu yang sudah dipakai membuat enrolment PENDING_APPROVAL.
+	var buf bytes.Buffer
+	if err := GenerateCards(&buf, 2, 100000); err != nil {
+		t.Fatal(err)
+	}
+	pool, err := LoadCards(bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id, _ := pool.Next(); id != "084c54000186a0" {
+		t.Fatalf("kartu pertama = %q", id)
 	}
 }

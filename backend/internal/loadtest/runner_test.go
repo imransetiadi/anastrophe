@@ -89,3 +89,21 @@ func TestLaporanTanpaRahasia(t *testing.T) {
 		}
 	}
 }
+
+func TestRunnerBerhentiSaatErrStop(t *testing.T) {
+	// Baseline lab ADR-0055: pool kartu habis membuat pekerja berputar tanpa henti; ErrStop menghentikan run.
+	var n atomic.Int64
+	start := time.Now()
+	Runner{Concurrency: 4, Duration: 10 * time.Second}.Run(context.Background(), func(ctx context.Context, rec *Recorder) error {
+		if n.Add(1) > 10 {
+			return ErrStop
+		}
+		return nil
+	})
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("runner berhenti sesudah %v", elapsed)
+	}
+	if got := n.Load(); got > 10+4 {
+		t.Fatalf("iterasi sesudah ErrStop = %d", got)
+	}
+}

@@ -73,7 +73,7 @@ func apiLab(t *testing.T, cards int) *Client {
 		t.Fatal(err)
 	}
 	var csvBuf bytes.Buffer
-	if err := GenerateCards(&csvBuf, cards); err != nil {
+	if err := GenerateCards(&csvBuf, cards, 0); err != nil {
 		t.Fatal(err)
 	}
 	pool, err := LoadCards(bytes.NewReader(csvBuf.Bytes()))
@@ -157,8 +157,8 @@ func TestRenewTanpaKredensialGagalJelas(t *testing.T) {
 func TestEnrolKartuHabisGagalJelas(t *testing.T) {
 	c := &Client{Base: "http://127.0.0.1:1", HTTP: http.DefaultClient, Cards: &CardPool{}, Creds: &CredPool{}}
 	rec := NewRecorder()
-	if err := c.Enrol(context.Background(), rec); err == nil {
-		t.Fatal("enrol tanpa kartu tidak gagal")
+	if err := c.Enrol(context.Background(), rec); !errors.Is(err, ErrStop) {
+		t.Fatalf("enrol tanpa kartu = %v, ingin ErrStop", err)
 	}
 	if s := rec.Summary(); len(s) != 1 || s[0].Step != "enrol.kartu_habis" || s[0].Errors != 1 {
 		t.Fatalf("ringkasan = %+v", s)
@@ -178,5 +178,28 @@ func TestStatusTakTerdugaDihitungGalat(t *testing.T) {
 	}
 	if s := rec.Summary(); len(s) != 1 || s[0].Errors != 1 || s[0].ByStatus[500] != 1 {
 		t.Fatalf("ringkasan = %+v", s)
+	}
+}
+
+func TestEnrolKartuTerpakaiGagalJelas(t *testing.T) {
+	// Baseline lab ADR-0055: kartu yang sudah dipakai perangkat lain menghasilkan 201 PENDING_APPROVAL; itu
+	// harus tercatat sebagai galat enrolment, bukan sukses yang berujung provisioning 409.
+	c := apiLab(t, 1)
+	rec := NewRecorder()
+	ctx := context.Background()
+	if err := c.Enrol(ctx, rec); err != nil {
+		t.Fatal(err)
+	}
+	c.Cards = &CardPool{ids: c.Cards.ids} // pakai ulang kartu yang sama
+	if err := c.Enrol(ctx, rec); err == nil {
+		t.Fatal("enrolment kartu terpakai dianggap sukses")
+	}
+	for _, s := range rec.Summary() {
+		if s.Step == "enrol.enrolment" && (s.Count != 2 || s.Errors != 1 || s.ByStatus[201] != 2) {
+			t.Fatalf("enrol.enrolment = %+v", s)
+		}
+		if s.Step == "enrol.provisioning" && s.Count != 1 {
+			t.Fatalf("provisioning dijalankan untuk kartu terpakai: %+v", s)
+		}
 	}
 }

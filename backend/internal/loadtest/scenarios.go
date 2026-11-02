@@ -30,7 +30,7 @@ type Client struct {
 }
 
 var (
-	errCardsExhausted = errors.New("pool kartu sintetis habis")
+	errCardsExhausted = fmt.Errorf("pool kartu sintetis habis: %w", ErrStop)
 	errNoCredentials  = errors.New("pool kredensial kosong; jalankan enrol lebih dulu")
 )
 
@@ -68,9 +68,16 @@ func (c *Client) Enrol(ctx context.Context, rec *Recorder) error {
 	}
 	var enrolled struct {
 		EnrollmentID string `json:"enrollment_id"`
+		Status       string `json:"status"`
 	}
 	if _, err := rec.Measure(ctx, "enrol.enrolment", func(ctx context.Context) (int, error) {
-		return c.do(ctx, http.MethodPost, "/v1/enrollments", body, nil, &enrolled, http.StatusCreated, http.StatusOK)
+		status, err := c.do(ctx, http.MethodPost, "/v1/enrollments", body, nil, &enrolled, http.StatusCreated, http.StatusOK)
+		if err == nil && enrolled.Status != "PROVISIONING" {
+			// Kartu yang sudah dipakai perangkat lain menjadi PENDING_APPROVAL (ADR-0032): bukan enrolment yang
+			// bisa diprovisikan, jadi dihitung galat agar kartu terpakai tidak tertutupi.
+			err = fmt.Errorf("status enrolment %s; kartu sudah dipakai?", enrolled.Status)
+		}
+		return status, err
 	}); err != nil {
 		return err
 	}

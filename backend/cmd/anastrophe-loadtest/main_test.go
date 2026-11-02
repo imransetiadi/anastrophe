@@ -30,11 +30,11 @@ func TestTolakHostNonLoopback(t *testing.T) {
 
 func TestGenCardsCLI(t *testing.T) {
 	var out, errOut bytes.Buffer
-	if code := run([]string{"gen-cards", "-n", "3"}, &out, &errOut); code != 0 {
+	if code := run([]string{"gen-cards", "-n", "3", "-offset", "100000"}, &out, &errOut); code != 0 {
 		t.Fatalf("exit %d: %s", code, errOut.String())
 	}
 	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
-	if len(lines) != 4 || lines[0] != "tech,card_id,holder_contact,zones" || !strings.HasPrefix(lines[1], "iso14443a,084c54") {
+	if len(lines) != 4 || lines[0] != "tech,card_id,holder_contact,zones" || !strings.HasPrefix(lines[1], "iso14443a,084c54000186a0") {
 		t.Fatalf("keluaran = %q", out.String())
 	}
 }

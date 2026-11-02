@@ -15,14 +15,15 @@ import (
 const syntheticPrefix = "084c54"
 
 // GenerateCards menulis CSV impor registri (tech,card_id,holder_contact,zones) berisi n kartu sintetis
-// iso14443a: awalan 084c54 lalu nomor urut 4 byte, tanpa kontak dan zona.
-func GenerateCards(w io.Writer, n int) error {
+// iso14443a: awalan 084c54 lalu nomor urut 4 byte mulai dari offset, tanpa kontak dan zona. Run yang berurutan
+// memakai offset berbeda, karena kartu yang sudah dipakai membuat enrolment berikutnya PENDING_APPROVAL.
+func GenerateCards(w io.Writer, n, offset int) error {
 	cw := csv.NewWriter(w)
 	if err := cw.Write([]string{"tech", "card_id", "holder_contact", "zones"}); err != nil {
 		return err
 	}
 	for i := 0; i < n; i++ {
-		if err := cw.Write([]string{"iso14443a", fmt.Sprintf("%s%08x", syntheticPrefix, i), "", ""}); err != nil {
+		if err := cw.Write([]string{"iso14443a", fmt.Sprintf("%s%08x", syntheticPrefix, offset+i), "", ""}); err != nil {
 			return err
 		}
 	}
