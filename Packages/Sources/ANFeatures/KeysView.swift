@@ -49,6 +49,7 @@ public struct KeysView: View {
                                             await model.load()
                                         }
                                     }
+                                    .accessibilityIdentifier("detail.lab_renew")
                                 }
                             }
                             #endif
@@ -60,15 +61,18 @@ public struct KeysView: View {
                             Label(localized("keys.add"), systemImage: "plus")
                         }
                         .disabled(!model.canAddCard || services.storageFailed)
+                        .accessibilityIdentifier("keys.add")
                     }
                     ToolbarItem(placement: Self.leadingPlacement) {
                         Button { showsHelp = true } label: {
                             Label(localized("keys.help"), systemImage: "questionmark.circle")
                         }
+                        .accessibilityIdentifier("keys.help")
                     }
                     #if DEBUG
                     ToolbarItem(placement: Self.leadingPlacement) {
                         Button(localized("keys.lab")) { showsLab = true }
+                            .accessibilityIdentifier("keys.lab")
                     }
                     #endif
                 }
@@ -114,6 +118,9 @@ public struct KeysView: View {
                         labAutoCode: request.labAutoCode, labAutoSubmit: request.labAutoSubmit) {
                 Task { await model.load() }
             }
+            #if DEBUG
+            .demo(request.demoScreen)
+            #endif
         }
         .alert(deleteMessage ?? "", isPresented: Binding(get: { deleteMessage != nil }, set: { if !$0 { deleteMessage = nil } })) {
             Button(localized("present.done"), role: .cancel) {}
@@ -144,6 +151,9 @@ public struct KeysView: View {
             LabView(services: services) { Task { await model.load() } }
         }
         #endif
+        // Tint app = token `secondary` (tautan/info, ADR-0058), bukan biru sistem (3,5:1 di atas putih). Dipasang paling
+        // luar, sesudah semua `.sheet`, agar ikut ke setiap lembar; alert dan share sheet memakai aset AccentColor yang sama.
+        .tint(ANColor.secondary)
     }
 
     @ViewBuilder
@@ -152,7 +162,7 @@ public struct KeysView: View {
             ContentUnavailableView {
                 Label(localized("storage.unavailable.title"), systemImage: "externaldrive.badge.exclamationmark")
             } description: {
-                Text(localized("storage.unavailable.message"))
+                ANMutedText(localized("storage.unavailable.message"))
             }
         } else if model.isLoading {
             ProgressView()
@@ -161,20 +171,24 @@ public struct KeysView: View {
             ContentUnavailableView {
                 Label(localized("keys.empty.title"), systemImage: "key")
             } description: {
-                Text(localized("keys.empty.message"))
+                ANMutedText(localized("keys.empty.message"))
             } actions: {
                 Button(localized("keys.add")) { addCard = AddCardRequest(entry: .start) }
                     .buttonStyle(ANPrimaryButtonStyle())
                     .disabled(!model.canAddCard)
                     .padding(.horizontal)
+                    .accessibilityIdentifier("keys.empty.add")
             }
         } else {
             List(model.cards) { card in
                 NavigationLink(value: card.id) {
                     CardRow(card: card, presentability: model.presentability(of: card)) { use(card) }
                 }
+                // Permukaan baris memakai token `card` (design system §3), juga di mode gelap.
+                .listRowBackground(ANColor.card)
             }
             .scrollContentBackground(.hidden)
+            .accessibilityIdentifier("keys.list")
         }
     }
 
@@ -232,12 +246,17 @@ public struct KeysView: View {
 
     private func openDemoScreen() {
         #if DEBUG
-        switch services.demoScreen {
-        case "lab": showsLab = true
-        case "help": showsHelp = true
-        case "detail": if let first = model.cards.first { path = [first.id] }
-        case "presentation", "bluetooth-denied": if let first = model.cards.first(where: { model.presentability(of: $0).canPresent }) { use(first) }
-        default: break
+        guard let screen = services.demoScreen else { return }
+        switch screen {
+        case .lab: showsLab = true
+        case .help: showsHelp = true
+        case .detail: if let first = model.cards.first { path = [first.id] }
+        case .detailSuspended: if let card = model.cards.first(where: { $0.status == .suspended }) { path = [card.id] }
+        case .presentation, .bluetoothDenied, .presentationDenied:
+            if let first = model.cards.first(where: { model.presentability(of: $0).canPresent }) { use(first) }
+        case .empty: break
+        case .add, .addCode, .addConfirm, .addInvitation, .addDone, .addPending, .addFailed:
+            addCard = AddCardRequest(entry: .start, demoScreen: screen)
         }
         #endif
     }

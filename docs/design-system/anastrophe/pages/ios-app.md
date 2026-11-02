@@ -23,7 +23,7 @@ Uji hingga ukuran aksesibilitas terbesar (AX5) tanpa teks terpotong (NFR-A01).
 
 ## 3. Warna (token → Asset Catalog, light/dark)
 
-Semua pasangan di bawah sudah dihitung dan lolos **WCAG AA ≥ 4,5:1**.
+Semua pasangan di bawah sudah dihitung dan lolos **WCAG AA ≥ 4,5:1**. Rasio dihitung terhadap `background`, kecuali `onAccent` yang dihitung terhadap `accent`. Nilai dan rasio tabel ini diuji terhadap kode oleh `ANDesignSystemTests` (TC-UX-03), termasuk teks di atas `card`.
 
 | Token | Light | Dark | Pemakaian |
 |---|---|---|---|
@@ -33,12 +33,19 @@ Semua pasangan di bawah sudah dihitung dan lolos **WCAG AA ≥ 4,5:1**.
 | `mutedForeground` | `#475569` | `#94A3B8` | Teks sekunder (7,2:1 / 7,9:1) |
 | `primary` | `#0F172A` | `#E2E8F0` | Navigasi, ikon utama |
 | `secondary` | `#1E3A8A` | `#93C5FD` | Tautan, info (9,9:1 / 11,2:1) |
-| `accent` (CTA) | `#A16207` + teks putih | `#EAB308` + teks `#020617` | Tombol utama (4,9:1 / 10,5:1) |
+| `accent` (CTA) | `#A16207` | `#EAB308` | Tombol utama; teks di atasnya memakai `onAccent` |
+| `onAccent` | `#FFFFFF` | `#020617` | Teks di atas `accent` (4,9:1 / 10,5:1) |
 | `success` | `#15803D` | `#4ADE80` | Akses diberikan (4,8:1 / 11,6:1) |
 | `warning` | `#B45309` | `#FBBF24` | "Perlu diperbarui" (4,8:1 / 12,1:1) |
 | `destructive` | `#DC2626` | `#F87171` | Hapus/cabut/gagal (4,6:1 / 7,3:1) |
 
 Status **tidak boleh** dibedakan oleh warna saja. Selalu sertakan ikon SF Symbol + teks, misalnya "Ditangguhkan".
+
+**Tint app adalah `secondary` (ADR-0058).**
+- `.tint(ANColor.secondary)` dipasang paling luar di `KeysView`, sehingga ikut ke setiap lembar.
+- Aset AccentColor bernilai sama dipakai alert, share sheet, dan menu. Kesamaan aset dan token dijaga `AccentColorAssetTests`.
+- Semua teks yang dikendalikan app memakai token. Abu-abu, biru, dan merah sistem tidak dipakai untuk teks; lint `tanpaWarnaTeksSistem` menjaganya.
+- Elemen sistem yang tidak bisa diwarnai app (tombol merah `confirmationDialog`, chevron `NavigationLink`) dicatat di QA §11.1.
 
 ## 4. Ikon & spasi
 
@@ -59,6 +66,11 @@ Status **tidak boleh** dibedakan oleh warna saja. Selalu sertakan ikon SF Symbol
 | **Pemuatan daftar** | Skeleton/`redacted(reason: .placeholder)`; jangan layar kosong. |
 | **Tombol Wallet (kanal W)** | Hanya aset resmi *Add to Apple Wallet* (`PKAddPassButton`) sesuai pedoman Apple. |
 | **Dialog destruktif** | Hapus kartu/akun memakai `confirmationDialog` dengan peran `.destructive` + autentikasi. |
+| **Tombol sekunder** | `ANSecondaryButtonStyle`: teks `secondary`, bingkai ≥ 44 pt dan `contentShape` di dalam gaya. Dipakai untuk "Batal", "Coba lagi", "Bukan gedung saya", dan tautan "Buka Pengaturan". |
+| **Tombol aksi di baris** | `ANCompactAccentButtonStyle` ("Gunakan"): teks `onAccent` di atas `accent`, kapsul, tinggi ≥ 44 pt. |
+| **Ukuran kontrol besar** | `.controlSize(.large)` memberi 50 pt pada ketiga gaya tombol. Dipakai di lembar setengah tinggi iOS 26 yang tampil ±96 %, agar area ketuk tetap ≥ 44 pt di layar. |
+| **Field teks** | `ANTextField`: `UITextField` ≥ 44 pt dengan padding di dalam field, latar `card`, garis tepi dan placeholder `mutedForeground`, ikut Dynamic Type. |
+| **Teks sekunder daftar** | `ANMutedText` untuk judul dan catatan seksi serta deskripsi `ContentUnavailableView`. `ANValueRow` untuk baris label–nilai, dengan nilai `mutedForeground`. |
 
 ## 6. Gerak & haptic
 
@@ -77,6 +89,7 @@ Status **tidak boleh** dibedakan oleh warna saja. Selalu sertakan ikon SF Symbol
 - Desain *playful*, UX keamanan yang buruk (pesan error samar, aksi destruktif tanpa konfirmasi), gradien ungu/pink ala "AI".
 - Meniru tampilan Apple Wallet/Apple Pay (O-A10).
 - Emoji sebagai ikon; ukuran font tetap; target sentuh < 44 pt; status hanya lewat warna.
+- Teks berwarna sistem (`secondaryLabel`, biru atau merah sistem), judul seksi berupa string tanpa token, dan gaya tombol terisi `.borderedProminent`/`.glassProminent` (ADR-0058).
 - Istilah teknis di UI presentasi: "NFC", "HCE", "APDU".
 
 ## 9. Checklist sebelum rilis UI

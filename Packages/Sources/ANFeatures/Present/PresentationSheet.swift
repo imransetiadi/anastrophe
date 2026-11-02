@@ -39,8 +39,12 @@ struct PresentationSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if model.phase == .unavailable(.bluetoothUnauthorized), let settings = Self.settingsURL {
+                    // `Link` memakai `ButtonStyle`, jadi bingkai gaya menjadi area ketuk tautan itu sendiri. Ukuran besar:
+                    // lihat `actions` di bawah.
                     Link(localized("present.open_settings"), destination: settings)
-                        .frame(minHeight: 44)
+                        .buttonStyle(ANSecondaryButtonStyle())
+                        .controlSize(.large)
+                        .accessibilityIdentifier("present.open_settings")
                 }
                 if case .coolingDown = model.phase, let cooldownUntil {
                     ProgressView(timerInterval: Date.now...max(Date.now, cooldownUntil), countsDown: true) {
@@ -58,8 +62,12 @@ struct PresentationSheet: View {
             .padding(.horizontal, 24)
             .padding(.top, 32)
         }
+        .accessibilityIdentifier("present.scroll")
         .safeAreaInset(edge: .bottom) {
             actions
+                // Lembar setengah tinggi tampil diperkecil sistem (±96 %): ukuran besar (50 pt) menjaga area ketuk tombol
+                // tetap ≥ 44 pt di layar (design system §4).
+                .controlSize(.large)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 16)
                 .background(ANColor.background)
@@ -92,14 +100,17 @@ struct PresentationSheet: View {
             VStack(spacing: 8) {
                 Button(localized("present.done")) { dismiss() }
                     .buttonStyle(ANPrimaryButtonStyle())
+                    .accessibilityIdentifier("present.done")
                 if model.phase != .granted {
                     Button(localized("present.retry"), action: onRetry)
-                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .buttonStyle(ANSecondaryButtonStyle())
+                        .accessibilityIdentifier("present.retry")
                 }
             }
         } else {
             Button(localized("present.cancel"), role: .cancel, action: onCancel)
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .buttonStyle(ANSecondaryButtonStyle())
+                .accessibilityIdentifier("present.cancel")
         }
     }
 

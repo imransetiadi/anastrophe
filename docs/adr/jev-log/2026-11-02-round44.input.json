@@ -1,0 +1,26 @@
+{
+  "tool": "jev_decide",
+  "decision": "Pilih kebijakan untuk isu kontras 'nearly passed' (dan isu kontras lain) dari performAccessibilityAudit pada elemen yang pasangan tokennya terbukti ≥ 4,5:1 di test host (ADR-0057, spesifikasi 'Keputusan sesudah bukti audit pertama' butir 2).",
+  "candidates": [
+    {
+      "id": "pengecualian_per_elemen_bukti",
+      "description": "Tidak ada aturan kategori. Isu kontras dikecualikan satu elemen per entri (jenis audit + identifier/label persis + alasan) hanya bila elemen memakai warna token, pasangan token lolos test host pada permukaan nyatanya, dan pengukuran piksel screenshot mengonfirmasi warna yang dirender. Alasan merujuk WCAG Understanding 1.4.3 dan ditinjau ulang tiap rilis iOS atau kelas perangkat baru."
+    },
+    {
+      "id": "aturan_kategori_nyaris_lulus",
+      "description": "Aturan umum kedua di handler audit: semua isu kontras berkategori 'nearly passed' (rasio terukur 3,0–4,49) dilewati tanpa entri per elemen."
+    },
+    {
+      "id": "token_gagal_eskalasi",
+      "description": "Setiap isu kontras pada elemen bertoken dianggap kegagalan token: tidak ada pengecualian; nilai token dinaikkan lewat ADR baru dan dieskalasi ke pengguna."
+    }
+  ],
+  "requirements": [
+    "Tidak menyembunyikan kegagalan kontras nyata warna sistem (rentang 3,0–4,49:1) yang saat ini ditandai audit (anti-goal: pengecualian luas demi test hijau).",
+    "Setiap pengecualian menyebut satu jenis audit, satu elemen yang dikenali persis, dan alasan tertulis (spesifikasi Tujuan 8).",
+    "Nilai token hanya berubah lewat ADR baru dengan bukti bahwa token itu sendiri gagal (non-goal spesifikasi)."
+  ],
+  "escalate_on_contradiction": true,
+  "priorities": "Audit harus tetap menangkap kegagalan kontras nyata; pengecualian sempit dan beralasan (anti-goal: pengecualian luas demi test hijau). Nilai token tidak diubah tanpa bukti token gagal dan ADR baru. Kebijakan harus bisa dijalankan otomatis di UI test dan diperiksa reviewer. Mode iterasi otomatis: JEV memutuskan, eskalasi ke pengguna bila confidence < 0,60.",
+  "evidence": "Kalibrasi agen C (runtime iOS 26.5, simulator iPhone Air 3x; layar kalibrasi berisi teks berwarna sRGB yang diketahui, setiap baris diverifikasi piksel sebelum diaudit):\n- Abu-abu di atas putih dan hitam, 17 pt dan 13 pt: rasio 3,00 → 'failed'; 3,50–4,49 → 'nearly passed'; 4,61–7,94 → tidak ditandai.\n- Pasangan token 4,62–4,92 (destructive, success, warning, onAccent, accent) pada 17 pt, 13 pt, dan 12 pt semibold tidak pernah ditandai; galat field (destructive 4,62, 13 pt) juga tidak.\n- Teks besar (≥ 18 pt, atau 19 pt tebal) dengan rasio 3,50 tidak ditandai (ambang 3:1 teks besar). Warna tembus pandang dicampur dengan benar. Di perangkat 3x tidak ada penalti antialiasing untuk teks kecil; perangkat 2x belum diuji.\n- Semua kegagalan warna sistem saat ini berada di rentang 3,0–4,49 di mode terang (systemBlue 3,36–3,52, systemRed 3,57, secondaryLabel 3,38–3,44) dan dilaporkan 'nearly passed'.\n- Satu positif palsu: 'Gedung Anda' (AddCardView, token mutedForeground) terukur 7,24/7,87 tetapi dilaporkan 'failed' (bukan 'nearly passed'); penyebabnya struktural (permukaan, elemen gabungan, atau bilah kaca), bukan token di dekat ambang.\n- Run RED pertama (fd5590c, iPhone 17e): 144 isu, 41 kontras (8 failed, 33 nearly passed); hasil mode gelap run itu tidak sah karena screenshot 'gelap' ternyata terang.\n- W3C Understanding SC 1.4.3: kontras dinilai dari warna yang ditetapkan, bukan piksel hasil antialias; disarankan melampaui minimum untuk huruf tipis.\n- Spesifikasi ADR-0057 Tujuan 8: pengecualian per elemen (jenis audit + identifier/label persis + alasan), tanpa pengecualian per jenis audit. Anti-goal: pengecualian luas demi test hijau. Non-goal: perubahan nilai token tanpa ADR baru.\n- Margin token tertipis: destructive di atas background 4,62:1."
+}

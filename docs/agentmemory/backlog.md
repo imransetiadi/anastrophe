@@ -32,6 +32,16 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
 
 ## Terbuka
 
+- **Aksesibilitas (ADR-0057, unit belum selesai):**
+  - GREEN penuh UI test audit di iPhone 17e dan iPhone 17 Pro, mutasi UI, cek `strings` build Release, dan screenshot bukti (rencana Task 4 Step 7–10).
+  - Pengecualian per elemen sesuai ADR-0059 dan spesifikasi Tujuan 8: grabber lembar, positif palsu kontras "Gedung Anda", `textClipped` field URL satu baris, dan `textClipped`/`elementDetection` di lembar setengah tinggi.
+  - Pastikan mode gelap benar-benar aktif sebelum audit, karena run RED pertama ternyata terang semua.
+  - UI test fungsional: ketuk "Gunakan" di daftar membuka lembar presentasi (tombol bergaya kustom di dalam `NavigationLink`).
+  - Dokumen Task 5: QA §11.1 TC-UX-01–04 dan TC-UX-09, SDD §5.10 + baris versi 2.35, README perintah UI test.
+  - Review akhir (opus) dan `jev_gate`.
+  - Pemeriksaan VoiceOver manual di iPhone fisik, CI untuk UI test, dan TC-UX-05.
+- **Test BLE flaky:** `autentikasiBatalMembatalkanPemindaian` sesekali gagal (`scanCount == 0 || scanWasCancelled`) saat mesin sangat sibuk, lalu lulus 6/6 saat diulang. Pembatalan pindai belum tercatat sebelum aliran selesai.
+
 - **Audit:** waktu event bisa mundur sepanjang `seq` (waktu dari pemanggil); peran DB runtime masih pemilik tabel (perlu pemisahan peran di infrastruktur produksi).
 - **Hapus kartu:** penghapusan lokal masih *best-effort*; penghapusan yang terputus setelah 204 pulih lewat `CARD-GONE`; `DELETE` membawa body (RFC 9110).
 - **Perpanjangan:** celah test (cek kanal dan kunci group di renewer, kredensial non-ACTIVE di backend); slot pekerjaan tunggal tidak terikat ke tap; renewer menulis salinan kartu lama; endpoint `:challenge` tanpa autentikasi bisa memperbesar tabel (dibersihkan per jam) dan membedakan status kredensial; drift dokumen (ADR-0023 "paralel", SDD §8.4.2 App Attest, QA TC-DEV-09).

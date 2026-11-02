@@ -30,7 +30,7 @@ struct LabView: View {
                         Text(localized("channel.tap")).tag(ChannelKind.nfcHCE)
                     }
                 }
-                Section(localized("lab.backend")) {
+                Section {
                     labeledField(localized("lab.backend.url"), text: $backendURL, prompt: "http://127.0.0.1:8080", isURL: true)
                     labeledField(localized("lab.backend.device"), text: $deviceID, prompt: "UUID", isURL: false)
                     labeledField(localized("lab.backend.site"), text: $siteID, prompt: "UUID", isURL: false)
@@ -44,8 +44,10 @@ struct LabView: View {
                         }
                     }
                     .disabled(backendTarget == nil || busy)
+                } header: {
+                    ANMutedText(localized("lab.backend"))
                 }
-                Section(localized("lab.step1")) {
+                Section {
                     Button(localized("lab.create_key"), action: begin).disabled(busy)
                     if let command {
                         Text(command)
@@ -53,14 +55,18 @@ struct LabView: View {
                             .textSelection(.enabled)
                         Button(localized("lab.copy")) { copy(command) }
                     }
+                } header: {
+                    ANMutedText(localized("lab.step1"))
                 }
-                Section(localized("lab.step2")) {
+                Section {
                     TextEditor(text: $json)
                         .font(.footnote.monospaced())
                         .frame(minHeight: 160)
                         .autocorrectionDisabled()
                     Button(localized("lab.import")) { Task { await importCard() } }
                         .disabled(json.isEmpty || begun == nil || busy)
+                } header: {
+                    ANMutedText(localized("lab.step2"))
                 }
                 if let message {
                     Section { Text(message) }

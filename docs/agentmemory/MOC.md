@@ -11,6 +11,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Sesi
 
+- [2026-11-02 — Audit aksesibilitas app (sebagian)](sessions/2026-11-02-audit-aksesibilitas.md)
 - [2026-11-02 — Pemindaian secret dan dependensi](sessions/2026-11-02-pemindaian-secret-dependensi.md)
 - [2026-11-02 — Uji beban API dan baseline lab](sessions/2026-11-02-uji-beban-api.md)
 - [2026-11-02 — Observabilitas backend: log akses dan metrik](sessions/2026-11-02-observabilitas-backend.md)
@@ -33,6 +34,9 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Keputusan
 
+- [ADR-0059 — Isu kontras audit: pengecualian per elemen dengan bukti](decisions/ADR-0059-pengecualian-kontras-per-elemen.md) · JEV 0,93
+- [ADR-0058 — Cakupan token warna dan tint app `secondary`](decisions/ADR-0058-cakupan-token-warna-tint-app.md) · JEV 0,95
+- [ADR-0057 — Fokus berikutnya: audit aksesibilitas app](decisions/ADR-0057-fokus-audit-aksesibilitas.md) · JEV 0,70 (provisional)
 - [ADR-0056 — Fokus berikutnya: pemindaian secret dan dependensi](decisions/ADR-0056-fokus-pemindaian-secret-dependensi.md) · JEV 0,93
 - [ADR-0055 — Fokus berikutnya: uji beban API dan baseline lab](decisions/ADR-0055-fokus-uji-beban-api.md) · JEV 0,95
 - [ADR-0054 — Fokus berikutnya: observabilitas backend](decisions/ADR-0054-fokus-observabilitas-backend.md) · JEV 0,99
@@ -67,6 +71,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 - [jev_gate memverifikasi klaim hanya dari butir evidence](lessons/jev-gate-butir-evidence.md)
 - [Kunci implisit foreign key ikut dalam urutan kunci](lessons/kunci-implisit-foreign-key.md)
 - [Verifikasi uji dan gerbang commit](lessons/verifikasi-uji-dan-gerbang.md)
+- [Batas audit aksesibilitas otomatis di iOS 26](lessons/audit-aksesibilitas-otomatis.md)
 
 ## Backlog
 

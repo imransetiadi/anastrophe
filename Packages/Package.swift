@@ -40,6 +40,7 @@ let package = Package(
         // Utilitas khusus test (reader ANP/1 perangkat lunak, signer & counter in-memory).
         .target(name: "ANTestSupport", dependencies: ["ANCore", "ANProtocol", "ANCrypto"], path: "Tests/ANTestSupport"),
         .testTarget(name: "ANCoreTests", dependencies: ["ANCore"]),
+        .testTarget(name: "ANDesignSystemTests", dependencies: ["ANDesignSystem"]),
         .testTarget(name: "ANProtocolTests", dependencies: ["ANProtocol"]),
         .testTarget(name: "ANCryptoTests", dependencies: ["ANCrypto", "ANProtocol", "ANTestSupport"], resources: [.process("Resources")]),
         .testTarget(name: "ANChannelNFCTests", dependencies: ["ANChannelNFC", "ANCrypto", "ANProtocol", "ANTestSupport"]),
