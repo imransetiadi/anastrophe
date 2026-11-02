@@ -313,6 +313,7 @@ Format ID: `TC-<AREA>-<NN>`. **Prio:** P0/P1/P2. **Tipe:** U unit · I integrasi
 | TC-SEC-13 | Rotasi Site CA | CA baru → perpanjangan menerbitkan sertifikat dari CA baru; transisi tanpa lockout | NFR-S08 | P1 | S |
 | TC-SEC-14 | Pembaruan sertifikat layanan | Alert ≥ 30 hari sebelum kedaluwarsa; perpanjangan otomatis | NFR-S08 | P1 | I |
 | TC-SEC-15 | Enumerasi identitas kartu lewat enrolment | Kirim enrolment beruntun dengan identitas kartu acak untuk satu `site_id`, dengan dan tanpa attestation | Ditolak/terdeteksi sesuai gerbang ADR-0046 (App Attest + pembatas/deteksi kegagalan); tidak ada identitas di log. **Pending:** kontrol belum diputuskan pengguna | NFR-S03, NFR-S09 | P0 | S | N, B |
+| TC-SEC-16 | Verifier App Attest di server | Attestation dan assertion diverifikasi menurut langkah Apple: rantai ke Apple App Attestation Root CA, nonce, key id, RP ID, counter, aaguid, `credentialId`, digest assertion `SHA256(nonce)`, dan counter yang naik. Contoh resmi Apple lulus; setiap penyimpangan ditolak seragam (`ErrInvalid`) tanpa panic | NFR-S03 | P0 | U |
 
 ### 5.13 Privasi (PRIV)
 
@@ -705,7 +706,7 @@ Jadwal mengikuti milestone PRD §13; uji pilot mencakup 2 lokasi (ADR-0011).
 | NFR-R04 | TC-DEV-03, TC-DEV-04, TC-DEV-11, TC-RDR-02, TC-RDR-04, TC-PERF-08, TC-DR-03 |
 | NFR-S01 | TC-ENR-13 |
 | NFR-S02 | TC-PROTO-01, TC-PROTO-02, TC-PROTO-04, TC-PROTO-05, TC-PROTO-06, TC-PROTO-07, TC-PROTO-11, TC-SEC-08 |
-| NFR-S03 | TC-ENR-17, TC-SEC-05, TC-SEC-15 |
+| NFR-S03 | TC-ENR-17, TC-SEC-05, TC-SEC-15, TC-SEC-16 |
 | NFR-S04 | TC-SEC-04 |
 | NFR-S05 | TC-MGT-04, TC-MGT-05, TC-SEC-10 |
 | NFR-S06 | TC-SEC-02, TC-SEC-03 |
