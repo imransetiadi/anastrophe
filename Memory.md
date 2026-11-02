@@ -11,8 +11,8 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 
 ## Status terkini
 
-- Branch kerja: `feat/r1-scaffold`, di-push ke GitHub private `imransetiadi/anastrophe` (origin) atas permintaan pengguna; belum di-merge.
-- Suite terakhir: Swift host 364 test (1 dilewati, tanpa gagal), simulator 362 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 13 paket lulus dengan PostgreSQL dan `-race`.
+- Branch kerja: `feat/r1-scaffold`, yang juga branch bawaan (dan satu-satunya branch) di GitHub private `imransetiadi/anastrophe`. Pengguna meminta commit sesudah `1f87775` digabung lewat PR ke branch itu (2026-11-02).
+- Suite terakhir: Swift host 364 test (1 dilewati, tanpa gagal), simulator 362 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 13 paket lulus dengan PostgreSQL dan `-race` (go1.27.3), pemindai keamanan 42 test. Swift host diulang 2026-11-02: 364 test, 1 dilewati.
 - Menunggu keputusan pengguna:
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
   - ADR-0038: cara mencegah pemegang kartu membatalkan suspend/revoke operator; rekomendasi `hold_pending_approval`, JEV 0,45.
@@ -21,8 +21,8 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
   - ADR-0047: kedaluwarsa permintaan `PENDING_APPROVAL` (batas 4 per kartu sudah diterapkan), JEV 0,51.
   - Penyambungan App Attest (ADR-0053, seri JEV 0,47): pengikatan kunci attested ke `device_id` (terkait ADR-0041/0046), endpoint yang wajib attestation, bypass dev, dan kategori produksi.
 
-  - Tinjauan 20 gate JEV (18 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan, verifier App Attest, sisa Keychain instal ulang, observabilitas backend, uji beban API (`docs/adr/jev-log/*-gate.json`).
-  - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
+  - Tinjauan 21 gate JEV (19 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan, verifier App Attest, sisa Keychain instal ulang, observabilitas backend, uji beban API, pemindaian secret dan dependensi (`docs/adr/jev-log/*-gate.json`).
+  - Perbarui `cryptography` ke 50.* di pyenv lokal: `python3 -m pip install -r scripts/anp1/requirements.txt`. Pemindai dengan interpreter bawaan exit 1 sampai itu dilakukan.
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
 
 ### Ringkasan kemampuan
@@ -47,6 +47,40 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Observabilitas | Log akses terstruktur per permintaan (request id di header dan log galat, pola rute, status, durasi; tanpa path, query, body, atau IP) dan metrik teks Prometheus di listener internal; alert, on-call, dan log terpusat menunggu infrastruktur | NFR-O01 (sebagian), ADR-0054 |
 | Uji beban | Alat `anastrophe-loadtest`: skenario config, lookup, enrol, dan renew dengan kartu sintetis, hanya ke loopback, porsi ≤ 0,3 dtk dari `/metrics`, serta exit code untuk galat, laju tak tercapai, dan run terpotong. Baseline lab di QA §11.1; uji 1.000 rps menunggu lingkungan Load | TC-PERF-05 (baseline lab), ADR-0055 |
 | App Attest (verifier) | Paket backend `internal/appattest` memverifikasi attestation dan assertion menurut langkah Apple; teruji dengan contoh resmi Apple dan data iOS 27 nyata (scratch). Belum disambungkan ke endpoint, database, atau app; gerbang pra-pilot NFR-S03 masih terbuka | NFR-S03 (sebagian), ADR-0052 |
+| Pemindaian keamanan | `scripts/security/scan.py`: gitleaks atas riwayat, staged, dan produk build; govulncheck; paket Swift remote; OSV untuk alat Python. Exit 0/1/2; git gagal, clone dangkal, dan `.gitleaksignore` memberi exit 2. Backend Go ≥ 1.25 dengan toolchain go1.27.3 | TC-SEC-11, NFR-S09, ADR-0056 |
+
+## SEC-2026-11-02-1540 - Pemindaian secret dan dependensi (Selesai; PR ke GitHub atas permintaan pengguna; gate eskalasi)
+
+Fokus dari ADR-0056 (JEV 0,93, Diterima). TC-SEC-11 (P0) belum pernah dijalankan, dan aturan 9 CLAUDE.md (secret tidak pernah masuk repo) belum diperiksa otomatis.
+
+Perubahan:
+- **Pemindai `scripts/security/scan.py`** (Python stdlib) dengan `.gitleaks.toml`:
+  - secret: gitleaks ≥ 8.30 atas seluruh riwayat dan perubahan yang di-stage, serta produk build (langsung dan lewat string cetak). Allowlist sempit beralasan: nilai `P256.Signing.PrivateKey` dan path vektor ANP/1;
+  - dependensi: govulncheck v1.9.0 (kerentanan terpanggil = gagal), app iOS tanpa paket remote, dan OSV untuk alat Python (hanya nama dan versi yang dikirim);
+  - exit 0/1/2. Nilai secret tidak pernah dicetak. Git yang gagal, clone dangkal, dan `.gitleaksignore` memberi exit 2, dan `gitleaks:allow` diabaikan.
+- **Kenaikan versi dari temuan nyata:** pgx v5.9.2, x/text v0.41.0, direktif `go 1.25.0` dengan `toolchain go1.27.3` (x/crypto hilang dari graf), dan `cryptography==50.*`.
+- **Dokumen:** QA §11.1 TC-SEC-11, SDD §10.3 dan §2 (versi 2.34), README "Pemindaian keamanan", catatan sesudah review di ADR-0056, dan backlog.
+
+Bukti:
+- **Run nyata** dengan venv yang mengikuti requirements: secret di 169 commit + staged 0, build Release simulator 0 (9 berkas, 35.282 string), Go 0 terpanggil, Swift 0, Python 0 → exit 0. Interpreter pyenv pengguna exit 1 karena `cryptography` 49.0.0.
+- **Pengujian:**
+  - 42 test pemindai, mutasi 13 + 10 + 19 tertangkap;
+  - suite backend 13/13 dengan go1.27.3;
+  - Swift host 364 test (1 dilewati);
+  - test anp1 7/7, dan vektor ANP/1 yang dibangkitkan ulang identik.
+
+Review akhir (opus): "With fixes".
+- **Diperbaiki dengan test lebih dulu:**
+  - 1 Critical: git gagal → gitleaks 8.30 exit 0 dengan laporan kosong;
+  - 4 Important: aturan path dan tab di build, clone dangkal, penekanan liar, halaman OSV yang hanya berisi token;
+  - minor yang dinaikkan: exit code galat, penggabungan per OSV, dan fakta dokumen.
+- **Ditunda di backlog:** sisa minor.
+
+`jev_gate`: eskalasi (komposit 0,66, rubrik pembatas *correctness*). Satu klaim dibantah karena fungsinya dikirim sebagai ringkasan, bukan kode. Tidak diajukan ulang.
+
+Commit unit ini: `0b1198b`, `d9d11b4`, `b4974d3`, `5d99ab1`, `6dc6254`, `a8bc3aa`, dan commit ini. Obsidian: `sessions/2026-11-02-pemindaian-secret-dependensi.md`, `decisions/ADR-0056…`, `lessons/verifikasi-uji-dan-gerbang.md`, `lessons/jev-gate-butir-evidence.md`, `backlog.md`, dan MOC.
+
+Sesudah unit ini pengguna meminta commit, PR, dan merge ke GitHub, lalu semua task dihentikan. Branch bawaan GitHub adalah `feat/r1-scaffold`; tidak ada `main`.
 
 ## API-2026-11-02-1425 - Uji beban API dan baseline lab (Selesai, commit lokal; gate eskalasi)
 
