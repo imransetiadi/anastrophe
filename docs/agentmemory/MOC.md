@@ -11,6 +11,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Sesi
 
+- [2026-11-02 — Verifier App Attest di backend](sessions/2026-11-02-verifier-app-attest.md)
 - [2026-11-02 — Deadlock enrolment–sapuan per jam](sessions/2026-11-02-deadlock-enrolment-sapuan.md)
 - [2026-11-02 — Filter daftar kartu](sessions/2026-11-02-filter-daftar-kartu.md)
 - [2026-11-02 — Kebijakan gedung](sessions/2026-11-02-kebijakan-gedung.md)
@@ -28,6 +29,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Keputusan
 
+- [ADR-0052 — Fokus berikutnya: verifier App Attest di backend](decisions/ADR-0052-fokus-verifier-app-attest.md) · JEV 0,60 (provisional)
 - [ADR-0051 — Fokus berikutnya: deadlock enrolment–sapuan per jam](decisions/ADR-0051-fokus-deadlock-enrolment-sapuan.md) · JEV 0,96
 - [ADR-0050 — Fokus berikutnya: filter kanal dan pencarian daftar kartu](decisions/ADR-0050-fokus-filter-daftar-kartu.md) · JEV 1,0
 - [ADR-0049 — Fokus berikutnya: kebijakan gedung](decisions/ADR-0049-fokus-kebijakan-gedung.md) · JEV 0,63 (provisional)
@@ -56,6 +58,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 - [SwiftDataError menyembunyikan galat Core Data](lessons/swiftdata-galat-tersembunyi.md)
 - [jev_gate memverifikasi klaim hanya dari butir evidence](lessons/jev-gate-butir-evidence.md)
 - [Kunci implisit foreign key ikut dalam urutan kunci](lessons/kunci-implisit-foreign-key.md)
+- [Verifikasi uji dan gerbang commit](lessons/verifikasi-uji-dan-gerbang.md)
 
 ## Backlog
 
@@ -64,6 +67,6 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 ## Menunggu pengguna
 
 - ADR-0017 (entitas hukum untuk entitlement), ADR-0022 (bentuk reader uji BLE), ADR-0038 (cegah pembatalan suspend/revoke; rekomendasi `hold_pending_approval`), ADR-0041 (pengambilalihan enrolment yang belum selesai; rekomendasi `first_writer_wins`), ADR-0046 (kontrol enumerasi kartu sebagai gerbang pra-pilot; rekomendasi deteksi per gedung + App Attest), ADR-0047 (kedaluwarsa permintaan menunggu).
-- Tinjauan gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung (review), filter daftar kartu (review), deadlock enrolment–sapuan.
+- Tinjauan gate JEV yang tereskalasi: lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung (review), filter daftar kartu (review), deadlock enrolment–sapuan, verifier App Attest.
 - Integrasi branch `feat/r1-scaffold`: merge ke `main` atau PR (sudah di-push ke GitHub private).
 - `DEVELOPMENT_TEAM` serta iPhone dan reader untuk uji bertipe H.

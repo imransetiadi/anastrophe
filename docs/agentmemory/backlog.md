@@ -99,5 +99,14 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
   - `TestSapuanMenulisAuditBerurutanPerRantai` menangkap mutasi "tanpa urut" ±69/70 kali (4+4 UUID acak kadang sudah terurut).
   - Lanjutan `PENDING_APPROVAL` di jalur undangan belum dikunci. Cabang ini tak terjangkau saat ini, dan pengerasannya cukup 3 baris seperti jalur kartu.
   - Sisa risiko: kunci rantai memakai `hashtext(chain)`, sedangkan urutan memakai nama rantai; tabrakan hash (±2⁻³² per pasangan) masih bisa memicu 40P01 yang dideteksi PostgreSQL.
+- **App Attest — wajib di unit penyambungan (minor review akhir, ADR-0052):**
+  - **Challenge sekali pakai:** server menerbitkan dan mengonsumsinya sendiri. `VerifyAttestation` saat ini menerima `clientDataHash` kosong, dan `VerifyAssertion` tidak memeriksa challenge di `clientData`. Pertimbangkan wrapper yang menghitung `SHA256(challenge)` dan callback pemeriksa challenge, dengan test challenge basi.
+  - **Penyimpanan per perangkat:** kunci publik dan counter disimpan per perangkat, dan counter diperbarui atomik (compare-and-swap) untuk menolak replay bersamaan.
+  - **Receipt:** belum terautentikasi (di luar nonce), jadi jangan dipakai sampai validasi receipt (U15).
+  - **Kategori:** `Config.Categories` wajib diisi di produksi. Saat ini kategori 0 (invalid) dan 7–9 diterima bila daftar kosong.
+  - **Platform:** tolak platform credCert selain `iphoneos` (OID `1.2.840.113635.100.8.7`), karena attestation macOS butuh cek `aclBlob`.
+  - **`Verifier` nilai nol:** panic di `v.now`. Wajibkan `NewVerifier` atau jaga nilai nol.
+  - **Uji H (U14):** capture attestation + assertion dari build bertanda tangan dengan App ID Anastrophe, termasuk iOS 26.x.
+  - **Catatan kecil:** `p256PublicKey` memakai field `X`/`Y` ecdsa yang ditandai deprecated di toolchain baru (alternatif: SPKI tetap + `x509.ParsePKIXPublicKey`).
 - **Test flaky:** `BLETapTests.autentikasiBatalMembatalkanPemindaian` sesekali gagal (pembatalan pemindaian bergantung waktu); lulus 6/6 saat diulang.
 - **Riwayat tap:** judul baris "Ditolak · alasan" dirakit di kode (M8; dikerjakan saat bahasa ketiga ditambahkan); VoiceOver baris Status belum diperiksa dengan Accessibility Inspector.

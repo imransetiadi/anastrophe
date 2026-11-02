@@ -1,0 +1,111 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "action": "escalate",
+  "label": "verifier-app-attest-plan-close-gate",
+  "request": "Close plan 2026-11-02-verifier-app-attest (ADR-0052, NFR-S03 first step): a server-side Apple App Attest verifier library (attestation + assertion) that follows Apple's documented steps, proven with Apple's official sample and synthetic vectors, not yet wired to endpoints; including the final-review fix pass.",
+  "evidence_ids": [
+    "apple-sample-tests",
+    "assertion-tests",
+    "real-device-scratch",
+    "alloc-fix",
+    "fuzz-output",
+    "mutations",
+    "suite-docs",
+    "review-and-ledger"
+  ],
+  "reason_codes": [
+    "confidence_below_review",
+    "review_escalated",
+    "claim_confidence_below_auto_accept"
+  ],
+  "review": {
+    "action": "escalate",
+    "safe_to_apply": 0.59,
+    "composite": 0.829,
+    "limiting_rubrics": [
+      "blast_radius"
+    ],
+    "scores": {
+      "correctness": 1.67,
+      "spec_match": 1.87,
+      "test_gap": 0.44,
+      "blast_radius": 0.7
+    },
+    "confidence": {
+      "correctness": 0.52,
+      "spec_match": 0.79,
+      "test_gap": 0.34,
+      "blast_radius": 0.16
+    }
+  },
+  "verification": {
+    "action": "review",
+    "verified": 9,
+    "contradicted": 0,
+    "unsupported": 0,
+    "needs_review": 3,
+    "results": [
+      {
+        "claim": "Contoh attestation resmi Apple lulus VerifyAttestation dengan App ID 1234567890.com.example.myapp, clientDataHash berupa challenge mentah, dan waktu periksa 2026-04-21T12:00:00Z; kunci yang dikembalikan 65 byte dengan SHA256 = keyId, kategori 1, versi \"1\".",
+        "verdict": "verified",
+        "confidence": 0.89,
+        "action": "auto"
+      },
+      {
+        "claim": "Contoh Apple ditolak dengan alasan yang tepat untuk: App ID lain (rp_id), development (aaguid), keyId lain (key_id), clientDataHash = SHA256(challenge) (nonce), waktu 2026-11-02 (chain), pool root uji (chain), authData diubah (nonce), tanpa intermediate (chain), dan x5c tertukar (chain).",
+        "verdict": "verified",
+        "confidence": 0.96,
+        "action": "auto"
+      },
+      {
+        "claim": "VerifyAssertion memverifikasi tanda tangan atas SHA256(nonce); tanda tangan atas nonce langsung ditolak dengan alasan signature, dan counter yang tidak lebih besar dari sebelumnya ditolak dengan alasan counter.",
+        "verdict": "verified",
+        "confidence": 0.73,
+        "action": "review"
+      },
+      {
+        "claim": "Verifier lulus terhadap attestation iOS 27.0.1 nyata (kategori 3, versi \"1\"), dua assertion nyata dengan counter 1 dan 2, serta assertion block/buzz dengan counter 116, diuji di scratchpad tanpa meng-commit data pihak ketiga.",
+        "verdict": "verified",
+        "confidence": 0.74,
+        "action": "review"
+      },
+      {
+        "claim": "Decoder CBOR dibatasi 128 item per objek; masukan serangan 65525 byte kini mengalokasi 10320 byte dan ditolak (sebelumnya ±8,7 MB menurut reviewer).",
+        "verdict": "verified",
+        "confidence": 0.92,
+        "action": "auto"
+      },
+      {
+        "claim": "Fuzz tanpa crash: FuzzVerifyAttestation 1.440.335 eksekusi, FuzzVerifyAssertion 2.137.102 eksekusi, dan FuzzParseAuthData PASS.",
+        "verdict": "verified",
+        "confidence": 1.0,
+        "action": "auto"
+      },
+      {
+        "claim": "Mutasi tertangkap 28/28: Task 1 delapan, Task 2 dua belas, Task 3 delapan.",
+        "verdict": "verified",
+        "confidence": 0.97,
+        "action": "auto"
+      },
+      {
+        "claim": "Suite Go 11 paket lulus, go vet bersih, dan check_docs melaporkan 0 masalah.",
+        "verdict": "verified",
+        "confidence": 1.0,
+        "action": "auto"
+      },
+      {
+        "claim": "Review akhir independen menyatakan siap merge dengan 0 Critical dan 0 Important; satu Minor (amplifikasi alokasi CBOR) dinaikkan menjadi Important dan diperbaiki dengan test RED→GREEN; Minor lain ditunda dan dicatat untuk unit penyambungan.",
+        "verdict": "verified",
+        "confidence": 0.56,
+        "action": "review"
+      }
+    ]
+  },
+  "note": "Tidak diajukan ulang (ADR-0018); masuk daftar gate yang menunggu tinjauan pengguna. Eskalasi berasal dari rubrik blast_radius dengan confidence rendah (0,16) untuk pustaka keamanan baru yang belum disambungkan; semua klaim verified.",
+  "usage": {
+    "input_tokens": 6037,
+    "output_tokens": 438
+  }
+}

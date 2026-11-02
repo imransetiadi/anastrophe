@@ -12,7 +12,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 ## Status terkini
 
 - Branch kerja: `feat/r1-scaffold`, di-push ke GitHub private `imransetiadi/anastrophe` (origin) atas permintaan pengguna; belum di-merge.
-- Suite terakhir: Swift host 354 test (1 dilewati, tanpa gagal), simulator 352 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 10 paket lulus dengan PostgreSQL.
+- Suite terakhir: Swift host 354 test (1 dilewati, tanpa gagal), simulator 352 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 11 paket lulus dengan PostgreSQL.
 - Menunggu keputusan pengguna:
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
   - ADR-0038: cara mencegah pemegang kartu membatalkan suspend/revoke operator; rekomendasi `hold_pending_approval`, JEV 0,45.
@@ -20,7 +20,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
   - ADR-0046: kontrol enumerasi identitas kartu lewat enrolment, yang menjadi **gerbang pra-pilot** bersama App Attest; rekomendasi deteksi per gedung + pembatas per perangkat yang di-attest, JEV 0,49.
   - ADR-0047: kedaluwarsa permintaan `PENDING_APPROVAL` (batas 4 per kartu sudah diterapkan), JEV 0,51.
 
-  - Tinjauan 16 gate JEV (14 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan (`docs/adr/jev-log/*-gate.json`).
+  - Tinjauan 17 gate JEV (15 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan, verifier App Attest (`docs/adr/jev-log/*-gate.json`).
   - Integrasi branch: merge ke `main` atau PR (branch sudah di-push).
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
 
@@ -43,6 +43,38 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Tambah Kartu | Alur produksi di semua build: kode gedung + tempel kartu (pembaca identifier saja) atau tautan undangan, kanal otomatis, perangkat dibuat saat enrolment, batas 4 permintaan menunggu per kartu. Gerbang pra-pilot terbuka: App Attest + kontrol enumerasi kartu (ADR-0046) | FR-05, FR-10–FR-13, ADR-0043–ADR-0047 |
 | Bantuan | Tombol Bantuan di tab Kunci: FAQ sepuluh topik (ID/EN), status cara akses di iPhone ini, iPhone yang didukung, laporan diagnostik tanpa rahasia | FR-60, FR-02, FR-27, FR-63, ADR-0048 |
 | Kebijakan gedung | CLI `policy` untuk masa berlaku sertifikat dan kanal per gedung; kanal efektif gedung di lookup/enrolment dan ditegakkan saat provisioning; app memilih kanal yang diizinkan | FR-55 (sebagian), FR-05, ADR-0049 |
+| App Attest (verifier) | Paket backend `internal/appattest` memverifikasi attestation dan assertion menurut langkah Apple; teruji dengan contoh resmi Apple dan data iOS 27 nyata (scratch). Belum disambungkan ke endpoint, database, atau app; gerbang pra-pilot NFR-S03 masih terbuka | NFR-S03 (sebagian), ADR-0052 |
+
+## API-2026-11-02-0857 - Verifier App Attest di backend (Selesai, commit lokal; gate eskalasi)
+
+Fokus dari ADR-0052 (JEV 0,60, Provisional). Ini langkah pertama NFR-S03, gerbang pra-pilot. Paket `backend/internal/appattest` memverifikasi attestation dan assertion App Attest menurut langkah Apple, tetapi belum disambungkan ke endpoint, database, atau app.
+
+Riset (E35–E41, O-AA01–O-AA08):
+- Apple menerbitkan contoh attestation resmi, tetapi contoh itu tidak konsisten dengan teksnya: nonce hanya cocok bila challenge tidak di-hash, hash kunci yang tertulis salah, dan versinya "1" bukan "1.0".
+- Tiga assertion iOS 27 nyata membuktikan tanda tangan dibuat atas `SHA256(nonce)` (hash ganda).
+- Byte flags authData tidak konsisten antarversi, jadi pengurai tidak memakainya.
+
+Perubahan:
+- **Decoder CBOR minimal:** paling banyak 128 item per objek.
+- **Pengurai authData:** tidak bergantung pada flags.
+- **`VerifyAttestation`:** rantai ke root Apple tertanam dengan sidik jari dipin, credCert bukan CA, nonce, key id, RP ID, counter, aaguid, credentialId, dan kebijakan kategori opsional. `clientDataHash` diberikan pemanggil.
+- **`VerifyAssertion`:** counter harus naik dan digest `SHA256(nonce)`.
+- **Contoh resmi Apple:** disimpan sebagai data uji. Data pihak ketiga tidak masuk repo.
+
+Bukti:
+- Contoh Apple lulus, dan setiap penyimpangan ditolak dengan alasan yang tepat.
+- Verifier lulus terhadap attestation dan dua assertion iOS 27.0.1 nyata, serta assertion block/buzz (scratch).
+- Mutasi 28/28 tertangkap.
+- Fuzz tiga target tanpa crash.
+- Go 11 paket lulus; `check_docs` 0 masalah.
+
+Review akhir (opus): "ready to merge — Yes". Amplifikasi alokasi CBOR (±8,7 MB dari 64 KiB) dinaikkan menjadi Important dan diperbaiki dengan batas 128 item (±10 KB). Minor untuk unit penyambungan dicatat di backlog: challenge sekali pakai, receipt belum terautentikasi, `Categories` wajib di produksi, platform non-iOS, dan `Verifier` nilai nol.
+
+`jev_gate`: eskalasi (safe_to_apply 0,59, pembatas `blast_radius` dengan confidence 0,16; 9 klaim verified, 0 contradicted). Tidak diajukan ulang.
+
+Catatan proses: commit `582a850` sempat lolos dengan `check_docs` 1 masalah karena status pipeline diambil dari `tail`. Masalahnya diperbaiki di `c137330`, dan sejak itu commit dijaga dengan exit code.
+
+Commit unit ini: `582a850`, `c137330`, `56997af`, `337de87`, `6bbe1f7`, `e38f20d`, `c8441c5`, dan commit ini. Obsidian: `sessions/2026-11-02-verifier-app-attest.md`, `decisions/ADR-0052…`, `lessons/verifikasi-uji-dan-gerbang.md`, `backlog.md`, dan MOC. Belum di-push sejak `1f87775`.
 
 ## API-2026-11-02-0647 - Deadlock enrolment–sapuan per jam (Selesai, commit lokal; gate eskalasi)
 
