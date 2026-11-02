@@ -47,11 +47,36 @@ enum AuditScreen: String, CaseIterable {
         }
     }
 
+    /// Identifier kontainer gulir layar (List atau ScrollView). Gulir dan sidik jari gulir memakai kontainer ini,
+    /// bukan seluruh app: teks layar di belakang lembar tidak ikut, sehingga lembar tidak berhenti di halaman 1.
+    /// Nil = layar tanpa kontainer gulir; gulir memakai app.
+    var scrollContainer: String? {
+        switch self {
+        case .list: "keys.list"
+        case .empty: nil
+        case .detail, .detailSuspended: "detail.list"
+        case .history: "history.list"
+        case .help: "help.list"
+        case .presentation, .bluetoothDenied, .presentationDenied: "present.scroll"
+        case .add, .addCode, .addConfirm, .addInvitation, .addDone, .addPending, .addFailed: "add.scroll"
+        }
+    }
+
     /// Elemen yang diketuk sebelum penanda ditunggu: riwayat lengkap dan satu topik FAQ yang dibuka.
     var preparation: String? {
         switch self {
         case .history: "detail.history.see_all"
         case .help: "help.faq.devices"
+        default: nil
+        }
+    }
+
+    /// Kontainer yang digulir untuk mencari elemen persiapan: "Lihat semua" ada di detail kartu, topik FAQ di
+    /// Bantuan sendiri.
+    var preparationContainer: String? {
+        switch self {
+        case .history: "detail.list"
+        case .help: "help.list"
         default: nil
         }
     }

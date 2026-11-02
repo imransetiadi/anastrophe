@@ -14,9 +14,9 @@ final class AuditAX5Tests: XCTestCase {
     private func run(_ screen: AuditScreen, file: StaticString = #filePath, line: UInt = #line) {
         for english in [false, true] {
             let variant = AuditVariant(largeText: true, english: english)
-            guard let app = AccessibilityAudit.open(screen, variant: variant, file: file, line: line) else { continue }
-            AccessibilityAudit.auditPages(app, screen: screen, context: "\(screen) \(variant)", pages: Self.pages, file: file, line: line)
-            app.terminate()
+            guard let opened = AccessibilityAudit.open(screen, variant: variant, file: file, line: line) else { continue }
+            AccessibilityAudit.auditPages(opened, screen: screen, context: "\(screen) \(variant)", pages: Self.pages, file: file, line: line)
+            opened.app.terminate()
         }
     }
 

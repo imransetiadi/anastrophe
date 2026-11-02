@@ -13,9 +13,9 @@ final class AuditTerangGelapTests: XCTestCase {
         for appearance in [XCUIDevice.Appearance.light, .dark] {
             XCUIDevice.shared.appearance = appearance
             let label = appearance == .dark ? "gelap" : "terang"
-            guard let app = AccessibilityAudit.open(screen, variant: AuditVariant(), file: file, line: line) else { continue }
-            AccessibilityAudit.auditPages(app, screen: screen, context: "\(screen) \(label)", pages: screen.scrollPages, file: file, line: line)
-            app.terminate()
+            guard let opened = AccessibilityAudit.open(screen, variant: AuditVariant(), file: file, line: line) else { continue }
+            AccessibilityAudit.auditPages(opened, screen: screen, context: "\(screen) \(label)", pages: screen.scrollPages, file: file, line: line)
+            opened.app.terminate()
         }
     }
 
@@ -38,9 +38,9 @@ final class AuditTerangGelapTests: XCTestCase {
 
     /// Review Focus 1: cek target sentuh tidak lulus kosong bila tidak ada elemen konten yang diperiksa.
     @MainActor func testCekTargetSentuhGagalTanpaElemen() {
-        guard let app = AccessibilityAudit.open(.add, variant: AuditVariant()) else { return }
+        guard let app = AccessibilityAudit.open(.add, variant: AuditVariant())?.app else { return }
         XCTExpectFailure("semua elemen difilter keluar: cek harus gagal") {
-            AccessibilityAudit.checkTouchTargets(app, context: "tanpa elemen", requireTargets: true, excluding: { _ in true })
+            _ = AccessibilityAudit.checkTouchTargets(app, context: "tanpa elemen", requireTargets: true, excluding: { _ in true })
         }
         app.terminate()
     }
