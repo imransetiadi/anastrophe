@@ -33,6 +33,7 @@ struct AddCardView: View {
     private var demoScreen: DemoScreen?
     #endif
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// `labAutoCode` dan `labAutoSubmit` hanya dipakai DEBUG untuk e2e di simulator (`-ANLabAddCode`,
     /// `-ANLabOpenURL`).
@@ -299,14 +300,18 @@ struct AddCardView: View {
             .disabled(model.isBusy)
     }
 
-    /// Pilihan cara menambah kartu: baris datar dengan ikon, judul, dan keterangan (bukan gaya pass Wallet).
+    /// Pilihan cara menambah kartu: baris datar dengan ikon, judul, dan keterangan (bukan gaya pass Wallet). Di ukuran
+    /// aksesibilitas ikon ditumpuk di atas teks dan penunjuk (chevron) dihilangkan, seperti baris kartu: teks mendapat
+    /// lebar penuh, sehingga kata panjang tidak terpecah di tengah ("undanga/n" di AX5, NFR-A01).
     private func methodButton(_ title: String, detail: String, systemImage: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 16) {
+        let stacked = dynamicTypeSize.isAccessibilitySize
+        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 16))
+        return Button(action: action) {
+            layout {
                 Image(systemName: systemImage)
                     .font(.title3)
                     .foregroundStyle(ANColor.primary)
-                    .frame(width: 32)
+                    .frame(width: stacked ? nil : 32)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
@@ -316,11 +321,13 @@ struct AddCardView: View {
                         .font(.footnote)
                         .foregroundStyle(ANColor.mutedForeground)
                 }
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(ANColor.mutedForeground)
-                    .accessibilityHidden(true)
+                if !stacked {
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(ANColor.mutedForeground)
+                        .accessibilityHidden(true)
+                }
             }
             .padding()
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)

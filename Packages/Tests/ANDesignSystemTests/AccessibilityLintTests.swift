@@ -104,6 +104,35 @@ struct AccessibilityLintTests {
         }
     }
 
+    /// Pola yang memotong teks (NFR-A01, TC-UX-02): batas baris, pengecilan otomatis, dan mode pemotongan. Teks app tidak
+    /// punya mekanisme pemotong, jadi membungkus dan tampil utuh di AX5. Audit Apple `textClipped` tetap menandai
+    /// sebagian teks "mungkin terpotong" di ukuran bawaan; pengecualiannya per elemen di `AccessibilityAudit` merujuk
+    /// lint ini sebagai dasar. Baris komentar diabaikan.
+    func clippingViolations(_ text: String) -> [String] {
+        let code = text.split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+        return [".lineLimit(", ".minimumScaleFactor(", ".truncationMode("].filter(code.contains)
+    }
+
+    @Test func pemotongTeksTerdeteksi() {
+        #expect(clippingViolations("Text(\"A\").lineLimit(1)") == [".lineLimit("])
+        #expect(clippingViolations("Text(\"A\").minimumScaleFactor(0.5)") == [".minimumScaleFactor("])
+        #expect(clippingViolations("Text(\"A\").truncationMode(.middle)") == [".truncationMode("])
+    }
+
+    @Test func teksTanpaPemotongBoleh() {
+        #expect(clippingViolations("Text(\"A\").font(.headline).multilineTextAlignment(.center)").isEmpty)
+        #expect(clippingViolations("static let inlineLimit = 5").isEmpty)
+        #expect(clippingViolations("// jangan pakai .lineLimit(1) di sini").isEmpty)
+    }
+
+    @Test func tanpaPemotongTeks() throws {
+        for (path, text) in try Self.sources() {
+            #expect(clippingViolations(text).isEmpty, "\(path): \(clippingViolations(text)) — teks harus membungkus, bukan terpotong")
+        }
+    }
+
     @Test func animasiHanyaDenganReduceMotion() throws {
         for (path, text) in try Self.sources() {
             let animated = ["withAnimation", ".animation(", ".transition(", ".symbolEffect("].filter(text.contains)

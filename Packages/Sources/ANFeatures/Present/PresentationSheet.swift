@@ -31,12 +31,14 @@ struct PresentationSheet: View {
                     .multilineTextAlignment(.center)
                     .foregroundStyle(ANColor.foreground)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("present.title")
                 if let detail {
                     Text(detail)
                         .font(.body)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(ANColor.mutedForeground)
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("present.detail")
                 }
                 if model.phase == .unavailable(.bluetoothUnauthorized), let settings = Self.settingsURL {
                     // `Link` memakai `ButtonStyle`, jadi bingkai gaya menjadi area ketuk tautan itu sendiri. Ukuran besar:

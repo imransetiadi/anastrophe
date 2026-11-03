@@ -7,6 +7,7 @@ import SwiftUI
 struct HelpView: View {
     let services: AppServices
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var availability: [ChannelKind: ChannelAvailability] = [:]
     @State private var report: String?
 
@@ -90,7 +91,18 @@ struct HelpView: View {
             Text(HelpContent.status(for: availability))
                 .foregroundStyle(ANColor.mutedForeground)
         } label: {
-            Label(name, systemImage: systemImage)
+            if dynamicTypeSize.isAccessibilitySize {
+                // Di ukuran aksesibilitas ikon ditumpuk di atas nama, seperti badge status: `Label` di baris daftar
+                // mengalirkan baris kedua nama ke bawah ikon, di luar bingkai teksnya ("Hold near / reader" di AX5).
+                VStack(alignment: .leading, spacing: 4) {
+                    Image(systemName: systemImage)
+                        .foregroundStyle(ANColor.secondary)
+                        .accessibilityHidden(true)
+                    Text(name)
+                }
+            } else {
+                Label(name, systemImage: systemImage)
+            }
         }
         .accessibilityElement(children: .combine)
         .listRowBackground(ANColor.card)
