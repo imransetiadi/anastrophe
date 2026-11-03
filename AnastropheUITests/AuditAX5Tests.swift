@@ -2,8 +2,10 @@ import XCTest
 
 /// Audit setiap keadaan layar pada ukuran teks AX5 dalam bahasa ID dan EN, mode terang (TC-UX-02; ADR-0057).
 final class AuditAX5Tests: XCTestCase {
-    /// Di AX5 hampir setiap layar bisa digulir; batas halaman yang sama untuk semua keadaan.
-    static let pages = 4
+    /// Di AX5 hampir setiap layar bisa digulir. Batas halaman cukup besar agar layar terpanjang (Bantuan) habis diaudit
+    /// dengan gulir 60 % tinggi kontainer; layar pendek berhenti sendiri saat isi tidak lagi bergerak, dan test gagal
+    /// bila batas habis sebelum ujung isi.
+    static let pages = 24
 
     override func setUp() async throws {
         continueAfterFailure = true
@@ -15,7 +17,9 @@ final class AuditAX5Tests: XCTestCase {
         for english in [false, true] {
             let variant = AuditVariant(largeText: true, english: english)
             guard let opened = AccessibilityAudit.open(screen, variant: variant, file: file, line: line) else { continue }
-            AccessibilityAudit.auditPages(opened, screen: screen, context: "\(screen) \(variant)", pages: Self.pages, file: file, line: line)
+            if AccessibilityAudit.verifyAppearance(opened.app, expected: .light, context: "\(screen) \(variant)", file: file, line: line) {
+                AccessibilityAudit.auditPages(opened, screen: screen, context: "\(screen) \(variant)", pages: Self.pages, largeText: true, file: file, line: line)
+            }
             opened.app.terminate()
         }
     }

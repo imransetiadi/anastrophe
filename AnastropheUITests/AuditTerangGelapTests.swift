@@ -14,7 +14,10 @@ final class AuditTerangGelapTests: XCTestCase {
             XCUIDevice.shared.appearance = appearance
             let label = appearance == .dark ? "gelap" : "terang"
             guard let opened = AccessibilityAudit.open(screen, variant: AuditVariant(), file: file, line: line) else { continue }
-            AccessibilityAudit.auditPages(opened, screen: screen, context: "\(screen) \(label)", pages: screen.scrollPages, file: file, line: line)
+            // Hasil audit atas mode yang salah tidak sah: lewati audit bila mode tidak sesuai (kegagalan sudah dicatat).
+            if AccessibilityAudit.verifyAppearance(opened.app, expected: appearance, context: "\(screen) \(label)", file: file, line: line) {
+                AccessibilityAudit.auditPages(opened, screen: screen, context: "\(screen) \(label)", pages: screen.scrollPages, file: file, line: line)
+            }
             opened.app.terminate()
         }
     }
@@ -35,6 +38,36 @@ final class AuditTerangGelapTests: XCTestCase {
     @MainActor func testTambahBerhasil() { run(.addDone) }
     @MainActor func testTambahMenunggu() { run(.addPending) }
     @MainActor func testTambahGagal() { run(.addFailed) }
+
+    /// Penjaga mode tidak lulus kosong: layar terang tidak boleh dinilai gelap, dan sebaliknya tetap lulus.
+    @MainActor func testPenjagaModeMenolakModeSalah() {
+        XCUIDevice.shared.appearance = .light
+        guard let app = AccessibilityAudit.open(.list, variant: AuditVariant())?.app else { return }
+        XCTAssertTrue(AccessibilityAudit.verifyAppearance(app, expected: .light, context: "penjaga terang"))
+        XCTExpectFailure("layar terang diharapkan gelap: penjaga harus gagal") {
+            XCTAssertFalse(AccessibilityAudit.verifyAppearance(app, expected: .dark, context: "penjaga salah"))
+        }
+        app.terminate()
+    }
+
+    /// Dasar pengecualian `backdropReason`: isu `elementDetection` tanpa elemen di lembar setengah tinggi berasal dari
+    /// teks latar redup layar Kunci. Sesudah lembar diperbesar ke tinggi penuh (latar tertutup), batasnya 0, jadi audit
+    /// gagal bila masih ada teks tak terpapar.
+    @MainActor func testLembarPenuhTanpaTeksLatar() {
+        guard let opened = AccessibilityAudit.open(.presentation, variant: AuditVariant()) else { return }
+        let app = opened.app
+        let sheet = AccessibilityAudit.element("present.scroll", in: app)
+        XCTAssertGreaterThan(sheet.frame.minY, AccessibilityAudit.backdropVisibleMinimum, "lembar tidak mulai setengah tinggi")
+        sheet.swipeUp()
+        var waited = 0.0
+        while sheet.frame.minY >= AccessibilityAudit.backdropVisibleMinimum && waited < 5 {
+            Thread.sleep(forTimeInterval: 0.25)
+            waited += 0.25
+        }
+        XCTAssertLessThan(sheet.frame.minY, AccessibilityAudit.backdropVisibleMinimum, "lembar tidak membesar ke tinggi penuh")
+        AccessibilityAudit.audit(app, screen: .presentation, context: "presentation penuh", scrolled: false)
+        app.terminate()
+    }
 
     /// Review Focus 1: cek target sentuh tidak lulus kosong bila tidak ada elemen konten yang diperiksa.
     @MainActor func testCekTargetSentuhGagalTanpaElemen() {
