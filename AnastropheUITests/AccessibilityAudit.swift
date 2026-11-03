@@ -185,6 +185,8 @@ struct PageOutcome {
     let deferred: Set<String>
     /// Kunci elemen yang terlihat jernih di halaman ini tanpa pengecualian letak (lihat `AuditPage.isClearlyVisible`).
     let audited: Set<String>
+    /// Audit Apple tetap habis waktu sesudah diulang (kegagalan infrastruktur, bukan temuan); hasil halaman ini kosong.
+    var timedOut = false
 }
 
 /// Konteks satu halaman audit untuk kebijakan pengecualian.
@@ -553,7 +555,18 @@ enum AccessibilityAudit {
         func auditPage(_ number: Int, scrolled: Bool) {
             let name = "\(context) hlm \(number)"
             checked += checkTouchTargets(app, context: name, file: file, line: line)
-            let outcome = audit(app, screen: screen, context: name, scrolled: scrolled, largeText: largeText, file: file, line: line)
+            var outcome = audit(app, screen: screen, context: name, scrolled: scrolled, largeText: largeText,
+                                failOnTimeout: container == nil, file: file, line: line)
+            if outcome.timedOut, let container {
+                // Audit Apple bisa tetap habis waktu di satu posisi gulir walau diulang: riwayat AX5 hlm 2 (posisi 454 pt)
+                // di iPhone 17e gagal di tiga run 2026-11-03/04, sedangkan semua posisi lain dan iPhone 17 Pro lulus.
+                // Isi digeser `nudgeDistance` lalu halaman diaudit sekali lagi sebagai halaman tergulir; halaman
+                // berurutan tetap bertumpang tindih, dan posisi dipulihkan sesudahnya. Gagal bila tetap habis waktu.
+                drag(container, by: -nudgeDistance, band: screen.dragBand)
+                print("AUDIT-NUDGE | \(name) | isi digeser \(Int(nudgeDistance)) pt sesudah audit habis waktu")
+                outcome = audit(app, screen: screen, context: "\(name) geser", scrolled: true, largeText: largeText,
+                                file: file, line: line)
+            }
             deferred.formUnion(outcome.deferred)
             auditedWhole.formUnion(outcome.audited)
             guard let container, let before = audited.last, let position = positions.last else { return }
@@ -762,6 +775,10 @@ enum AccessibilityAudit {
     /// ketukan pada baris di bawah jari: seretan 9 pt membuka "Lihat semua" di detail AX5 (run 2026-11-03).
     static let minimumDrag: CGFloat = 32
 
+    /// Geseran isi (poin) sebelum audit diulang di posisi lain sesudah tetap habis waktu (`auditPages`): di atas
+    /// `minimumDrag`, jauh di bawah satu langkah gulir, sehingga isi halaman hampir sama.
+    static let nudgeDistance: CGFloat = 48
+
     /// Satu langkah gulir terkendali: seret sepanjang pita seret layar lalu tahan sebelum dilepas, sehingga tanpa
     /// momentum. Langkah ini lebih pendek dari pita jernih halaman tergulir, jadi setiap elemen pernah terlihat jernih di
     /// salah satu halaman. `swipeUp()` biasa bermomentum dan bisa melompati isi sepanjang lebih dari satu layar (baris
@@ -807,9 +824,11 @@ enum AccessibilityAudit {
     }
 
     /// `scrolled`: halaman sesudah digulir, sehingga sebagian konten berada di bawah bahan kaca bilah sistem.
+    /// `failOnTimeout`: false = audit yang tetap habis waktu tidak menggagalkan test, tetapi dilaporkan lewat
+    /// `PageOutcome.timedOut` agar pemanggil mengulang di posisi lain.
     @discardableResult
     static func audit(_ app: XCUIApplication, screen: AuditScreen, context: String, scrolled: Bool, largeText: Bool = false,
-                      file: StaticString = #filePath, line: UInt = #line) -> PageOutcome {
+                      failOnTimeout: Bool = true, file: StaticString = #filePath, line: UInt = #line) -> PageOutcome {
         attachScreenshot(of: app, named: context)
         // Snapshot SEBELUM audit: posisi saat piksel diukur (lihat `PageElement`).
         let snapshot = pageSnapshot(app)
@@ -823,6 +842,9 @@ enum AccessibilityAudit {
         print("AUDIT-PAGE | \(context) | scrolled=\(scrolled) | bars=\(page.barFrames.map { describe($0) }) | nonaktif=\(disabled) | latar=\(page.backdropAllowance)")
         do {
             try performAudit(app, page: page)
+        } catch let error as NSError where !failOnTimeout && isAuditTimeout(error) {
+            print("AUDIT-TIMEOUT | \(context) | \(error.localizedDescription)")
+            return PageOutcome(deferred: [], audited: [], timedOut: true)
         } catch {
             XCTFail("\(context): audit tidak bisa dijalankan: \(error)", file: file, line: line)
         }
