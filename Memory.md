@@ -13,7 +13,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 
 - Branch kerja: `feat/r1-scaffold`, yang juga branch bawaan (dan satu-satunya branch) di GitHub private `imransetiadi/anastrophe`. Pengguna meminta commit sesudah `1f87775` digabung lewat PR ke branch itu (2026-11-02).
 - Unit audit aksesibilitas dilanjutkan di branch `iterasi-r1-lanjutan` (2026-11-04, belum di-push).
-- Suite terakhir: Swift host 394 test (1 dilewati, tanpa gagal; 2026-11-04). UI test audit aksesibilitas 37 test: iPhone 17 Pro 37/37 lulus, iPhone 17e 36/37 lulus dan satu sisanya lulus saat dijalankan ulang sesudah perbaikan (2026-11-04). Sebelumnya: Swift host 391 test (1 dilewati, tanpa gagal; 2026-11-02, audit aksesibilitas), 364 test (1 dilewati, tanpa gagal), simulator 362 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 13 paket lulus dengan PostgreSQL dan `-race` (go1.27.3), pemindai keamanan 42 test. Swift host diulang 2026-11-02: 364 test, 1 dilewati.
+- Suite terakhir: Swift host 394 test dan simulator 375 test (masing-masing 1 dilewati, tanpa gagal; 2026-11-04). UI test audit aksesibilitas 37 test: iPhone 17 Pro 37/37 lulus, iPhone 17e 36/37 lulus dan satu sisanya lulus saat dijalankan ulang sesudah perbaikan (2026-11-04). Sebelumnya: Swift host 391 test (1 dilewati, tanpa gagal; 2026-11-02, audit aksesibilitas), 364 test (1 dilewati, tanpa gagal), simulator 362 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 13 paket lulus dengan PostgreSQL dan `-race` (go1.27.3), pemindai keamanan 42 test. Swift host diulang 2026-11-02: 364 test, 1 dilewati.
 - Menunggu keputusan pengguna:
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
   - ADR-0038: cara mencegah pemegang kartu membatalkan suspend/revoke operator; rekomendasi `hold_pending_approval`, JEV 0,45.
@@ -84,6 +84,7 @@ Perubahan:
 
 Bukti:
 - **Swift host:** 394 test di 10 run, 1 dilewati, 0 gagal.
+- **Suite paket di simulator iPhone 17 Pro:** 375 test di 10 run, 1 dilewati, 0 gagal (`TEST SUCCEEDED`). Selisih 19 test dengan host berasal dari 24 test khusus host (lint sumber, tabel design system, aset AccentColor, katalog string, dan ukuran komponen) dikurangi 5 test khusus iOS (`ANTextField` UIKit).
 - **iPhone 17 Pro atas `4d4e1e7`:** 37/37 lulus (`TEST SUCCEEDED`, 59 menit). 147 halaman, 0 isu dihitung, 315 dikecualikan dengan alasan, 31 `AUDIT-SKIP`.
 - **iPhone 17e atas `83c9f41`:** 36/37 lulus (75 menit). 155 halaman, 0 isu dihitung, 369 dikecualikan, 43 `AUDIT-SKIP`. Satu-satunya yang gagal, riwayat AX5, gagal karena audit habis waktu di halaman 2; test itu lulus atas `4d4e1e7`.
 - **RED sebelum perbaikan** (sesi 2026-11-02): 67 kegagalan target sentuh, 8 `hitRegion`, dan 31 isu kontras.

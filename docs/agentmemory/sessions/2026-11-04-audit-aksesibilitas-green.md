@@ -40,6 +40,7 @@ Tidak ada keputusan JEV baru.
 ## Bukti
 
 - **Swift host:** 394 test di 10 run, 1 dilewati, 0 gagal.
+- **Suite paket di simulator iPhone 17 Pro:** 375 test, 1 dilewati, 0 gagal. Selisih 19 test dengan host berasal dari 24 test khusus host (lint sumber, tabel design system, aset AccentColor, katalog string, dan ukuran komponen) dikurangi 5 test khusus iOS (`ANTextField` UIKit).
 - **iPhone 17 Pro atas `4d4e1e7`:** 37/37 lulus (`TEST SUCCEEDED`, 59 menit). 147 halaman, 0 isu dihitung, 315 dikecualikan dengan alasan, 31 `AUDIT-SKIP`.
 - **iPhone 17e atas `83c9f41`:** 36/37 lulus (75 menit). 155 halaman, 0 isu dihitung, 369 dikecualikan, 43 `AUDIT-SKIP`. Satu-satunya yang gagal, riwayat AX5, gagal karena audit habis waktu di halaman 2; test itu lulus atas `4d4e1e7`.
 - **Mutasi UI 2/2 tertangkap:**
