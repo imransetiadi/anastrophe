@@ -65,7 +65,7 @@ Rinciannya di [backlog](../backlog.md):
 - dokumen Task 5;
 - review akhir dan `jev_gate`.
 
-Atas permintaan pengguna, unit dihentikan di titik ini dan digabung lewat PR ke `feat/r1-scaffold`.
+Atas permintaan pengguna, unit dihentikan di titik ini dan digabung lewat PR ke `feat/r1-scaffold`. Sisanya dikerjakan di [sesi 2026-11-04](2026-11-04-audit-aksesibilitas-green.md).
 
 ## Pelajaran
 

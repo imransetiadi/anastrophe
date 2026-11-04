@@ -1,7 +1,7 @@
 ---
 type: moc
 project: anastrophe
-updated: 2026-11-02
+updated: 2026-11-04
 ---
 # Anastrophe — Map of Content
 
@@ -11,6 +11,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Sesi
 
+- [2026-11-04 — Audit aksesibilitas app: GREEN di dua perangkat](sessions/2026-11-04-audit-aksesibilitas-green.md)
 - [2026-11-02 — Audit aksesibilitas app (sebagian)](sessions/2026-11-02-audit-aksesibilitas.md)
 - [2026-11-02 — Pemindaian secret dan dependensi](sessions/2026-11-02-pemindaian-secret-dependensi.md)
 - [2026-11-02 — Uji beban API dan baseline lab](sessions/2026-11-02-uji-beban-api.md)

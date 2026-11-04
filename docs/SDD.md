@@ -48,6 +48,7 @@
 | 2.32 | 2026-11-02 | Uji beban API (ADR-0055): alat `anastrophe-loadtest` (stdlib, kartu sintetis, penjaga loopback, porsi SLO dari `/metrics`) dan baseline lab (§14). |
 | 2.33 | 2026-11-02 | Perbaikan review akhir uji beban (ADR-0055): redirect tidak diikuti, enrol mengikuti jalur app (`Idempotency-Key`, `status_token_hash`), token laju terlewat dan run terpotong terlihat; baseline lab diukur ulang (§14). |
 | 2.34 | 2026-11-02 | Pemindaian secret dan dependensi (ADR-0056, §10.3): gitleaks + govulncheck + OSV lewat `scripts/security/scan.py`; backend Go ≥ 1.25 dengan toolchain go1.27.3 (§2). |
+| 2.35 | 2026-11-04 | Aksesibilitas app (ADR-0057–ADR-0059, §5.10): token warna sebagai data dengan test kontras, lint sumber, komponen dengan area ketuk ≥ 44 pt, dan audit XCUITest 16 keadaan (terang, gelap, AX5 ID/EN) dengan pengecualian per elemen. |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -361,6 +362,24 @@ Tombol "Bantuan" ada di toolbar tab Kunci pada semua build. Layarnya tidak mengh
   - Isinya versi app/build, iOS, bahasa, status kanal, status penyimpanan (`ok`/`gagal`), layanan terkonfigurasi, jumlah kartu, serta status/kanal/tanggal berlaku per kartu. Penyimpanan yang gagal dibuka atau kartu yang gagal dibaca ditulis `kartu: tidak terbaca`, bukan nol kartu.
   - Masukan laporan (`DiagnosticsInput`, `CardSummary`) sengaja tidak membawa `cred_id`, id kartu server, `device_id`, token, nama kartu, zona, atau URL layanan.
 - **Dukungan:** pengelola gedung, karena kanal dukungan Anastrophe belum ditetapkan.
+
+### 5.10 Aksesibilitas dan audit (NFR-A01; ADR-0057–ADR-0059)
+
+NFR-A01 dijaga di tiga lapis: data token, lint sumber, dan audit UI otomatis. Hasilnya ada di QA §11.1 (TC-UX-01–04, TC-UX-09).
+
+- **Token sebagai data:** `ANColorToken` (nama, hex terang, hex gelap) menjadi sumber `ANColor`. `ContrastTests` menghitung rasio WCAG 2.x untuk 15 pasangan teks/permukaan di kedua mode (semua ≥ 4,5:1) dan memastikan hex serta rasio tabel design system §3 sama dengan kode. Semua teks app memakai token, dan tint app adalah `secondary` dengan aset AccentColor yang sama (ADR-0058).
+- **Lint sumber (host):** menolak ukuran font tetap, animasi di berkas yang tidak membaca Reduce Motion, warna teks sistem (ADR-0058), dan pemotong teks (`lineLimit`, `minimumScaleFactor`, `truncationMode`).
+- **Komponen:** area ketuk ada di dalam gaya, bukan bingkai di luar tombol: `ANSecondaryButtonStyle`, `ANCompactAccentButtonStyle`, dan `ANPrimaryButtonStyle` minimal 44 pt (50 pt dengan `.controlSize(.large)` di lembar setengah tinggi), serta `ANTextField` berbasis UIKit yang tingginya sendiri ≥ 44 pt. Di ukuran aksesibilitas, baris kartu, badge status, baris status detail, pilihan cara Tambah Kartu, dan status cara akses Bantuan ditumpuk agar teks mendapat lebar penuh.
+- **Audit XCUITest** (target `AnastropheUITests`, skema `Anastrophe`): 16 keadaan layar demo DEBUG (`-ANDemo -ANDemoScreen …`, tanpa jaringan dan tanpa presentasi nyata) diaudit di mode terang dan gelap serta AX5 ID dan EN. Mode tampilan diverifikasi dari kecerahan screenshot sebelum audit. Di setiap halaman, cek target sentuh sendiri (≥ 44 × 44 pt, jarak ≥ 8 pt) berjalan lebih dulu, lalu `performAccessibilityAudit` dalam dua lintasan: kontras, lalu semua jenis lain, yang bersama-sama mencakup `.all`. Urutan ini dipakai karena audit Dynamic Type memperbesar teks dan bisa menggeser isi.
+  - **Gulir:** kontainer digulir dengan seretan tanpa momentum sampai isi tidak bergerak lagi. Halaman berurutan wajib bertumpang tindih, dan posisi yang digeser audit dipulihkan sebelum gulir berikutnya.
+  - **Audit yang habis waktu** diulang dua kali. Bila tetap habis waktu, isi digeser 48 pt lalu diaudit sekali lagi.
+  - Setiap halaman dilampiri screenshot.
+- **Pengecualian:**
+  - tidak pernah per jenis audit;
+  - aturan umum hanya kontras komponen nonaktif (WCAG 1.4.3);
+  - aturan letak: zona kaca bilah di halaman tergulir (tepi layar sampai bilah + 48 pt) dan elemen yang hanya sebagian terlihat di tepi layar. Letak diukur dari snapshot sebelum audit, dan elemen yang dikecualikan wajib diaudit utuh di halaman lain;
+  - selebihnya per elemen (identifier, label, atau pola label, ditambah keadaan layar dan alasan) dengan bukti: screenshot AX5 untuk `dynamicType` dan `textClipped`, lint untuk pemotong teks, dan pengukuran piksel untuk kontras (ADR-0059).
+- **Batas:** audit Apple tidak melihat nilai `LabeledContent`, placeholder, `confirmationDialog`, dan chevron; bagian itu dijaga lint dan pengukuran piksel. Pemeriksaan VoiceOver manual di iPhone fisik dan CI untuk UI test belum ada.
 
 ## 6. Presentasi per kanal
 
@@ -1026,7 +1045,7 @@ Skill REA terpasang di `.claude/skills/reverse-engineer-anything/`. Pemakaian ya
 | NFR-R01–R04 | §8.4.3, §9.3, §12 |
 | NFR-S01–S10 | §5.3, §7, §10 |
 | NFR-O01–O02, NFR-CP01–CP02 | §12, §13, §5.2, §9.1 |
-| NFR-A01 | Design system iOS; §5.1 (`ANDesignSystem`) |
+| NFR-A01 | Design system iOS; §5.1 (`ANDesignSystem`), §5.10 |
 | NFR-C01–C04 | §2, §6.4, §8.4.6, §11 |
 
 ## 19. Pertanyaan teknis terbuka

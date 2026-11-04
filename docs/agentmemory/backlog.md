@@ -1,7 +1,7 @@
 ---
 type: backlog
 project: anastrophe
-updated: 2026-11-02
+updated: 2026-11-04
 ---
 # Backlog minor tertunda (terverifikasi terhadap kode, 2026-11-01)
 
@@ -28,18 +28,16 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
 | Penerbitan kredensial lewat id instance dari `:challenge` (prioritas tinggi, review akhir siklus hidup) | ADR-0040: provisioning wajib rahasia enrolment dan hanya untuk instance `PROVISIONING` (`TestProvisioningTanpaRahasiaIdentik`; lab: 404 tanpa rahasia) |
 | Minor siklus hidup M1/M3/M4/M5b/M6/M8, provisioning M1/M2/M4/M5/M6, undangan M4/M6/M7(id)/M9 | Rencana perbaikan minor (ADR-0042): update dijaga status, urutan kunci perpanjangan, denylist dari sertifikat terpanjang + purge, pembaruan kartu terarah, jam `ContinuousClock`, parameter rahasia wajib, CLI id undangan dan `--link-base` `/i/` |
 | Deadlock 40P01 enrolment–sapuan per jam (pra-ada, review perbaikan minor), termasuk audit `abandonStale` lintas gedung | ADR-0051: audit enrolment dan sapuan ditahan lalu ditulis di akhir transaksi, berurutan per rantai; lanjutan `PENDING_APPROVAL` dikunci di dalam enrolment (`TestEnrolmentKartuTidakMemegangKunciAuditSaatMenunggu`, `TestSapuanMenulisAuditBerurutanPerRantai`, TC-DR-05). siklus dengan `DecideEnrollment` diputus kunci lanjutan `PENDING_APPROVAL`; siklus dengan `policy`/`site-code` (`sites FOR UPDATE`) diputus `FOR KEY SHARE` baris gedung sebelum kunci rantai (`TestEnrolmentTidakMemegangKunciRantaiSaatMenungguBarisGedung`) |
+| Aksesibilitas, sisa Task 4–5 (ADR-0057): GREEN UI test di dua perangkat, mutasi UI, `strings` Release, screenshot, pengecualian per elemen, penjaga mode gelap, UI test fungsional "Gunakan", dokumen | QA §11.1 TC-UX-01–04 dan TC-UX-09, SDD §5.10; `KunciFungsionalTests`, `testPenjagaModeMenolakModeSalah`, mutasi `present.cancel` dan label Bantuan tertangkap |
 | Sisa instal ulang: item Keychain dari instalasi lama tidak dibersihkan (alur Tambah Kartu, ADR-0043) | ADR-0053: semua item service app dihapus pada peluncuran pertama tanpa penanda dan tanpa kartu lokal, sebelum layanan dipakai (`instalUlangMembersihkanSisa`, TC-DEV-13) |
 
 ## Terbuka
 
-- **Aksesibilitas (ADR-0057, unit belum selesai):**
-  - GREEN penuh UI test audit di iPhone 17e dan iPhone 17 Pro, mutasi UI, cek `strings` build Release, dan screenshot bukti (rencana Task 4 Step 7–10).
-  - Pengecualian per elemen sesuai ADR-0059 dan spesifikasi Tujuan 8: grabber lembar, positif palsu kontras "Gedung Anda", `textClipped` field URL satu baris, dan `textClipped`/`elementDetection` di lembar setengah tinggi.
-  - Pastikan mode gelap benar-benar aktif sebelum audit, karena run RED pertama ternyata terang semua.
-  - UI test fungsional: ketuk "Gunakan" di daftar membuka lembar presentasi (tombol bergaya kustom di dalam `NavigationLink`).
-  - Dokumen Task 5: QA §11.1 TC-UX-01–04 dan TC-UX-09, SDD §5.10 + baris versi 2.35, README perintah UI test.
-  - Review akhir (opus) dan `jev_gate`.
-  - Pemeriksaan VoiceOver manual di iPhone fisik, CI untuk UI test, dan TC-UX-05.
+- **Aksesibilitas (ADR-0057; rencana selesai, penutupan unit tertunda):**
+  - Review akhir unit oleh subagent baru dan `jev_gate`. Keduanya belum dijalankan karena alat JEV dan subagent review tidak tersedia di sesi 2026-11-04.
+  - Pemeriksaan VoiceOver manual di iPhone fisik (sisi H TC-UX-01), TC-UX-05 dengan Reduce Motion aktif, dan CI untuk UI test.
+  - Pesan galat belum dicocokkan butir per butir dengan katalog SDD §15 (butir terakhir checklist design system §9).
+  - Audit Apple di riwayat AX5 halaman 2 (iPhone 17e) selalu habis waktu dan kini lulus lewat audit ulang sesudah isi digeser 48 pt. Bila pola ini muncul di posisi lain, selidiki penyebabnya, mis. jumlah baris riwayat demo.
 - **Test BLE flaky:** `autentikasiBatalMembatalkanPemindaian` sesekali gagal (`scanCount == 0 || scanWasCancelled`) saat mesin sangat sibuk, lalu lulus 6/6 saat diulang. Pembatalan pindai belum tercatat sebelum aliran selesai.
 
 - **Audit:** waktu event bisa mundur sepanjang `seq` (waktu dari pemanggil); peran DB runtime masih pemilik tabel (perlu pemisahan peran di infrastruktur produksi).
