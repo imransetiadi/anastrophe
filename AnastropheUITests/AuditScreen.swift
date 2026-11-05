@@ -81,15 +81,32 @@ enum AuditScreen: String, CaseIterable {
         }
     }
 
-    /// Gulir tambahan pada ukuran teks bawaan untuk layar panjang. Di AX5 setiap layar sampai 4.
+    /// Batas gulir tambahan pada ukuran teks bawaan untuk layar panjang; audit berhenti sendiri di ujung isi, dan test
+    /// gagal bila batas habis lebih dulu. Satu gulir = 60 % tinggi kontainer. Di AX5 batasnya `AuditAX5Tests.pages`.
     var scrollPages: Int {
         switch self {
-        case .detail, .detailSuspended, .history: 2
-        case .help: 3
+        case .detail, .detailSuspended, .history: 4
+        case .help: 8
         default: 0
         }
     }
 
     /// Riwayat lengkap hanya berisi baris teks; layar lain wajib punya elemen konten yang bisa diketuk.
     var hasContentTargets: Bool { self != .history }
+
+    /// Pita seret (posisi vertikal ternormalisasi di dalam kontainer gulir) tempat seretan gulir dimulai dan berakhir.
+    /// Pita harus berada di atas isi yang bisa digulir: di bawah bilah navigasi (±30 % teratas daftar) dan, pada lembar
+    /// presentasi, di atas tombol aksi yang tersemat di bawah (`safeAreaInset`, mulai ±57 % tinggi lembar di AX5).
+    var dragBand: ClosedRange<CGFloat> {
+        isPresentationSheet ? 0.12...0.5 : 0.3...0.85
+    }
+
+    /// Layar berupa lembar presentasi (`present.scroll`): di ukuran bawaan setengah tinggi dengan latar redup layar
+    /// Kunci di belakangnya, di AX5 lembar penuh.
+    var isPresentationSheet: Bool {
+        switch self {
+        case .presentation, .bluetoothDenied, .presentationDenied: true
+        default: false
+        }
+    }
 }

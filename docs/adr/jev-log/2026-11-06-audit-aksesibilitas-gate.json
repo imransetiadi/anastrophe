@@ -1,0 +1,32 @@
+{
+  "tool": "jev_gate",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "action": "escalate",
+  "label": "audit-aksesibilitas-plan-close-gate",
+  "request": "Tutup unit audit aksesibilitas app (ADR-0057, NFR-A01, TC-UX-01/02/03/04/09): nyatakan selesai bila klaim di bawah didukung bukti uji nyata.",
+  "note": "Dua panggilan jev_gate dijalankan (bukti pertama ringkasan sesi; bukti kedua diperkaya dengan kutipan diff dokumen QA/SDD/README/backlog). Keduanya eskalasi; tidak diulang ketiga kalinya karena tidak ada bukti baru untuk diajukan (aturan CLAUDE.md: jangan mengajukan ulang keputusan yang sama tanpa bukti baru).",
+  "runs": [
+    {
+      "composite": 0.66175,
+      "action": "escalate",
+      "limiting_rubrics": ["test_gap"],
+      "verification_summary": { "verified": 5, "contradicted": 0, "unsupported": 3, "needs_review": 3 }
+    },
+    {
+      "composite": 0.58025,
+      "action": "escalate",
+      "limiting_rubrics": ["correctness"],
+      "verification_summary": { "verified": 7, "contradicted": 0, "unsupported": 1, "needs_review": 4 }
+    }
+  ],
+  "reason_codes": [
+    "confidence_below_review",
+    "safe_to_apply_below_review",
+    "review_escalated",
+    "claims_unsupported",
+    "claim_confidence_below_auto_accept"
+  ],
+  "interpretation": "Confidence rendah di kedua run (correctness 0.24-0.31, test_gap 0.14-0.32) mencerminkan bahwa reviewer hanya diberi potongan diff kode produksi (AddCardView/HelpView/PresentationSheet/lint) dan kutipan dokumen, bukan harness AnastropheUITests/AccessibilityAudit.swift (+829 baris, terlalu besar untuk payload diff/evidence) maupun xcresult mentah. Tidak ada temuan 'contradicted' pada klaim manapun di kedua run; semua klaim yang 'unsupported' adalah soal cakupan bukti yang diberikan, bukan bukti yang bertentangan. Komposit di bawah 0,60 -> eskalasi ke pengguna per CLAUDE.md (lapisan JEV, ADR-0018), bukan deklarasi selesai sepihak.",
+  "human_decision_needed": "Terima penutupan unit berdasarkan bukti uji nyata yang sudah dicatat (394/375 test paket, 37/37 dan 36/37 lalu 37/37 UI test di dua perangkat, 2/2 mutasi tertangkap, build Release bersih, dokumen QA/SDD/README/backlog konsisten, check_docs.py 0 masalah) — SELESAI-KECUALI-H; atau minta review akhir manusia/subagent tambahan atas AccessibilityAudit.swift sebelum ditutup."
+}

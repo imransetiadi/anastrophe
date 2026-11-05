@@ -71,7 +71,14 @@ swift test --package-path Packages                                   # unit test
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test)    # unit test di simulator iOS
 xcodebuild -project Anastrophe.xcodeproj -scheme Anastrophe \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build     # build app
+xcodebuild test -project Anastrophe.xcodeproj -scheme Anastrophe \
+  -destination 'platform=iOS Simulator,name=iPhone 17e' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -maximum-concurrent-test-simulator-destinations 1 -parallel-testing-enabled NO \
+  -derivedDataPath build/DerivedDataA11y                             # UI test audit aksesibilitas (ADR-0057), ±75 menit per perangkat
 ```
+
+UI test `AnastropheUITests` mengaudit 16 keadaan layar demo (terang, gelap, AX5 ID/EN) dengan `performAccessibilityAudit` ditambah cek target sentuh, lalu dua alur fungsional. Jalankan satu perangkat sekali jalan: simulator dan mode tampilan dipakai bersama, dan mesin yang sangat sibuk memberi timeout palsu. Baris log `AUDIT-ISSUE`, `AUDIT-EXEMPT` (dengan alasan), dan `AUDIT-SKIP` merangkum setiap isu; screenshot setiap halaman ada di result bundle (`xcrun xcresulttool export attachments`). Xcode memangkas result bundle lama di `build/DerivedDataA11y/Logs/Test`; tambahkan `-resultBundlePath <path>` bila bukti perlu disimpan. Aturan pengecualian: SDD §5.10.
 
 Backend (Go, ADR-0020; butuh PostgreSQL 16 lokal untuk test integrasi):
 

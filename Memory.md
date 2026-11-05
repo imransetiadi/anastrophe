@@ -12,7 +12,8 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 ## Status terkini
 
 - Branch kerja: `feat/r1-scaffold`, yang juga branch bawaan (dan satu-satunya branch) di GitHub private `imransetiadi/anastrophe`. Pengguna meminta commit sesudah `1f87775` digabung lewat PR ke branch itu (2026-11-02).
-- Suite terakhir: Swift host 391 test (1 dilewati, tanpa gagal; 2026-11-02, audit aksesibilitas), sebelumnya 364 test (1 dilewati, tanpa gagal), simulator 362 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 13 paket lulus dengan PostgreSQL dan `-race` (go1.27.3), pemindai keamanan 42 test. Swift host diulang 2026-11-02: 364 test, 1 dilewati.
+- Unit audit aksesibilitas dilanjutkan di branch `iterasi-r1-lanjutan` (2026-11-04, belum di-push).
+- Suite terakhir: Swift host 394 test dan simulator 375 test (masing-masing 1 dilewati, tanpa gagal; 2026-11-04). UI test audit aksesibilitas 37 test: iPhone 17 Pro 37/37 lulus, iPhone 17e 36/37 lulus dan satu sisanya lulus saat dijalankan ulang sesudah perbaikan (2026-11-04). Sebelumnya: Swift host 391 test (1 dilewati, tanpa gagal; 2026-11-02, audit aksesibilitas), 364 test (1 dilewati, tanpa gagal), simulator 362 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 13 paket lulus dengan PostgreSQL dan `-race` (go1.27.3), pemindai keamanan 42 test. Swift host diulang 2026-11-02: 364 test, 1 dilewati.
 - Menunggu keputusan pengguna:
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
   - ADR-0038: cara mencegah pemegang kartu membatalkan suspend/revoke operator; rekomendasi `hold_pending_approval`, JEV 0,45.
@@ -21,6 +22,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
   - ADR-0047: kedaluwarsa permintaan `PENDING_APPROVAL` (batas 4 per kartu sudah diterapkan), JEV 0,51.
   - Penyambungan App Attest (ADR-0053, seri JEV 0,47): pengikatan kunci attested ke `device_id` (terkait ADR-0041/0046), endpoint yang wajib attestation, bypass dev, dan kategori produksi.
 
+  - `jev_gate` unit audit aksesibilitas (ADR-0057) dijalankan 2026-11-06, dua run, **eskalasi** kedua kali (composite 0,66 lalu 0,58; 0 klaim `contradicted`). Menunggu keputusan pengguna: terima penutupan berdasarkan bukti uji nyata (394/375 test paket, 37/37 dan 36/37→37/37 UI test, 2/2 mutasi, build Release bersih), atau minta review manusia/subagent atas `AccessibilityAudit.swift` (terlalu besar untuk payload gate). Lihat `docs/adr/jev-log/2026-11-06-audit-aksesibilitas-gate.json`.
   - Tinjauan 21 gate JEV (19 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan, verifier App Attest, sisa Keychain instal ulang, observabilitas backend, uji beban API, pemindaian secret dan dependensi (`docs/adr/jev-log/*-gate.json`).
   - Perbarui `cryptography` ke 50.* di pyenv lokal: `python3 -m pip install -r scripts/anp1/requirements.txt`. Pemindai dengan interpreter bawaan exit 1 sampai itu dilakukan.
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
@@ -48,6 +50,70 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Uji beban | Alat `anastrophe-loadtest`: skenario config, lookup, enrol, dan renew dengan kartu sintetis, hanya ke loopback, porsi ≤ 0,3 dtk dari `/metrics`, serta exit code untuk galat, laju tak tercapai, dan run terpotong. Baseline lab di QA §11.1; uji 1.000 rps menunggu lingkungan Load | TC-PERF-05 (baseline lab), ADR-0055 |
 | App Attest (verifier) | Paket backend `internal/appattest` memverifikasi attestation dan assertion menurut langkah Apple; teruji dengan contoh resmi Apple dan data iOS 27 nyata (scratch). Belum disambungkan ke endpoint, database, atau app; gerbang pra-pilot NFR-S03 masih terbuka | NFR-S03 (sebagian), ADR-0052 |
 | Pemindaian keamanan | `scripts/security/scan.py`: gitleaks atas riwayat, staged, dan produk build; govulncheck; paket Swift remote; OSV untuk alat Python. Exit 0/1/2; git gagal, clone dangkal, dan `.gitleaksignore` memberi exit 2. Backend Go ≥ 1.25 dengan toolchain go1.27.3 | TC-SEC-11, NFR-S09, ADR-0056 |
+| Aksesibilitas | Token warna sebagai data dengan test kontras WCAG; lint font tetap, animasi, warna teks sistem, dan pemotong teks; komponen dengan area ketuk ≥ 44 pt; target UI test `AnastropheUITests` yang mengaudit 16 keadaan demo (terang, gelap, AX5 ID/EN) dengan pengecualian per elemen. VoiceOver manual di iPhone fisik dan CI UI test belum ada | NFR-A01, TC-UX-01–04, TC-UX-09, ADR-0057–ADR-0059 |
+
+## APP-2026-11-06-0000 - Gate penutupan audit aksesibilitas (Eskalasi; menunggu keputusan pengguna)
+
+Lanjutan entri APP-2026-11-04-0725: satu-satunya item terbuka unit ADR-0057, review akhir dan `jev_gate`, dijalankan di sesi ini sekarang alat JEV tersambung.
+
+- `jev_gate` atas diff `a240a52^..36eb254` dijalankan dua kali (bukti ditambah di run kedua: kutipan diff `QA_SUITE.md`/`SDD.md`/`README.md`/`backlog.md`). Keduanya **eskalasi**: composite 0,662 (limiting `test_gap`) lalu 0,580 (limiting `correctness`). 0 klaim `contradicted` di kedua run; sisanya `unsupported`/`needs_review` karena reviewer hanya menerima potongan diff kode dan kutipan dokumen, bukan `AnastropheUITests/AccessibilityAudit.swift` (+829 baris, melebihi batas payload gate) atau xcresult mentah. Tidak diulang ketiga kalinya (tidak ada bukti baru, CLAUDE.md melarang mengajukan ulang keputusan sama tanpa bukti baru).
+- Komposit < 0,60 → eskalasi ke pengguna (ADR-0018), bukan deklarasi selesai sepihak. Status unit: selesai-kecuali-H, menunggu pengguna menerima penutupan berdasarkan bukti uji nyata yang sudah tercatat, atau meminta review akhir manusia/subagent tambahan atas harness UI test.
+- Dua perubahan dokumen tak ter-commit dari sesi lain (`README.md`, `QA_SUITE.md`, draf kasus uji baru "model iPhone yang didukung") **dibuang**: bukti di `build/perangkat/*.log` (di luar git) menunjukkan run itu sendiri gagal/terinterupsi untuk beberapa model, bertentangan dengan klaim "lulus di setiap model" yang sudah ditulis di draf. Tidak pernah tercatat di Memory.md/sesi sebelumnya, jadi tidak ada riwayat yang perlu dikoreksi.
+
+Rujukan: ADR-0057, NFR-A01, TC-UX-01–04/09. Log JEV: `docs/adr/jev-log/2026-11-06-audit-aksesibilitas-gate.json`. Sesi Obsidian: `docs/agentmemory/sessions/2026-11-06-audit-aksesibilitas-gate.md`. Tidak ada uji baru dijalankan (gate adalah tinjauan atas bukti yang sudah ada, bukan eksekusi uji).
+
+## APP-2026-11-04-0725 - Audit aksesibilitas app: GREEN di dua perangkat, mutasi, Release, dokumen (Selesai; review akhir dan jev_gate tertunda)
+
+Lanjutan entri APP-2026-11-02-2058, berisi sisa rencana `docs/superpowers/plans/2026-11-02-audit-aksesibilitas.md` (Task 4 Step 6–11 dan Task 5). Run penuh pertama sesudah merge (iPhone 17 Pro) meluluskan 32 dari 37 test. Lima test AX5 gagal:
+- posisi gulir tidak bisa dipulihkan sesudah audit (Bantuan, detail);
+- halaman daftar kartu dinilai tidak berkesinambungan;
+- lembar Tambah Kartu tertutup sesudah seretan mundur;
+- dua positif palsu `dynamicType` di detail ditangguhkan.
+
+Di iPhone 17e muncul tambahan `textClipped` "Belum ada kartu" di daftar kosong.
+
+Perubahan:
+- **App (`a240a52`):**
+  - di AX5, pilihan cara Tambah Kartu dan status cara akses Bantuan ditumpuk;
+  - identifier `present.title` dan `present.detail`;
+  - lint `tanpaPemotongTeks`.
+- **Harness (`83c9f41`, `4d4e1e7`):**
+  - posisi gulir yang dipindah audit dipulihkan (seretan maju ≤ 500 pt, mundur ≤ 100 pt);
+  - kesinambungan halaman dicek per kemunculan label;
+  - gulir pendek di ujung isi tetap menjadi halaman baru;
+  - audit yang habis waktu diulang dua kali, lalu sekali lagi sesudah isi digeser 48 pt;
+  - `elementDetection` ikut aturan zona kaca bilah;
+  - penjaga mode terang/gelap;
+  - `KunciFungsionalTests` ("Gunakan" dan ketukan sel FAQ).
+- **Pengecualian per elemen:** 36 entri, dengan bukti screenshot elemen untuk yang berlaku di AX5.
+- **Dokumen:**
+  - QA §11.1: TC-UX-01, -02, -03, -04, -09, dan baris pengecualian;
+  - SDD §5.10 dan versi 2.35;
+  - README;
+  - backlog dan pelajaran.
+
+Bukti:
+- **Swift host:** 394 test di 10 run, 1 dilewati, 0 gagal.
+- **Suite paket di simulator iPhone 17 Pro:** 375 test di 10 run, 1 dilewati, 0 gagal (`TEST SUCCEEDED`). Selisih 19 test dengan host berasal dari 24 test khusus host (lint sumber, tabel design system, aset AccentColor, katalog string, dan ukuran komponen) dikurangi 5 test khusus iOS (`ANTextField` UIKit).
+- **iPhone 17 Pro atas `4d4e1e7`:** 37/37 lulus (`TEST SUCCEEDED`, 59 menit). 147 halaman, 0 isu dihitung, 315 dikecualikan dengan alasan, 31 `AUDIT-SKIP`.
+- **iPhone 17e atas `83c9f41`:** 36/37 lulus (75 menit). 155 halaman, 0 isu dihitung, 369 dikecualikan, 43 `AUDIT-SKIP`. Satu-satunya yang gagal, riwayat AX5, gagal karena audit habis waktu di halaman 2; test itu lulus atas `4d4e1e7`.
+- **RED sebelum perbaikan** (sesi 2026-11-02): 67 kegagalan target sentuh, 8 `hitRegion`, dan 31 isu kontras.
+- **Mutasi UI 2/2 tertangkap:**
+  - bingkai `present.cancel` dipindah ke luar tombol → 37 × 19 pt dan `hitRegion`;
+  - tombol Bantuan tanpa label → `sufficientElementDescription`.
+- **Release simulator:** `BUILD SUCCEEDED`, biner tanpa simbol demo.
+- `check_docs.py` 0 masalah; `scan.py secrets` exit 0.
+
+Belum selesai:
+- review akhir dan `jev_gate` (alat tidak tersedia di sesi ini);
+- VoiceOver manual di iPhone fisik;
+- TC-UX-05;
+- CI UI test;
+- pencocokan pesan galat dengan SDD §15.
+
+Rinciannya di backlog. Run penuh pertama di sesi ini sempat terganggu oleh mesin yang sibuk (load ±12, timeout sintesis event), lalu diulang dengan satu simulator.
+
+Commit unit ini: `a240a52`, `83c9f41`, `4d4e1e7`, dan commit ini. Obsidian: `sessions/2026-11-04-audit-aksesibilitas-green.md`, `lessons/audit-aksesibilitas-otomatis.md`, dan MOC. Tidak push, tidak merge.
 
 ## APP-2026-11-02-2058 - Audit aksesibilitas app (Sebagian; PR ke GitHub atas permintaan pengguna)
 

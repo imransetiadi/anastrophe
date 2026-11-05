@@ -43,3 +43,6 @@ docs/agentmemory/.trash/
 # CSV registri berisi identitas kartu mentah (CLAUDE.md aturan 6); simpan di luar repo
 /*.csv
 /backend/*.csv
+
+# Worktree git lokal untuk subagent (checkout penuh, bukan bagian dari sejarah repo utama)
+/.claude/worktrees/
