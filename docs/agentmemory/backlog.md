@@ -34,7 +34,7 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
 ## Terbuka
 
 - **Aksesibilitas (ADR-0057; rencana selesai, penutupan unit tertunda):**
-  - Review akhir unit oleh subagent baru dan `jev_gate`. Keduanya belum dijalankan karena alat JEV dan subagent review tidak tersedia di sesi 2026-11-04.
+  - `jev_gate` dijalankan 2026-11-06 (dua run, bukti bertambah di run kedua): **eskalasi** kedua kali (composite 0,66 lalu 0,58; limiting rubric `test_gap` lalu `correctness`; 0 klaim `contradicted` di kedua run). Menunggu keputusan pengguna: terima penutupan berdasarkan bukti uji nyata yang sudah tercatat, atau minta review akhir manusia/subagent atas `AnastropheUITests/AccessibilityAudit.swift` (harness +829 baris, di luar batas payload gate). Log: `docs/adr/jev-log/2026-11-06-audit-aksesibilitas-gate.json`, sesi: `sessions/2026-11-06-audit-aksesibilitas-gate.md`.
   - Pemeriksaan VoiceOver manual di iPhone fisik (sisi H TC-UX-01), TC-UX-05 dengan Reduce Motion aktif, dan CI untuk UI test.
   - Pesan galat belum dicocokkan butir per butir dengan katalog SDD §15 (butir terakhir checklist design system §9).
   - Audit Apple di riwayat AX5 halaman 2 (iPhone 17e) selalu habis waktu dan kini lulus lewat audit ulang sesudah isi digeser 48 pt. Bila pola ini muncul di posisi lain, selidiki penyebabnya, mis. jumlah baris riwayat demo.

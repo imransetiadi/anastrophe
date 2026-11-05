@@ -22,7 +22,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
   - ADR-0047: kedaluwarsa permintaan `PENDING_APPROVAL` (batas 4 per kartu sudah diterapkan), JEV 0,51.
   - Penyambungan App Attest (ADR-0053, seri JEV 0,47): pengikatan kunci attested ke `device_id` (terkait ADR-0041/0046), endpoint yang wajib attestation, bypass dev, dan kategori produksi.
 
-  - Review akhir dan `jev_gate` unit audit aksesibilitas (ADR-0057): belum dijalankan, karena alat JEV dan subagent review tidak tersedia di sesi 2026-11-04.
+  - `jev_gate` unit audit aksesibilitas (ADR-0057) dijalankan 2026-11-06, dua run, **eskalasi** kedua kali (composite 0,66 lalu 0,58; 0 klaim `contradicted`). Menunggu keputusan pengguna: terima penutupan berdasarkan bukti uji nyata (394/375 test paket, 37/37 dan 36/37→37/37 UI test, 2/2 mutasi, build Release bersih), atau minta review manusia/subagent atas `AccessibilityAudit.swift` (terlalu besar untuk payload gate). Lihat `docs/adr/jev-log/2026-11-06-audit-aksesibilitas-gate.json`.
   - Tinjauan 21 gate JEV (19 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan, verifier App Attest, sisa Keychain instal ulang, observabilitas backend, uji beban API, pemindaian secret dan dependensi (`docs/adr/jev-log/*-gate.json`).
   - Perbarui `cryptography` ke 50.* di pyenv lokal: `python3 -m pip install -r scripts/anp1/requirements.txt`. Pemindai dengan interpreter bawaan exit 1 sampai itu dilakukan.
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
@@ -51,6 +51,16 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | App Attest (verifier) | Paket backend `internal/appattest` memverifikasi attestation dan assertion menurut langkah Apple; teruji dengan contoh resmi Apple dan data iOS 27 nyata (scratch). Belum disambungkan ke endpoint, database, atau app; gerbang pra-pilot NFR-S03 masih terbuka | NFR-S03 (sebagian), ADR-0052 |
 | Pemindaian keamanan | `scripts/security/scan.py`: gitleaks atas riwayat, staged, dan produk build; govulncheck; paket Swift remote; OSV untuk alat Python. Exit 0/1/2; git gagal, clone dangkal, dan `.gitleaksignore` memberi exit 2. Backend Go ≥ 1.25 dengan toolchain go1.27.3 | TC-SEC-11, NFR-S09, ADR-0056 |
 | Aksesibilitas | Token warna sebagai data dengan test kontras WCAG; lint font tetap, animasi, warna teks sistem, dan pemotong teks; komponen dengan area ketuk ≥ 44 pt; target UI test `AnastropheUITests` yang mengaudit 16 keadaan demo (terang, gelap, AX5 ID/EN) dengan pengecualian per elemen. VoiceOver manual di iPhone fisik dan CI UI test belum ada | NFR-A01, TC-UX-01–04, TC-UX-09, ADR-0057–ADR-0059 |
+
+## APP-2026-11-06-0000 - Gate penutupan audit aksesibilitas (Eskalasi; menunggu keputusan pengguna)
+
+Lanjutan entri APP-2026-11-04-0725: satu-satunya item terbuka unit ADR-0057, review akhir dan `jev_gate`, dijalankan di sesi ini sekarang alat JEV tersambung.
+
+- `jev_gate` atas diff `a240a52^..36eb254` dijalankan dua kali (bukti ditambah di run kedua: kutipan diff `QA_SUITE.md`/`SDD.md`/`README.md`/`backlog.md`). Keduanya **eskalasi**: composite 0,662 (limiting `test_gap`) lalu 0,580 (limiting `correctness`). 0 klaim `contradicted` di kedua run; sisanya `unsupported`/`needs_review` karena reviewer hanya menerima potongan diff kode dan kutipan dokumen, bukan `AnastropheUITests/AccessibilityAudit.swift` (+829 baris, melebihi batas payload gate) atau xcresult mentah. Tidak diulang ketiga kalinya (tidak ada bukti baru, CLAUDE.md melarang mengajukan ulang keputusan sama tanpa bukti baru).
+- Komposit < 0,60 → eskalasi ke pengguna (ADR-0018), bukan deklarasi selesai sepihak. Status unit: selesai-kecuali-H, menunggu pengguna menerima penutupan berdasarkan bukti uji nyata yang sudah tercatat, atau meminta review akhir manusia/subagent tambahan atas harness UI test.
+- Dua perubahan dokumen tak ter-commit dari sesi lain (`README.md`, `QA_SUITE.md`, draf kasus uji baru "model iPhone yang didukung") **dibuang**: bukti di `build/perangkat/*.log` (di luar git) menunjukkan run itu sendiri gagal/terinterupsi untuk beberapa model, bertentangan dengan klaim "lulus di setiap model" yang sudah ditulis di draf. Tidak pernah tercatat di Memory.md/sesi sebelumnya, jadi tidak ada riwayat yang perlu dikoreksi.
+
+Rujukan: ADR-0057, NFR-A01, TC-UX-01–04/09. Log JEV: `docs/adr/jev-log/2026-11-06-audit-aksesibilitas-gate.json`. Sesi Obsidian: `docs/agentmemory/sessions/2026-11-06-audit-aksesibilitas-gate.md`. Tidak ada uji baru dijalankan (gate adalah tinjauan atas bukti yang sudah ada, bukan eksekusi uji).
 
 ## APP-2026-11-04-0725 - Audit aksesibilitas app: GREEN di dua perangkat, mutasi, Release, dokumen (Selesai; review akhir dan jev_gate tertunda)
 
