@@ -51,7 +51,7 @@ public struct APIClient: Sendable {
 
     /// `POST /v1/enrollments`: enrolment untuk kartu fisik terdaftar (ADR-0031). Identitas kartu hanya
     /// lewat TLS; server menghitung HMAC per gedung. Security code dan App Attest menyusul (SDD §8.4.1).
-    public func createEnrollment(deviceID: String, siteID: String, card: CardIdentity, provisioningKeyHash: Data, idempotencyKey: UUID) async throws -> EnrollmentStart {
+    public func createEnrollment(deviceID: String, siteID: String, card: CardIdentity, provisioningKeyHash: ProvisioningSecretHash, idempotencyKey: UUID) async throws -> EnrollmentStart {
         struct Body: Encodable {
             struct Card: Encodable {
                 let tech: String
@@ -64,15 +64,15 @@ public struct APIClient: Sendable {
             enum CodingKeys: String, CodingKey { case deviceID = "device_id", siteID = "site_id", card, provisioningKeyHash = "provisioning_key_hash" }
         }
         let body = Body(deviceID: deviceID, siteID: siteID, card: .init(tech: card.technology.rawValue, id: card.hex),
-                        provisioningKeyHash: provisioningKeyHash.base64EncodedString())
+                        provisioningKeyHash: provisioningKeyHash.raw.base64EncodedString())
         return try await postEnrollment(body, idempotencyKey: idempotencyKey)
     }
 
     /// `POST /v1/enrollments` dengan undangan (FR-12, ADR-0033): token menggantikan kartu fisik. Gedung
     /// dan zona berasal dari undangan, jadi body hanya perangkat dan token.
-    public func createEnrollment(deviceID: String, invitation: String, provisioningKeyHash: Data, idempotencyKey: UUID) async throws -> EnrollmentStart {
+    public func createEnrollment(deviceID: String, invitation: String, provisioningKeyHash: ProvisioningSecretHash, idempotencyKey: UUID) async throws -> EnrollmentStart {
         // ADR-0040: hanya hash rahasia enrolment yang dikirim.
-        return try await postEnrollment(["device_id": deviceID, "invitation": invitation, "provisioning_key_hash": provisioningKeyHash.base64EncodedString()],
+        return try await postEnrollment(["device_id": deviceID, "invitation": invitation, "provisioning_key_hash": provisioningKeyHash.raw.base64EncodedString()],
                                         idempotencyKey: idempotencyKey)
     }
 
@@ -86,13 +86,13 @@ public struct APIClient: Sendable {
     }
 
     /// `POST /v1/enrollments/{id}/credentials`: kirim kunci publik kanal, terima sertifikat (FR-16).
-    public func submitCredentialKey(enrollmentID: String, channel: ChannelKind, publicKey: Data, statusTokenHash: Data? = nil, provisioningSecret: Data, idempotencyKey: UUID) async throws -> ProvisionedCredential {
+    public func submitCredentialKey(enrollmentID: String, channel: ChannelKind, publicKey: Data, statusTokenHash: Data? = nil, provisioningSecret: ProvisioningSecret, idempotencyKey: UUID) async throws -> ProvisionedCredential {
         var request = URLRequest(url: baseURL.appending(path: "v1/enrollments/\(enrollmentID)/credentials"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(idempotencyKey.uuidString, forHTTPHeaderField: "Idempotency-Key")
         // ADR-0040: rahasia enrolment membuktikan bahwa provisioning berasal dari perangkat yang mendaftar.
-        request.setValue(Self.bearer(provisioningSecret), forHTTPHeaderField: "Authorization")
+        request.setValue(Self.bearer(provisioningSecret.raw), forHTTPHeaderField: "Authorization")
         var body = ["channel": channel.rawValue, "public_key": publicKey.base64EncodedString()]
         // ADR-0037: hanya hash token baca status yang dikirim; tokennya tetap di perangkat.
         body["status_token_hash"] = statusTokenHash?.base64EncodedString()

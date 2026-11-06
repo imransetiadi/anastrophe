@@ -67,8 +67,10 @@ struct CardProvisioner {
         var movedTo: Data?
         do {
             // ADR-0040: rahasia enrolment hanya di memori selama alur ini; server menyimpan hash-nya.
-            let secret = try ProvisioningSecret.generate()
-            let secretHash = ProvisioningSecret.hash(secret)
+            // ADR-0061: secret dan secretHash bertipe berbeda (bukan Data polos keduanya), jadi
+            // tertukar di dua pemanggilan API di bawah ini jadi galat kompilasi, bukan bug senyap.
+            let secret = try ProvisioningSecretGenerator.generate()
+            let secretHash = ProvisioningSecretGenerator.hash(secret)
             let start: EnrollmentStart
             switch request {
             case .invitation(let token):

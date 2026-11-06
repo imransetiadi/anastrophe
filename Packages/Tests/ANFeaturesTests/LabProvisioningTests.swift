@@ -172,7 +172,7 @@ struct LabBackendProvisioningTests {
         while padded.count % 4 != 0 { padded += "=" }
         let secret = try #require(Data(base64Encoded: padded))
         #expect(bearer.hasPrefix("Bearer ") && secret.count == 32)
-        #expect(ProvisioningSecret.hash(secret).base64EncodedString() == hash)
+        #expect(ProvisioningSecretGenerator.hash(ProvisioningSecret(raw: secret)).raw.base64EncodedString() == hash)
         #expect(transport.authorizations[1] == nil)  // enrolment tidak membawa rahasia mentah
     }
 

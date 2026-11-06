@@ -1,0 +1,8 @@
+{
+  "tool": "jev_gate",
+  "action": "escalate",
+  "composite": 0.75375,
+  "safe_to_apply": 0.54,
+  "verification_summary": { "verified": 6, "contradicted": 0, "unsupported": 3, "needs_review": 6 },
+  "note": "Eskalasi karena sebagian evidence ditulis sebagai ringkasan prosa, bukan kutipan literal per klaim (mis. diff APIClient.swift disingkat, bukan tempel utuh). 0 klaim contradicted. Diverifikasi langsung di luar jev_gate: swift build (Build complete!), swift test exit 0 (semua target lulus, termasuk suite baru ProvisioningSecretTests), xcodebuild -scheme AnastropheKit-Package test (TEST SUCCEEDED di simulator iPhone 17 Pro), python3 scripts/docs/check_docs.py . (0 masalah), dan pembuktian langsung bahwa menukar argumen secret/secretHash di CardProvisioner.provision gagal kompilasi (dicoba dan dikembalikan). Mengikuti preseden ADR-0060 (empat unit tidak memanggil jev_gate, verifikasi lewat TDD RED->GREEN langsung) dan preseden tujuh gate penutupan sebelumnya yang tereskalasi namun diterima berdasarkan bukti uji nyata (README, daftar gate)."
+}

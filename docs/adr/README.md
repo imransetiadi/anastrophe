@@ -64,3 +64,4 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0058](0058-cakupan-token-warna-tint-app.md) | Cakupan token warna dan tint app `secondary` (NFR-A01, TC-UX-03) | Diterima | `token_semua_tint_secondary` | 0.95 |
 | [ADR-0059](0059-pengecualian-kontras-per-elemen.md) | Kebijakan isu kontras audit: pengecualian per elemen dengan bukti (TC-UX-01) | Diterima | `pengecualian_per_elemen_bukti` | 0.93 |
 | [ADR-0060](0060-fokus-berikutnya-pasca-aksesibilitas.md) | Fokus berikutnya pasca audit aksesibilitas (keempat kandidat disetujui) | Diterima — pengguna menyetujui semua kandidat (eskalasi diselesaikan manusia) | `app_attest_hardening` + 3 lainnya | 0.38 |
+| [ADR-0061](0061-fokus-berikutnya-tipe-rahasia-provisioning.md) | Fokus berikutnya: tipe nominal rahasia provisioning vs hash-nya (ADR-0040) | Diterima | `provisioning_secret_hash_type_safety` | 0.99 |
