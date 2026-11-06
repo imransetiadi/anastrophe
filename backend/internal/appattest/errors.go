@@ -9,7 +9,7 @@ import "errors"
 // kelak menerima jawaban seragam.
 var ErrInvalid = errors.New("appattest: verifikasi gagal")
 
-// Error membawa alasan singkat kegagalan ("format", "chain", "key", "nonce", "key_id", "rp_id",
+// Error membawa alasan singkat kegagalan ("config", "format", "chain", "key", "nonce", "key_id", "rp_id",
 // "counter", "aaguid", "credential_id", "category", "signature") dan penyebab teknisnya bila ada.
 type Error struct {
 	Reason string

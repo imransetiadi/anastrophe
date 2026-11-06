@@ -53,6 +53,20 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Pemindaian keamanan | `scripts/security/scan.py`: gitleaks atas riwayat, staged, dan produk build; govulncheck; paket Swift remote; OSV untuk alat Python. Exit 0/1/2; git gagal, clone dangkal, dan `.gitleaksignore` memberi exit 2. Backend Go ≥ 1.25 dengan toolchain go1.27.3 | TC-SEC-11, NFR-S09, ADR-0056 |
 | Aksesibilitas | Token warna sebagai data dengan test kontras WCAG; lint font tetap, animasi, warna teks sistem, dan pemotong teks; komponen dengan area ketuk ≥ 44 pt; target UI test `AnastropheUITests` yang mengaudit 16 keadaan demo (terang, gelap, AX5 ID/EN) dengan pengecualian per elemen. VoiceOver manual di iPhone fisik dan CI UI test belum ada | NFR-A01, TC-UX-01–04, TC-UX-09, ADR-0057–ADR-0059 |
 
+## API-2026-11-06-0300 - Pengerasan verifier App Attest (ADR-0060 `app_attest_hardening`; Selesai)
+
+Unit pertama dari empat kandidat ADR-0060 yang disetujui pengguna. Lingkup: perbaikan berdiri sendiri di `backend/internal/appattest` yang tidak menyentuh keputusan penyambungan endpoint (tetap dieskalasi).
+
+TDD, RED→GREEN→mutasi:
+- `TestVerifierNilValueTidakPanik` (RED: panik SIGSEGV di `v.now()`, line 145) → method `ready()` baru menolak Verifier yang tidak lewat `NewVerifier` (rpIDHash/now nil) dengan galat `config`, dipanggil di awal `VerifyAttestation` dan `VerifyAssertion`. Mutasi (hapus panggilan `ready()`) mengembalikan panik, membuktikan test menangkap regresi.
+- `TestClientDataHashKosongDitolak` (RED: alasan `nonce` yang ambigu) → `clientDataHash`/`clientData` kosong kini ditolak eksplisit dengan alasan `format`.
+- Diperiksa dan ditutup tanpa perubahan kode: `p256PublicKey` field X/Y ecdsa — `go vet` di go1.27.3 tidak menunjukkan peringatan deprecation saat ini.
+- **Tidak diimplementasikan** (perlu riset/keputusan tambahan): penolakan platform credCert non-`iphoneos` (OID `1.2.840.113635.100.8.7`) — klaim OID ini tidak punya bukti REA (E/O-id) di `RESEARCH_EVIDENCE.md`, jadi tidak dikode tanpa verifikasi lebih dulu (CLAUDE.md: klaim faktual baru wajib `jev_verify`). `Config.Categories` wajib di produksi dan item penyambungan lain tetap di backlog karena tumpang tindih dengan keputusan App Attest yang sudah dieskalasi.
+
+Uji: `go test ./internal/appattest/... -count=1` lulus (termasuk fuzz seed); `go build ./... && go vet ./...` bersih; `go test ./... -count=1` seluruh backend (13 paket) lulus dengan PostgreSQL lokal nyata (bukan skip diam-diam, diverifikasi lewat `-v` di `internal/store`).
+
+Rujukan: ADR-0052, ADR-0060, NFR-S03. Backlog diperbarui (`docs/agentmemory/backlog.md`).
+
 ## JEV-2026-11-06-0200 - Resolusi dua eskalasi: gate ADR-0057 dan fokus ADR-0060 (Selesai)
 
 Pengguna meng-approve semua pekerjaan yang tereskalasi di entri sebelumnya (`JEV-2026-11-06-0100`, `APP-2026-11-06-0000`):

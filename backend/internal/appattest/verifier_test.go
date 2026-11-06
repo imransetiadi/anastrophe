@@ -157,3 +157,35 @@ func TestAttestationMelebihiBatas(t *testing.T) {
 		t.Fatalf("galat = %v", err)
 	}
 }
+
+// TestClientDataHashKosongDitolak (minor review akhir ADR-0052): VerifyAttestation sebelumnya menerima
+// clientDataHash kosong tanpa galat format eksplisit, dan hanya gagal kebetulan di langkah nonce. Pemanggil
+// yang lupa menghitung SHA256(challenge) wajib dapat galat yang jelas, bukan kegagalan nonce yang ambigu
+// dengan serangan replay nonce.
+func TestClientDataHashKosongDitolak(t *testing.T) {
+	s, att, keyID, at := loadAppleSample(t)
+	v, err := NewVerifier(Config{AppID: s.AppID, Environment: Production, Now: func() time.Time { return at }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.VerifyAttestation(att, nil, keyID); err == nil || reasonOf(t, err) != "format" {
+		t.Fatalf("galat = %v, ingin alasan format", err)
+	}
+	if _, err := v.VerifyAttestation(att, []byte{}, keyID); err == nil || reasonOf(t, err) != "format" {
+		t.Fatalf("galat = %v, ingin alasan format", err)
+	}
+}
+
+// TestVerifierNilValueTidakPanik (minor review akhir ADR-0052): nilai nol Verifier (dibuat tanpa NewVerifier,
+// mis. `var v appattest.Verifier` dari paket lain) sebelumnya panik di v.now() karena fungsi jam nil. Verifier
+// yang tidak lewat NewVerifier harus mengembalikan galat jelas, bukan panik.
+func TestVerifierNilValueTidakPanik(t *testing.T) {
+	var v Verifier
+	s, att, keyID, _ := loadAppleSample(t)
+	if _, err := v.VerifyAttestation(att, []byte(s.ClientDataHash), keyID); err == nil {
+		t.Fatal("nilai nol Verifier menerima attestation")
+	}
+	if _, err := v.VerifyAssertion(make([]byte, 4), make([]byte, 4), make([]byte, 65), 0); err == nil {
+		t.Fatal("nilai nol Verifier menerima assertion")
+	}
+}

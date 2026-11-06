@@ -102,8 +102,14 @@ type Attestation struct {
 // Anastrophe akan mengirim SHA256(challenge) ke attestKey (O-AA03); contoh resmi Apple memakai challenge
 // mentah (O-AA05), jadi verifier tidak meng-hash challenge sendiri. keyID adalah key identifier dari app.
 func (v *Verifier) VerifyAttestation(attestation, clientDataHash, keyID []byte) (Attestation, error) {
+	if err := v.ready(); err != nil {
+		return Attestation{}, err
+	}
 	if len(attestation) > MaxAttestationSize {
 		return Attestation{}, invalid("format", errors.New("attestation terlalu besar"))
+	}
+	if len(clientDataHash) == 0 {
+		return Attestation{}, invalid("format", errors.New("clientDataHash kosong"))
 	}
 	obj, err := decodeCBOR(attestation)
 	if err != nil {
@@ -216,6 +222,16 @@ func nonceExtension(cert *x509.Certificate) ([]byte, error) {
 		return v.Nonce, nil
 	}
 	return nil, errors.New("ekstensi nonce tidak ada")
+}
+
+// ready menolak Verifier nilai nol (mis. `var v Verifier` dari paket lain, tanpa lewat NewVerifier) dengan
+// galat jelas. rpIDHash dan now hanya pernah diisi oleh NewVerifier, jadi nil berarti belum diinisialisasi;
+// tanpa pengecekan ini, v.now() panik (minor review akhir ADR-0052).
+func (v *Verifier) ready() error {
+	if v == nil || v.rpIDHash == nil || v.now == nil {
+		return invalid("config", errors.New("Verifier belum diinisialisasi lewat NewVerifier"))
+	}
+	return nil
 }
 
 // checkCategory menerapkan Config.Categories pada kategori yang ada (I-17).

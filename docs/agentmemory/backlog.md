@@ -108,15 +108,17 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
   - `TestSapuanMenulisAuditBerurutanPerRantai` menangkap mutasi "tanpa urut" ±69/70 kali (4+4 UUID acak kadang sudah terurut).
   - Lanjutan `PENDING_APPROVAL` di jalur undangan belum dikunci. Cabang ini tak terjangkau saat ini, dan pengerasannya cukup 3 baris seperti jalur kartu.
   - Sisa risiko: kunci rantai memakai `hashtext(chain)`, sedangkan urutan memakai nama rantai; tabrakan hash (±2⁻³² per pasangan) masih bisa memicu 40P01 yang dideteksi PostgreSQL.
-- **App Attest — wajib di unit penyambungan (minor review akhir, ADR-0052):**
-  - **Challenge sekali pakai:** server menerbitkan dan mengonsumsinya sendiri. `VerifyAttestation` saat ini menerima `clientDataHash` kosong, dan `VerifyAssertion` tidak memeriksa challenge di `clientData`. Pertimbangkan wrapper yang menghitung `SHA256(challenge)` dan callback pemeriksa challenge, dengan test challenge basi.
-  - **Penyimpanan per perangkat:** kunci publik dan counter disimpan per perangkat, dan counter diperbarui atomik (compare-and-swap) untuk menolak replay bersamaan.
-  - **Receipt:** belum terautentikasi (di luar nonce), jadi jangan dipakai sampai validasi receipt (U15).
-  - **Kategori:** `Config.Categories` wajib diisi di produksi. Saat ini kategori 0 (invalid) dan 7–9 diterima bila daftar kosong.
-  - **Platform:** tolak platform credCert selain `iphoneos` (OID `1.2.840.113635.100.8.7`), karena attestation macOS butuh cek `aclBlob`.
-  - **`Verifier` nilai nol:** panic di `v.now`. Wajibkan `NewVerifier` atau jaga nilai nol.
-  - **Uji H (U14):** capture attestation + assertion dari build bertanda tangan dengan App ID Anastrophe, termasuk iOS 26.x.
-  - **Catatan kecil:** `p256PublicKey` memakai field `X`/`Y` ecdsa yang ditandai deprecated di toolchain baru (alternatif: SPKI tetap + `x509.ParsePKIXPublicKey`).
+- **App Attest — pengerasan verifier selesai (ADR-0060 `app_attest_hardening`, 2026-11-06):**
+  - **`Verifier` nilai nol** tidak lagi panik: `ready()` menolak Verifier yang tidak lewat `NewVerifier` (rpIDHash/now nil) dengan galat `config`, bukan panik di `v.now`. Test `TestVerifierNilValueTidakPanik`; mutasi (hapus guard) tertangkap.
+  - **`clientDataHash`/`clientData` kosong** kini ditolak eksplisit dengan alasan `format`, bukan gagal kebetulan di langkah nonce. Test `TestClientDataHashKosongDitolak`.
+  - **`p256PublicKey` field X/Y deprecated:** diperiksa `go vet` di toolchain go1.27.3 — tidak ada peringatan deprecation saat ini. Dibiarkan, catatan ini ditutup sampai toolchain benar-benar menandainya.
+  - Sisa, **masih wajib di unit penyambungan** (di luar lingkup unit berdiri sendiri ini, karena butuh keputusan arsitektur penyambungan endpoint yang sudah dieskalasi):
+    - **Challenge sekali pakai:** server menerbitkan dan mengonsumsinya sendiri (wrapper `SHA256(challenge)` + callback pemeriksa, test challenge basi).
+    - **Penyimpanan per perangkat:** kunci publik dan counter per perangkat, counter diperbarui atomik (compare-and-swap).
+    - **Receipt:** belum terautentikasi, jangan dipakai sampai validasi receipt (U15).
+    - **Kategori:** `Config.Categories` wajib diisi di produksi — ditahan karena mengubah perilaku `NewVerifier` tanpa keputusan eksplisit pengguna, dan tumpang tindih dengan keputusan penyambungan.
+    - **Platform:** klaim "tolak platform credCert selain `iphoneos` (OID `1.2.840.113635.100.8.7`)" **tidak diimplementasikan** — tidak ada bukti REA (E/O-id) di `RESEARCH_EVIDENCE.md` untuk OID ini; App Attest resmi hanya iOS/iPadOS/tvOS (macOS pakai mekanisme lain), jadi risikonya rendah, tapi klaim OID itu sendiri butuh `jev_verify` atau riset ulang sebelum dikode.
+    - **Uji H (U14):** capture attestation + assertion dari build bertanda tangan App ID Anastrophe, iOS 26.x — butuh iPhone fisik.
 - **Pembersihan instal ulang (minor review akhir, ADR-0053):**
   - **Gagal-hapus + enrolment:** bila penghapusan gagal lalu pengguna melakukan enrolment di sesi yang sama, `deviceID()` membuat penanda dan sisa tidak lagi dicoba. Bisa ditutup dengan memanggil pembersihan di awal enrolment, sebelum `deviceID()`.
   - **Store bersama:** pembersihan bergantung pada satu `SecretStore` yang dipakai semua store di `live()`, dan bawaan protokol `false` membuat pembungkus bisa diam-diam tidak ikut. Tambahkan komentar aturan store bersama, atau hapus bawaan itu.
