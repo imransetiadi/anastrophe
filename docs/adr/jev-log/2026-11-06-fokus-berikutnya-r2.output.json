@@ -1,0 +1,40 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "renewal_type_safety_and_tests",
+    "escaped": false,
+    "confidence": 0.64,
+    "probabilities": {
+      "ble_flaky_test_fix": 0.02,
+      "load_test_tooling_hardening": 0,
+      "audit_timestamp_monotonicity": 0.28,
+      "renewal_type_safety_and_tests": 0.68,
+      "lifecycle_minor_fixes": 0,
+      "provisioning_concurrency_test_hardening": 0.01,
+      "ask_user": 0,
+      "investigate": 0.01,
+      "none": 0
+    },
+    "contradicted_requirements": []
+  },
+  "requirements_checked": 2,
+  "checks": [
+    { "candidate": "ble_flaky_test_fix", "requirement": 0, "answer": "supported" },
+    { "candidate": "ble_flaky_test_fix", "requirement": 1, "answer": "supported" },
+    { "candidate": "load_test_tooling_hardening", "requirement": 0, "answer": "supported" },
+    { "candidate": "load_test_tooling_hardening", "requirement": 1, "answer": "supported" },
+    { "candidate": "audit_timestamp_monotonicity", "requirement": 0, "answer": "supported" },
+    { "candidate": "audit_timestamp_monotonicity", "requirement": 1, "answer": "supported" },
+    { "candidate": "renewal_type_safety_and_tests", "requirement": 0, "answer": "supported" },
+    { "candidate": "renewal_type_safety_and_tests", "requirement": 1, "answer": "supported" },
+    { "candidate": "lifecycle_minor_fixes", "requirement": 0, "answer": "supported" },
+    { "candidate": "lifecycle_minor_fixes", "requirement": 1, "answer": "supported" },
+    { "candidate": "provisioning_concurrency_test_hardening", "requirement": 0, "answer": "supported" },
+    { "candidate": "provisioning_concurrency_test_hardening", "requirement": 1, "answer": "supported" }
+  ],
+  "warnings": [],
+  "usage": { "input_tokens": 4012, "output_tokens": 605 },
+  "note": "Dipanggil setelah keempat kandidat ADR-0060 selesai dan tercommit, untuk menentukan fokus kerja berikutnya. Kandidat sengaja dipilih agar tidak tumpang tindih dengan keputusan yang sudah dieskalasi (ADR-0017, 0022, 0038, 0041, 0046, 0047, 0048, 0049, penyambungan App Attest, keputusan produk katalog error)."
+}

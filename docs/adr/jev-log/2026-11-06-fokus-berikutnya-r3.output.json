@@ -1,0 +1,31 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "provisioning_secret_hash_type_safety",
+    "escaped": false,
+    "confidence": 0.99,
+    "probabilities": {
+      "ble_flaky_test_fix": 0.01,
+      "provisioning_secret_hash_type_safety": 0.99,
+      "provisioning_concurrency_test_hardening": 0,
+      "ask_user": 0,
+      "investigate": 0,
+      "none": 0
+    },
+    "contradicted_requirements": []
+  },
+  "requirements_checked": 2,
+  "checks": [
+    { "candidate": "ble_flaky_test_fix", "requirement": 0, "answer": "supported" },
+    { "candidate": "ble_flaky_test_fix", "requirement": 1, "answer": "unknown" },
+    { "candidate": "provisioning_secret_hash_type_safety", "requirement": 0, "answer": "supported" },
+    { "candidate": "provisioning_secret_hash_type_safety", "requirement": 1, "answer": "supported" },
+    { "candidate": "provisioning_concurrency_test_hardening", "requirement": 0, "answer": "supported" },
+    { "candidate": "provisioning_concurrency_test_hardening", "requirement": 1, "answer": "supported" }
+  ],
+  "warnings": [],
+  "usage": { "input_tokens": 2956, "output_tokens": 326 },
+  "note": "Ronde ketiga setelah ronde 1 (2026-11-06-fokus-berikutnya-r2.output.json) terbukti sebagian berbasis klaim backlog usang (audit timestamp, celah test renewal channel/key-group, slot-tap, salinan kartu lama — semua sudah diperbaiki sebelumnya). Kandidat ronde ini diverifikasi langsung terhadap kode sebelum dipanggil. confidence 0,99 > 0,80 -> Diterima, tidak eskalasi."
+}

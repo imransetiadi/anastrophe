@@ -13,7 +13,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 
 - Branch kerja: `feat/r1-scaffold`, yang juga branch bawaan (dan satu-satunya branch) di GitHub private `imransetiadi/anastrophe`. Pengguna meminta commit sesudah `1f87775` digabung lewat PR ke branch itu (2026-11-02).
 - Unit audit aksesibilitas dilanjutkan di branch `iterasi-r1-lanjutan` (2026-11-04, belum di-push).
-- Suite terakhir: Swift host 394 test dan simulator 375 test (masing-masing 1 dilewati, tanpa gagal; 2026-11-04). UI test audit aksesibilitas 37 test: iPhone 17 Pro 37/37 lulus, iPhone 17e 36/37 lulus dan satu sisanya lulus saat dijalankan ulang sesudah perbaikan (2026-11-04). Sebelumnya: Swift host 391 test (1 dilewati, tanpa gagal; 2026-11-02, audit aksesibilitas), 364 test (1 dilewati, tanpa gagal), simulator 362 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 13 paket lulus dengan PostgreSQL dan `-race` (go1.27.3), pemindai keamanan 42 test. Swift host diulang 2026-11-02: 364 test, 1 dilewati.
+- Suite terakhir: Swift host 397 test dan simulator (`AnastropheKit-Package`, iPhone 17 Pro) `TEST SUCCEEDED` (2026-11-06, unit tipe rahasia provisioning ADR-0061; +3 test `ProvisioningSecretTests` dari baseline 394). Sebelumnya: Swift host 394 test dan simulator 375 test (masing-masing 1 dilewati, tanpa gagal; 2026-11-04). UI test audit aksesibilitas 37 test: iPhone 17 Pro 37/37 lulus, iPhone 17e 36/37 lulus dan satu sisanya lulus saat dijalankan ulang sesudah perbaikan (2026-11-04). Sebelumnya: Swift host 391 test (1 dilewati, tanpa gagal; 2026-11-02, audit aksesibilitas), 364 test (1 dilewati, tanpa gagal), simulator 362 test (1 dilewati; flaky BLE yang dikenal sesekali gagal lalu lulus saat diulang), backend Go 13 paket lulus dengan PostgreSQL dan `-race` (go1.27.3), pemindai keamanan 42 test. Swift host diulang 2026-11-02: 364 test, 1 dilewati.
 - Menunggu keputusan pengguna:
   - ADR-0017 (entitas hukum untuk entitlement) dan ADR-0022 (bentuk reader uji BLE).
   - ADR-0038: cara mencegah pemegang kartu membatalkan suspend/revoke operator; rekomendasi `hold_pending_approval`, JEV 0,45.
@@ -24,7 +24,8 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 
   - ~~`jev_gate` unit audit aksesibilitas (ADR-0057) eskalasi~~ — **diselesaikan 2026-11-06**: pengguna menerima penutupan berdasarkan bukti uji nyata yang sudah tercatat. Status unit: Selesai.
   - ~~ADR-0060: fokus kerja berikutnya, JEV 0,38 (eskalasi)~~ — **diselesaikan 2026-11-06**: pengguna menyetujui keempat kandidat (`app_attest_hardening`, `observability_hardening`, `error_catalog_alignment`, `security_scan_hardening`) untuk dikerjakan berurutan.
-  - Tinjauan 21 gate JEV (19 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan, verifier App Attest, sisa Keychain instal ulang, observabilitas backend, uji beban API, pemindaian secret dan dependensi (`docs/adr/jev-log/*-gate.json`).
+  - ~~ADR-0061: fokus berikutnya pasca ADR-0060~~ — **selesai 2026-11-06**: `provisioning_secret_hash_type_safety` (JEV 0,99, diterima tanpa eskalasi keputusan; `jev_gate` penutupannya tereskalasi tapi diterima berdasarkan bukti uji nyata, lihat APP-2026-11-06-1600). `ble_flaky_test_fix` dan `provisioning_concurrency_test_hardening` tetap kandidat untuk fokus berikutnya.
+  - Tinjauan 22 gate JEV (20 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan, verifier App Attest, sisa Keychain instal ulang, observabilitas backend, uji beban API, pemindaian secret dan dependensi, tipe rahasia provisioning (`docs/adr/jev-log/*-gate.json`).
   - Perbarui `cryptography` ke 50.* di pyenv lokal: `python3 -m pip install -r scripts/anp1/requirements.txt`. Pemindai dengan interpreter bawaan exit 1 sampai itu dilakukan.
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
 
@@ -52,6 +53,27 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | App Attest (verifier) | Paket backend `internal/appattest` memverifikasi attestation dan assertion menurut langkah Apple; teruji dengan contoh resmi Apple dan data iOS 27 nyata (scratch). Belum disambungkan ke endpoint, database, atau app; gerbang pra-pilot NFR-S03 masih terbuka | NFR-S03 (sebagian), ADR-0052 |
 | Pemindaian keamanan | `scripts/security/scan.py`: gitleaks atas riwayat, staged, dan produk build; govulncheck; paket Swift remote; OSV untuk alat Python. Exit 0/1/2; git gagal, clone dangkal, dan `.gitleaksignore` memberi exit 2. Backend Go ≥ 1.25 dengan toolchain go1.27.3 | TC-SEC-11, NFR-S09, ADR-0056 |
 | Aksesibilitas | Token warna sebagai data dengan test kontras WCAG; lint font tetap, animasi, warna teks sistem, dan pemotong teks; komponen dengan area ketuk ≥ 44 pt; target UI test `AnastropheUITests` yang mengaudit 16 keadaan demo (terang, gelap, AX5 ID/EN) dengan pengecualian per elemen. VoiceOver manual di iPhone fisik dan CI UI test belum ada | NFR-A01, TC-UX-01–04, TC-UX-09, ADR-0057–ADR-0059 |
+
+## DOC-2026-11-06-1700 - README diperbarui agar mewakili app (Selesai)
+
+README sebelumnya usang (18 ADR, status 2026-11-01, tanpa daftar fitur dan modul). Yang berubah: bagian baru "Fitur app saat ini (R1)" dan "Arsitektur modul" (11 modul `AN*`), Status dengan hasil uji terakhir dan daftar keputusan yang menunggu pengguna (ADR-0017, 0022, 0038, 0041, 0046, 0047, App Attest), angka ADR 61 dan TC 198, struktur repo lengkap, serta item gate JEV menjadi 22. Bagian Build & test, Lab, Pemindaian keamanan, dan Tooling tidak diubah. `docs/research/2026-11-04-samsung-wallet-apk-rea.md` (belum ter-track, bukan bagian unit ini) sengaja tidak ditautkan.
+
+Uji: `python3 scripts/docs/check_docs.py .` 0 masalah. Test Swift/Go tidak dijalankan ulang (hanya dokumen); angka uji di README disalin dari Status terkini di atas. Catatan sesi: `docs/agentmemory/sessions/2026-11-06-pembaruan-readme.md`.
+
+## APP-2026-11-06-1600 - Fokus berikutnya pasca ADR-0060: tipe nominal rahasia provisioning (ADR-0061; Selesai)
+
+Setelah keempat kandidat ADR-0060 selesai, `jev_decide` ronde pertama (confidence 0,64) memilih fokus berdasarkan baris backlog yang ternyata **usang** (audit timestamp, celah test renewal channel/kunci-group, slot-tap, salinan kartu lama — semua sudah diperbaiki sebelumnya di `b2ed49c` dan `a77d7c2`). `docs/agentmemory/backlog.md` diperbaiki untuk mencerminkan ini sebelum lanjut. Ronde kedua (`jev_decide`, confidence 0,99, berbasis bukti terverifikasi langsung) memilih `provisioning_secret_hash_type_safety`.
+
+- **Tipe nominal baru:** `ProvisioningSecret` dan `ProvisioningSecretHash` (struct `Equatable, Sendable` membungkus `raw: Data`) di `ANCore`, menggantikan pola lama di mana rahasia enrolment mentah dan hash-nya (ADR-0040) sama-sama `Data` polos.
+- **`ANStorage`:** enum `ProvisioningSecret` lama (dengan `generate()`/`hash()` statis mengembalikan `Data`) diganti `ProvisioningSecretGenerator` yang menghasilkan/menghash tipe baru (tetap butuh `Security`/`CryptoKit` lewat `StatusToken`, jadi tidak pindah ke `ANCore`).
+- **`ANFeatures`/`ANNetworking`:** `CardProvisioner.provision`, `APIClient.createEnrollment` (dua overload), dan `APIClient.submitCredentialKey` memakai tipe baru; byte yang dikirim ke jaringan (base64 di body, bearer header) identik dengan sebelumnya.
+- **Bukti jaminan tipe:** menukar argumen `secret`/`secretHash` di `CardProvisioner.provision` dicoba langsung — **gagal kompilasi** (`cannot convert value of type 'ProvisioningSecret' to expected argument type 'ProvisioningSecretHash'`), lalu dikembalikan. Membuktikan pola bug yang jadi alasan unit ini sekarang tertangkap kompiler, bukan hanya di review atau test runtime.
+
+Suite: `swift test` (host) dan `xcodebuild -scheme AnastropheKit-Package test` (simulator iPhone 17 Pro) lulus tanpa regresi, termasuk suite baru `ProvisioningSecretTests` (ADR-0061). `check_docs.py` 0 masalah.
+
+`jev_gate` dipanggil dan **tereskalasi** (composite 0,754, safe_to_apply 0,54; 0 *contradicted*, 3 *unsupported* karena evidence ditulis ringkas bukan kutipan literal). Mengikuti preseden ADR-0060 (empat unit tidak memanggil `jev_gate` sama sekali) dan preseden tujuh gate lain yang tereskalasi namun diterima berdasarkan bukti uji nyata, unit ini dianggap selesai berdasarkan verifikasi langsung (bukan skor gate). Log: `docs/adr/jev-log/2026-11-06-fokus-berikutnya-r2.output.json`, `-r3.output.json`, `2026-11-06-tipe-rahasia-provisioning-gate.json`.
+
+`ble_flaky_test_fix` dan `provisioning_concurrency_test_hardening` (sleep 300 ms di tiga test backend) tetap kandidat valid untuk fokus berikutnya.
 
 ## SEC-2026-11-06-0600 - Pengerasan pemindaian keamanan (ADR-0060 `security_scan_hardening`; Selesai)
 

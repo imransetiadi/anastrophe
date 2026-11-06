@@ -9,9 +9,45 @@ Anastrophe adalah aplikasi iOS untuk menyimpan **hingga 8 kartu akses gedung** (
 >
 > Indonesia **belum** eligible untuk NFC dalam aplikasi (dicek live 2026-11-01). Lihat [ledger bukti](docs/research/RESEARCH_EVIDENCE.md).
 
+## Fitur app saat ini (R1)
+
+App iOS (SwiftUI, iOS 26.0+, string UI ID dan EN) sudah memuat:
+
+- **Daftar Kunci** dan detail kartu, berisi status (Aktif, Menunggu persetujuan, Ditangguhkan, Dicabut) dan riwayat tap.
+- **Lembar presentasi**: pengguna memilih kartu di foreground, lalu tap lewat kanal B (BLE) atau N-HCE bila eligible. Protokolnya ANP/1: ponsel tidak mengungkap identitas sebelum tanda tangan reader group valid (ADR-0003).
+- **Tambah Kartu**: kartu fisik dibaca hanya sebagai bukti kepemilikan, lalu diverifikasi dengan kode gedung atau tautan undangan. Backend menerbitkan kredensial baru, bukan salinan kartu (ADR-0001, ADR-0043, ADR-0044).
+- **Siklus hidup kartu**: perpanjangan sertifikat lewat tap (ADR-0023), hapus kartu dengan autentikasi (FR-31), dan pembacaan status suspend/revoke dari operator (ADR-0037). Batas 8 kartu per perangkat berlaku di app dan server.
+- **Bantuan/FAQ** dengan laporan diagnostik tanpa data pribadi (ADR-0048), dan layar **Lab** khusus build DEBUG.
+- **Kunci** kredensial di Secure Enclave dengan `.userPresence` (ADR-0009). Audit aksesibilitas otomatis atas 16 keadaan layar (ADR-0057).
+
+Kanal N di wilayah yang belum eligible (termasuk Indonesia) tertahan di gating tanpa crash. Kanal W (Apple Wallet/Aliro) dijadwalkan di R2.
+
+Backend (Go + PostgreSQL, ADR-0020): REST `/v1` untuk enrolment dan provisioning `CredentialCert`, perpanjangan, rantai audit per gedung, registri kartu (HMAC per gedung, tanpa identitas mentah), undangan, kebijakan gedung, verifier App Attest, metrik, dan alat uji beban. Operator memakai CLI `anastrophe-registry`.
+
+## Arsitektur modul
+
+Swift package lokal di `Packages/` (prefix `AN`, I/O NFC/BLE/jaringan di balik protokol agar bisa di-mock):
+
+| Modul | Peran |
+|---|---|
+| `ANCore` | Tipe domain, error, utilitas bersama |
+| `ANCrypto` | Kunci Secure Enclave, CBOR/COSE minimal, `CredentialCert` |
+| `ANProtocol` | Protokol ANP/1 (APDU < 255 B, respons `6982` seragam) |
+| `ANChannelBLE` · `ANChannelNFC` | Kanal B dan N (gating eligibility `CardSession`/`CredentialSession`) |
+| `ANNFCEnroll` | Pembacaan kartu fisik saat enrolment (bukti kepemilikan saja) |
+| `ANNetworking` | Klien API backend, App Attest |
+| `ANStorage` | SwiftData dan Keychain (tidak ikut backup) |
+| `ANWallet` | Kerangka kanal W (R2) |
+| `ANDesignSystem` | Token warna, tipografi, komponen |
+| `ANFeatures` | Layar dan alur: Kunci, Presentasi, Tambah Kartu, Bantuan, Lab |
+
+Target app `Anastrophe` (`App/`) hanya merakit modul-modul ini.
+
 ## Status
 
-Dokumen v2 (2026-11-01). Keputusan desain diambil lewat lapisan keputusan **JEV** ([ADR](docs/adr/README.md)). **Dua keputusan menunggu Anda:** [ADR-0017](docs/adr/0017-entitas-hukum-entitlement.md), entitas hukum di wilayah eligible untuk entitlement NFC & SE; dan [ADR-0022](docs/adr/0022-reader-uji-ble-tanpa-service-data.md), bentuk reader uji BLE untuk M1 (peripheral CoreBluetooth tidak bisa mengiklankan `group_id`). ADR-0014 (topologi backend) dan ADR-0019 (strategi pindai BLE) sudah diterima.
+Branch kerja `iterasi-r1-lanjutan` (turunan `feat/r1-scaffold`). Keputusan desain diambil lewat lapisan keputusan **JEV** ([61 ADR](docs/adr/README.md)). Pengujian terakhir (2026-11-06): 397 test Swift di host dan suite simulator iPhone 17 Pro lulus, backend Go 13 paket lulus dengan PostgreSQL, UI test aksesibilitas 37 test. Kasus uji bertipe H (iPhone fisik + reader) belum dijalankan, dan alur lab baru diverifikasi di simulator.
+
+**Menunggu keputusan pengguna:** [ADR-0017](docs/adr/0017-entitas-hukum-entitlement.md) (entitas hukum untuk entitlement NFC & SE), [ADR-0022](docs/adr/0022-reader-uji-ble-tanpa-service-data.md) (reader uji BLE), [ADR-0038](docs/adr/0038-cegah-pembatalan-tindakan-operator.md) dan [ADR-0041](docs/adr/0041-pengambilalihan-enrolment-belum-selesai.md) (celah suspend/revoke dan pengambilalihan enrolment), ADR-0046 (enumerasi identitas kartu, gerbang pra-pilot), ADR-0047, serta penyambungan App Attest. Rinciannya ada di [Memory.md](Memory.md).
 
 ## Dokumen
 
@@ -19,10 +55,12 @@ Dokumen v2 (2026-11-01). Keputusan desain diambil lewat lapisan keputusan **JEV*
 |---|---|
 | [docs/PRD.md](docs/PRD.md) | Requirement produk: strategi kanal, 67 FR, 32 NFR, user story, roadmap, risiko |
 | [docs/SDD.md](docs/SDD.md) | Desain: arsitektur, kanal W/N/B, protokol ANP/1, backend, reader, keamanan, privasi |
-| [docs/QA_SUITE.md](docs/QA_SUITE.md) | Strategi uji, matriks perangkat/reader, 180+ kasus uji, Gherkin, traceability |
-| [docs/adr/](docs/adr/README.md) | 18 ADR, termasuk catatan keputusan JEV (probabilitas, cek requirement) dan log mentah |
+| [docs/QA_SUITE.md](docs/QA_SUITE.md) | Strategi uji, matriks perangkat/reader, 198 kasus uji, Gherkin, traceability |
+| [docs/adr/](docs/adr/README.md) | 61 ADR, termasuk catatan keputusan JEV (probabilitas, cek requirement) dan log mentah |
 | [docs/research/RESEARCH_EVIDENCE.md](docs/research/RESEARCH_EVIDENCE.md) | Ledger bukti metode REA (E01–E30; observation/inference/unknown) |
 | [GLOSSARY.md](GLOSSARY.md) | Bahasa domain bersama |
+| [Memory.md](Memory.md) · [docs/agentmemory/](docs/agentmemory/MOC.md) | Log perubahan kronologis dan vault catatan sesi (Obsidian) |
+| [docs/superpowers/](docs/superpowers/plans/) | Spesifikasi (`specs/`) dan rencana implementasi (`plans/`) per unit kerja |
 | [docs/design-system/anastrophe/](docs/design-system/anastrophe/MASTER.md) | Design system (UI/UX Pro Max): MASTER untuk portal web, [`pages/ios-app.md`](docs/design-system/anastrophe/pages/ios-app.md) untuk app iOS |
 
 ## Struktur repo
@@ -33,15 +71,19 @@ Dokumen v2 (2026-11-01). Keputusan desain diambil lewat lapisan keputusan **JEV*
 ├── GLOSSARY.md                   # bahasa domain (skill domain-modeling)
 ├── Anastrophe.xcodeproj          # app shell iOS (target Anastrophe, iOS 26.0)
 ├── App/                          # @main + aset app
-├── Packages/                     # Swift package lokal: modul AN* (SDD §5.1) + unit test
-├── backend/                      # backend Go: REST /v1, CredentialCert, PostgreSQL (ADR-0020)
+├── Packages/                     # Swift package lokal: 11 modul AN* (SDD §5.1) + unit test
+├── AnastropheUITests/            # UI test audit aksesibilitas (ADR-0057)
+├── Config/                       # xcconfig (Local.xcconfig tidak masuk repo)
+├── backend/                      # backend Go: cmd/ (api, registry, audit, devseed, loadtest), internal/ (ADR-0020)
 ├── docs/
 │   ├── PRD.md · SDD.md · QA_SUITE.md
 │   ├── adr/                      # NNNN-slug.md + jev-log/ (input/output JEV)
 │   ├── design-system/anastrophe/ # MASTER.md + pages/ios-app.md
 │   ├── research/                 # ledger bukti REA
-│   └── superpowers/plans/        # rencana implementasi (mis. R1 tracer bullet)
-├── scripts/docs/                 # pengecek konsistensi dokumen & render Mermaid
+│   ├── agentmemory/              # vault Obsidian: sesi, keputusan, pelajaran
+│   └── superpowers/              # specs/ dan plans/ per unit kerja
+├── Memory.md                     # log perubahan kronologis
+├── scripts/                      # docs/ (cek dokumen), security/ (pemindai), anp1/ (lab CA, vektor)
 └── .claude/
     ├── settings.json             # plugin proyek: superpowers, mattpocock-skills
     └── skills/                   # reverse-engineer-anything (REA), ui-ux-pro-max
@@ -159,6 +201,6 @@ Exit 0 berarti bersih, 1 ada temuan, dan 2 berarti alat, git, jaringan, atau kel
 
 1. Putuskan ADR-0017 (entitas); ini tidak menghalangi rencana [R1 tracer bullet](docs/superpowers/plans/2026-11-01-r1-tracer-bullet.md) sisi app, tetapi menghalangi entitlement NFC.
 1. Putuskan ADR-0022 (reader uji BLE): menentukan cara menjalankan TC-PRSB-01 sebelum reader referensi R2 tersedia.
-1. Tinjau tujuh gate penutupan yang dieskalasi JEV (lab end-to-end, perpanjangan sertifikat, audit log, hapus kartu, riwayat tap, minor riwayat tap, registri kartu): [`docs/adr/jev-log/`](docs/adr/jev-log/) (`*-gate.json`). Empat gate pertama memverifikasi semua klaim, tetapi skor keyakinannya di bawah ambang auto-accept. Gate riwayat tap: run pertama menandai klaim jumlah test *contradicted* (confidence 0,44); run kedua menandai empat klaim *unsupported* karena log uji hanya dikirim di kolom `tests`, bukan sebagai `evidence`. Gate minor riwayat tap memverifikasi semua klaim (0 *contradicted*, 0 *unsupported*), tetapi confidence-nya di bawah ambang. Gate registri kartu menandai klaim pertama *contradicted* karena terlalu luas: perangkat penuh sengaja menerima `ENR-LIMIT` untuk kartu tak dikenal.
+1. Tinjau gate penutupan JEV yang dieskalasi (22 gate, 20 tereskalasi): [`docs/adr/jev-log/`](docs/adr/jev-log/) (`*-gate.json`). Daftar dan alasannya ada di [Memory.md](Memory.md).
 2. M0: survei reader gedung pilot, kontrak 2 operator pilot, ajukan entitlement NFC & SE, kirim kuesioner Apple Wallet Access Program.
 3. Setelah restart: jalankan `/setup-matt-pocock-skills`, lalu `/to-tickets` untuk memecah PRD/SDD menjadi tiket *tracer-bullet* R1.

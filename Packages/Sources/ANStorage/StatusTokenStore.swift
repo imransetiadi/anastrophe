@@ -17,11 +17,13 @@ public enum StatusToken {
     public static func hash(_ token: Data) -> Data { Data(SHA256.hash(data: token)) }
 }
 
-/// Rahasia enrolment (ADR-0040): 32 byte acak per enrolment, hanya di memori selama alur enrolment.
-/// Server menerima SHA-256-nya saat enrolment dan rahasianya sebagai bearer saat kredensial pertama.
-public enum ProvisioningSecret {
-    public static func generate() throws -> Data { try StatusToken.generate() }
-    public static func hash(_ secret: Data) -> Data { StatusToken.hash(secret) }
+/// Pembuat dan penghash `ProvisioningSecret` (ADR-0040; tipenya sendiri ada di `ANCore`, lihat
+/// dokumentasi di sana untuk alasan tipe `ProvisioningSecret`/`ProvisioningSecretHash` dipisah,
+/// ADR-0061). Hidup di `ANStorage`, bukan `ANCore`, karena pembuatan dan hashing butuh
+/// `Security`/`CryptoKit` lewat `StatusToken`.
+public enum ProvisioningSecretGenerator {
+    public static func generate() throws -> ProvisioningSecret { ProvisioningSecret(raw: try StatusToken.generate()) }
+    public static func hash(_ secret: ProvisioningSecret) -> ProvisioningSecretHash { ProvisioningSecretHash(raw: StatusToken.hash(secret.raw)) }
 }
 
 /// Penyimpanan token baca status per id card instance server, di balik protokol agar bisa di-mock.
