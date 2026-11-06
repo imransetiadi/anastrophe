@@ -22,8 +22,8 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
   - ADR-0047: kedaluwarsa permintaan `PENDING_APPROVAL` (batas 4 per kartu sudah diterapkan), JEV 0,51.
   - Penyambungan App Attest (ADR-0053, seri JEV 0,47): pengikatan kunci attested ke `device_id` (terkait ADR-0041/0046), endpoint yang wajib attestation, bypass dev, dan kategori produksi.
 
-  - `jev_gate` unit audit aksesibilitas (ADR-0057) dijalankan 2026-11-06, dua run, **eskalasi** kedua kali (composite 0,66 lalu 0,58; 0 klaim `contradicted`). Menunggu keputusan pengguna: terima penutupan berdasarkan bukti uji nyata (394/375 test paket, 37/37 dan 36/37→37/37 UI test, 2/2 mutasi, build Release bersih), atau minta review manusia/subagent atas `AccessibilityAudit.swift` (terlalu besar untuk payload gate). Lihat `docs/adr/jev-log/2026-11-06-audit-aksesibilitas-gate.json`.
-  - ADR-0060: fokus kerja berikutnya pasca audit aksesibilitas, JEV 0,38 (eskalasi). Empat kandidat berdiri sendiri, semua requirement *supported*: `app_attest_hardening` (0,47, pengerasan verifier App Attest ADR-0052), `observability_hardening` (0,26, ADR-0054), `error_catalog_alignment` (0,15, pesan galat vs SDD §15), `security_scan_hardening` (0,10, ADR-0056). Pilih salah satu sebelum sesi berikutnya lanjut.
+  - ~~`jev_gate` unit audit aksesibilitas (ADR-0057) eskalasi~~ — **diselesaikan 2026-11-06**: pengguna menerima penutupan berdasarkan bukti uji nyata yang sudah tercatat. Status unit: Selesai.
+  - ~~ADR-0060: fokus kerja berikutnya, JEV 0,38 (eskalasi)~~ — **diselesaikan 2026-11-06**: pengguna menyetujui keempat kandidat (`app_attest_hardening`, `observability_hardening`, `error_catalog_alignment`, `security_scan_hardening`) untuk dikerjakan berurutan.
   - Tinjauan 21 gate JEV (19 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan, verifier App Attest, sisa Keychain instal ulang, observabilitas backend, uji beban API, pemindaian secret dan dependensi (`docs/adr/jev-log/*-gate.json`).
   - Perbarui `cryptography` ke 50.* di pyenv lokal: `python3 -m pip install -r scripts/anp1/requirements.txt`. Pemindai dengan interpreter bawaan exit 1 sampai itu dilakukan.
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
@@ -52,6 +52,15 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | App Attest (verifier) | Paket backend `internal/appattest` memverifikasi attestation dan assertion menurut langkah Apple; teruji dengan contoh resmi Apple dan data iOS 27 nyata (scratch). Belum disambungkan ke endpoint, database, atau app; gerbang pra-pilot NFR-S03 masih terbuka | NFR-S03 (sebagian), ADR-0052 |
 | Pemindaian keamanan | `scripts/security/scan.py`: gitleaks atas riwayat, staged, dan produk build; govulncheck; paket Swift remote; OSV untuk alat Python. Exit 0/1/2; git gagal, clone dangkal, dan `.gitleaksignore` memberi exit 2. Backend Go ≥ 1.25 dengan toolchain go1.27.3 | TC-SEC-11, NFR-S09, ADR-0056 |
 | Aksesibilitas | Token warna sebagai data dengan test kontras WCAG; lint font tetap, animasi, warna teks sistem, dan pemotong teks; komponen dengan area ketuk ≥ 44 pt; target UI test `AnastropheUITests` yang mengaudit 16 keadaan demo (terang, gelap, AX5 ID/EN) dengan pengecualian per elemen. VoiceOver manual di iPhone fisik dan CI UI test belum ada | NFR-A01, TC-UX-01–04, TC-UX-09, ADR-0057–ADR-0059 |
+
+## JEV-2026-11-06-0200 - Resolusi dua eskalasi: gate ADR-0057 dan fokus ADR-0060 (Selesai)
+
+Pengguna meng-approve semua pekerjaan yang tereskalasi di entri sebelumnya (`JEV-2026-11-06-0100`, `APP-2026-11-06-0000`):
+
+- **ADR-0057 (gate):** diterima — penutupan unit aksesibilitas berdasarkan bukti uji nyata yang sudah tercatat (Swift host 394 test, simulator paket 375 test, UI test audit 37/37 dan 36/37→37/37 di dua perangkat, 2/2 mutasi, build Release bersih, `check_docs.py` 0). Ditulis sebagai bagian baru "Penutupan unit" di `docs/adr/0057-fokus-audit-aksesibilitas.md`. Status unit: **Selesai**.
+- **ADR-0060 (fokus berikutnya):** disetujui — bukan memilih satu kandidat, melainkan keempatnya dikerjakan berurutan sesuai probabilitas JEV: `app_attest_hardening` (ADR-0052), `observability_hardening` (ADR-0054), `error_catalog_alignment` (SDD §15), `security_scan_hardening` (ADR-0056). Status ADR: **Diterima**.
+
+Tidak ada kode yang berubah di entri ini; perubahan terbatas pada status ADR, backlog, dan log ini. Keempat unit kerja menyusul sebagai entri terpisah.
 
 ## JEV-2026-11-06-0100 - Fokus kerja berikutnya pasca audit aksesibilitas (Eskalasi; menunggu keputusan pengguna)
 

@@ -1,8 +1,8 @@
-# ADR-0060: Fokus berikutnya pasca audit aksesibilitas (terbuka)
+# ADR-0060: Fokus berikutnya pasca audit aksesibilitas (keempat kandidat disetujui)
 
-- **Status:** Diusulkan — butuh keputusan manusia (eskalasi)
+- **Status:** Diterima — pengguna menyetujui keempat kandidat dikerjakan berurutan (eskalasi JEV diselesaikan manusia)
 - **Tanggal:** 2026-11-06
-- **Pengambil keputusan:** JEV (`jev_decide`, jev-1.14.0) mengusulkan; keputusan akhir menunggu pengguna
+- **Pengambil keputusan:** JEV (`jev_decide`, jev-1.14.0) mengusulkan; pengguna menyetujui semua kandidat alih-alih memilih satu
 - **Rujukan:** NFR-S03, NFR-S09, NFR-O01, TC-UX-09, ADR-0018, ADR-0052, ADR-0054, ADR-0056
 
 ## Konteks
@@ -31,15 +31,15 @@ Confidence 0,38 < 0,60 (ADR-0018) → **eskalasi ke pengguna**, meski JEV tidak 
 
 ## Keputusan
 
-**Belum diputuskan.** Menunggu pengguna memilih salah satu dari:
-1. `app_attest_hardening` — pengerasan verifier App Attest (ADR-0052), probabilitas tertinggi JEV;
+Pengguna menyetujui **keempat kandidat** untuk dikerjakan, bukan memilih satu. Urutan pengerjaan mengikuti probabilitas JEV (tertinggi dulu), karena probabilitas mencerminkan independensi risiko dan ukuran unit yang disarankan model keputusan:
+1. `app_attest_hardening` — pengerasan verifier App Attest (ADR-0052);
 2. `observability_hardening` — pengerasan observabilitas backend (ADR-0054);
-3. `security_scan_hardening` — pengerasan pemindaian keamanan (ADR-0056);
-4. `error_catalog_alignment` — pencocokan pesan galat dengan SDD §15 (lingkup kecil, cepat selesai);
+3. `error_catalog_alignment` — pencocokan pesan galat dengan SDD §15;
+4. `security_scan_hardening` — pengerasan pemindaian keamanan (ADR-0056).
 
-atau menunjuk fokus lain di luar daftar ini.
+Setiap kandidat dikerjakan sebagai unit TDD terpisah dengan commit sendiri, diverifikasi sebelum lanjut ke kandidat berikutnya (superpowers: verification-before-completion).
 
 ## Konsekuensi
 
-- Tidak ada kode yang berubah dari keputusan ini sendiri.
-- Sesi berikutnya menunggu arahan pengguna sebelum memilih salah satu unit di atas sebagai kerja berikutnya.
+- Empat unit kerja backend/scripts menyusul di branch `iterasi-r1-lanjutan`, masing-masing dengan test baru dan commit sendiri.
+- Tidak satu pun menyentuh keputusan yang sudah dieskalasi sebelumnya (penyambungan App Attest, oracle tebak kartu, dll.) — itu tetap terbuka.

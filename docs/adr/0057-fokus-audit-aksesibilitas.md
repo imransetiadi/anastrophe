@@ -45,3 +45,7 @@ Desain dan rencananya ada di `docs/superpowers/specs/2026-11-02-audit-aksesibili
 - NFR-A01 bisa diperiksa ulang dengan satu perintah `xcodebuild test` di simulator, dan siap dijadikan langkah CI.
 - Mode demo DEBUG bertambah beberapa layar (`-ANDemoScreen`) untuk audit dan screenshot; build Release tidak berubah.
 - TC-UX-05 (Reduce Motion, P1), TC-UX-06 (lokalisasi), dan TC-ACC-02 (OTP) di luar cakupan unit ini.
+
+## Penutupan unit (2026-11-06)
+
+`jev_gate` penutupan unit dijalankan dua kali (2026-11-06) dan eskalasi kedua kali (composite 0,66 lalu 0,58; 0 klaim `contradicted` — lihat `jev-log/2026-11-06-audit-aksesibilitas-gate.json`), karena harness `AnastropheUITests/AccessibilityAudit.swift` (+829 baris) melebihi batas payload gate, bukan karena temuan cacat. **Pengguna menerima penutupan unit** berdasarkan bukti uji nyata yang sudah tercatat (Swift host 394 test, simulator paket 375 test, UI test audit 37/37 dan 36/37→37/37 di dua perangkat, 2/2 mutasi tertangkap, build Release bersih, `check_docs.py` 0 masalah). Status unit: **Selesai**, VoiceOver manual di iPhone fisik dan CI UI test tetap di backlog.
