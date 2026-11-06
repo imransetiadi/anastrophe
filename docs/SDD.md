@@ -49,6 +49,7 @@
 | 2.33 | 2026-11-02 | Perbaikan review akhir uji beban (ADR-0055): redirect tidak diikuti, enrol mengikuti jalur app (`Idempotency-Key`, `status_token_hash`), token laju terlewat dan run terpotong terlihat; baseline lab diukur ulang (§14). |
 | 2.34 | 2026-11-02 | Pemindaian secret dan dependensi (ADR-0056, §10.3): gitleaks + govulncheck + OSV lewat `scripts/security/scan.py`; backend Go ≥ 1.25 dengan toolchain go1.27.3 (§2). |
 | 2.35 | 2026-11-04 | Aksesibilitas app (ADR-0057–ADR-0059, §5.10): token warna sebagai data dengan test kontras, lint sumber, komponen dengan area ketuk ≥ 44 pt, dan audit XCUITest 16 keadaan (terang, gelap, AX5 ID/EN) dengan pengecualian per elemen. |
+| 2.36 | 2026-11-06 | Katalog error §15 dicocokkan dengan teks app nyata (ADR-0060 `error_catalog_alignment`, TC-UX-09 butir 9): `CH-NOT-ELIGIBLE`, `CH-BT-OFF`/`CH-BT-DENIED`, `PRS-DENIED-ZONE`, `PRS-SUSPENDED`, `CRED-EXPIRED` diperbarui ke teks literal; `ENR-NOT-FOUND`/`ENR-INVALID-KEY`/`ENR-INVALID-CHANNEL` ditandai belum punya teks tersendiri (fallback generik). |
 
 > Konvensi REA: klaim platform memakai ID bukti (E/O/I/U) dari ledger riset. Keputusan desain ada di ADR (`docs/adr/`). Istilah mengikuti `GLOSSARY.md`.
 
@@ -968,19 +969,19 @@ Baseline lab (QA §11.1): semua rute 100% ≤ 0,3 dtk tanpa galat pada konkurens
 | `ENR-DUPLICATE` | Kartu fisik yang sama sudah ada di iPhone ini (409) | "Kartu ini sudah ada di iPhone ini." | Buka kartu yang ada |
 | `ENR-INVITATION-INVALID` | Undangan tidak dikenal, kedaluwarsa, atau sudah dipakai; ketiganya dijawab identik (404, TC-ENR-08) | "Undangan tidak berlaku atau sudah dipakai." | Minta undangan baru ke pengelola |
 | `ENR-LIMIT` | Sudah 8 kartu | "Maksimal 8 kartu per iPhone." | Hapus kartu lain |
-| `ENR-NOT-FOUND` | Enrolment atau gedung tidak dikenal server (perangkat baru dibuat otomatis, ADR-0045), atau rahasia enrolment provisioning hilang/salah; keduanya dijawab identik (404, ADR-0040) | "Pendaftaran kartu tidak ditemukan. Mulai lagi." | Ulangi Tambah kartu |
-| `ENR-INVALID-KEY` | Kunci publik kanal bukan titik P-256 yang valid (400) | "Kartu tidak dapat disiapkan. Coba lagi." | Buat ulang kunci, ulangi |
-| `ENR-INVALID-CHANNEL` | Kanal tidak didukung, dimatikan global, atau di luar kebijakan kanal gedung saat provisioning (400; kebijakan gedung diperiksa sesudah rahasia enrolment, ADR-0049) | "Cara akses ini belum didukung." | Pilih kanal lain |
+| `ENR-NOT-FOUND`¹ | Enrolment atau gedung tidak dikenal server (perangkat baru dibuat otomatis, ADR-0045), atau rahasia enrolment provisioning hilang/salah; keduanya dijawab identik (404, ADR-0040) | "Pendaftaran kartu tidak ditemukan. Mulai lagi." | Ulangi Tambah kartu |
+| `ENR-INVALID-KEY`¹ | Kunci publik kanal bukan titik P-256 yang valid (400) | "Kartu tidak dapat disiapkan. Coba lagi." | Buat ulang kunci, ulangi |
+| `ENR-INVALID-CHANNEL`¹ | Kanal tidak didukung, dimatikan global, atau di luar kebijakan kanal gedung saat provisioning (400; kebijakan gedung diperiksa sesudah rahasia enrolment, ADR-0049) | "Cara akses ini belum didukung." | Pilih kanal lain |
 | `REQ-IDEMPOTENCY-KEY` | POST mutasi tanpa header `Idempotency-Key` (400) | — (bug klien) | Perbaiki klien |
 | `REQ-IDEMPOTENCY-CONFLICT` | `Idempotency-Key` dipakai ulang dengan isi berbeda (422) | — (bug klien) | Pakai key baru per permintaan |
 | `REQ-INVALID`, `NOT-FOUND`, `INTERNAL` | Body tidak valid (400), rute tak dikenal (404), kesalahan server (500; detail tidak pernah dikirim ke klien) | "Terjadi kesalahan. Coba lagi." | Coba lagi / laporkan |
 | `CODE-INVALID` / `CODE-LOCKED` | Security code salah / terkunci | "Kode salah. Sisa percobaan: n." / "Coba lagi dalam 30 menit." | — |
-| `CH-NOT-ELIGIBLE` | Perangkat/wilayah tidak eligible | "Fitur ini belum tersedia di perangkat/wilayah Anda." | Tampilkan kanal alternatif |
-| `CH-BT-OFF` / `CH-BT-DENIED` | Bluetooth mati / izin ditolak | "Nyalakan Bluetooth…" / "Izinkan Bluetooth di Pengaturan." | Tautan Pengaturan |
+| `CH-NOT-ELIGIBLE` | Perangkat/wilayah tidak eligible | "Fitur ini belum tersedia di perangkat atau wilayah Anda." | Tampilkan kanal alternatif |
+| `CH-BT-OFF` / `CH-BT-DENIED` | Bluetooth mati / izin ditolak | "Nyalakan Bluetooth di Pusat Kontrol, lalu coba lagi." / "Izinkan Bluetooth untuk Anastrophe di Pengaturan, lalu coba lagi." | Tautan Pengaturan |
 | `PRS-TIMEOUT` | 60 dtk tanpa reader | "Waktu habis. Coba lagi." | Retry |
-| `PRS-DENIED-ZONE` | Zona tidak diizinkan | "Kartu ini tidak berlaku di pintu ini." | — |
-| `PRS-SUSPENDED` | Kredensial ditangguhkan | "Kartu sedang ditangguhkan." | Hubungi pengelola |
-| `CRED-EXPIRED` | Sertifikat kedaluwarsa | "Sambungkan iPhone ke internet, lalu gunakan kartu lagi." | Diperpanjang saat kartu dipakai berikutnya dengan koneksi internet (ADR-0023) |
+| `PRS-DENIED-ZONE` | Zona tidak diizinkan | "Kartu ini tidak berlaku untuk pintu ini." | — |
+| `PRS-SUSPENDED` | Kredensial ditangguhkan | "Kartu ini ditangguhkan. Hubungi pengelola gedung." | Hubungi pengelola |
+| `CRED-EXPIRED` | Sertifikat kedaluwarsa | "Kartu kedaluwarsa dan belum bisa diperbarui. Sambungkan iPhone ke internet, lalu gunakan kartu lagi." | Diperpanjang saat kartu dipakai berikutnya dengan koneksi internet (ADR-0023) |
 | `CRED-NOT-FOUND` | `cred_id` tidak dikenal saat perpanjangan | "Kartu tidak ditemukan. Tambahkan ulang kartu." | Enrolment ulang |
 | `CRED-NOT-RENEWABLE` | Kredensial atau kartu ditangguhkan/dicabut | "Kartu sedang ditangguhkan. Hubungi pengelola gedung." | Hubungi admin |
 | `CRED-CHALLENGE-INVALID` | Nonce tidak dikenal, terpakai, kedaluwarsa, atau milik kredensial lain | — (diulang otomatis pada tap berikutnya) | Minta nonce baru |
@@ -990,6 +991,8 @@ Baseline lab (QA §11.1): semua rute 100% ≤ 0,3 dtk tanpa galat pada konkurens
 | `CARD-NOT-REMOVABLE` | Kartu belum aktif (mis. masih diprovisikan) saat hapus kartu | "Kartu belum bisa dihapus. Coba lagi nanti." | Coba lagi |
 | `DEV-KEY-MISSING` | Restore/passcode dimatikan | "Kartu perlu dipindahkan ke iPhone ini." | Alur transfer |
 | `NET-OFFLINE` | Aksi butuh online | "Butuh koneksi internet untuk langkah ini." | Retry otomatis |
+
+¹ Pesan di kolom ini belum diimplementasikan sebagai teks tersendiri di app (audit pencocokan katalog, ADR-0060 `error_catalog_alignment`, TC-UX-09 butir 9, 2026-11-06): `EnrollmentMessages` memetakan kode ini ke pesan generik `add.error.generic` ("Terjadi kesalahan. Coba lagi."), sama seperti `REQ-INVALID`/`NOT-FOUND`/`INTERNAL`. Dampaknya kecil karena aksi yang disarankan (ulangi/coba lagi) sama; dicatat di backlog sebagai kandidat penambahan string bila diminta.
 
 ## 16. Architecture Decision Records
 

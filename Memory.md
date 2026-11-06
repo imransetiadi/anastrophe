@@ -53,6 +53,22 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Pemindaian keamanan | `scripts/security/scan.py`: gitleaks atas riwayat, staged, dan produk build; govulncheck; paket Swift remote; OSV untuk alat Python. Exit 0/1/2; git gagal, clone dangkal, dan `.gitleaksignore` memberi exit 2. Backend Go ≥ 1.25 dengan toolchain go1.27.3 | TC-SEC-11, NFR-S09, ADR-0056 |
 | Aksesibilitas | Token warna sebagai data dengan test kontras WCAG; lint font tetap, animasi, warna teks sistem, dan pemotong teks; komponen dengan area ketuk ≥ 44 pt; target UI test `AnastropheUITests` yang mengaudit 16 keadaan demo (terang, gelap, AX5 ID/EN) dengan pengecualian per elemen. VoiceOver manual di iPhone fisik dan CI UI test belum ada | NFR-A01, TC-UX-01–04, TC-UX-09, ADR-0057–ADR-0059 |
 
+## DOC-2026-11-06-0500 - Katalog error dicocokkan dengan teks app (ADR-0060 `error_catalog_alignment`; Selesai)
+
+Unit ketiga ADR-0060 (dokumen murni, tanpa kode). Audit baris demi baris SDD §15 terhadap `Localizable.xcstrings` dan kode pemetaan (`EnrollmentMessages.swift`, `AddCardModel.swift`, `CardRemover.swift`).
+
+Hasil dari 33 baris katalog:
+- **15 cocok persis** tanpa perubahan.
+- **5 wording diperbarui di SDD §15** (bukan di app — string app sudah diaudit dan dikunci oleh unit aksesibilitas ADR-0057, jadi SDD yang menyusul ke kode): `CH-NOT-ELIGIBLE` ("perangkat/wilayah" → "perangkat atau wilayah"), `CH-BT-OFF`/`CH-BT-DENIED` (teks singkat SDD diganti teks literal app), `PRS-DENIED-ZONE` ("di pintu ini" → "untuk pintu ini"), `PRS-SUSPENDED` (SDD terlalu ringkas dibanding app), `CRED-EXPIRED` (app punya kalimat pembuka tambahan).
+- **5 memang tanpa teks pengguna by design**, konsisten dengan app (kolom pesan "—" di SDD).
+- **1 belum berlaku di R1** (OTP).
+- **3 kode tanpa teks tersendiri** (`ENR-NOT-FOUND`, `ENR-INVALID-KEY`, `ENR-INVALID-CHANNEL`): jatuh ke `add.error.generic`. Ditandai catatan kaki di SDD §15, dicatat di backlog sebagai kandidat penambahan string (dampak kecil, aksi sama).
+- **4 kode mendekati tapi tidak identik** (`CRED-NOT-FOUND`, `CRED-NOT-RENEWABLE`, `CRED-PROOF-INVALID`, `DEV-KEY-MISSING`): app memakai `card.reason.*`/`card.renewal_offline` di konteks badge daftar kartu, bukan pesan di titik kegagalan. Dicatat di backlog sebagai pertanyaan produk terbuka (perlu pesan seketika atau cukup status kartu), bukan diputuskan sepihak di sini.
+
+Tidak ada kode app yang diubah (string UI sudah diaudit aksesibilitas; mengubahnya berisiko merusak pengecualian/screenshot ADR-0057). SDD §15 dan QA §11.1 TC-UX-09 diperbarui dengan rincian di atas. Versi SDD 2.36.
+
+Rujukan: ADR-0060, NFR-A01, NFR-C01, TC-UX-09. Verifikasi: `python3 scripts/docs/check_docs.py .` → problems 0.
+
 ## API-2026-11-06-0400 - Pengerasan observabilitas backend (ADR-0060 `observability_hardening`; Selesai)
 
 Unit kedua ADR-0060. TDD, RED→GREEN→mutasi:
