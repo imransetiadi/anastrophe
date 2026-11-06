@@ -11,6 +11,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Sesi
 
+- [2026-11-06 — Pembaruan README](sessions/2026-11-06-pembaruan-readme.md)
 - [2026-11-06 — Fokus berikutnya pasca ADR-0060: tipe nominal rahasia provisioning](sessions/2026-11-06-tipe-rahasia-provisioning.md)
 - [2026-11-06 — Gate penutupan audit aksesibilitas (eskalasi)](sessions/2026-11-06-audit-aksesibilitas-gate.md)
 - [2026-11-04 — Audit aksesibilitas app: GREEN di dua perangkat](sessions/2026-11-04-audit-aksesibilitas-green.md)

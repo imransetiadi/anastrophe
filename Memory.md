@@ -54,6 +54,12 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Pemindaian keamanan | `scripts/security/scan.py`: gitleaks atas riwayat, staged, dan produk build; govulncheck; paket Swift remote; OSV untuk alat Python. Exit 0/1/2; git gagal, clone dangkal, dan `.gitleaksignore` memberi exit 2. Backend Go ≥ 1.25 dengan toolchain go1.27.3 | TC-SEC-11, NFR-S09, ADR-0056 |
 | Aksesibilitas | Token warna sebagai data dengan test kontras WCAG; lint font tetap, animasi, warna teks sistem, dan pemotong teks; komponen dengan area ketuk ≥ 44 pt; target UI test `AnastropheUITests` yang mengaudit 16 keadaan demo (terang, gelap, AX5 ID/EN) dengan pengecualian per elemen. VoiceOver manual di iPhone fisik dan CI UI test belum ada | NFR-A01, TC-UX-01–04, TC-UX-09, ADR-0057–ADR-0059 |
 
+## DOC-2026-11-06-1700 - README diperbarui agar mewakili app (Selesai)
+
+README sebelumnya usang (18 ADR, status 2026-11-01, tanpa daftar fitur dan modul). Yang berubah: bagian baru "Fitur app saat ini (R1)" dan "Arsitektur modul" (11 modul `AN*`), Status dengan hasil uji terakhir dan daftar keputusan yang menunggu pengguna (ADR-0017, 0022, 0038, 0041, 0046, 0047, App Attest), angka ADR 61 dan TC 198, struktur repo lengkap, serta item gate JEV menjadi 22. Bagian Build & test, Lab, Pemindaian keamanan, dan Tooling tidak diubah. `docs/research/2026-11-04-samsung-wallet-apk-rea.md` (belum ter-track, bukan bagian unit ini) sengaja tidak ditautkan.
+
+Uji: `python3 scripts/docs/check_docs.py .` 0 masalah. Test Swift/Go tidak dijalankan ulang (hanya dokumen); angka uji di README disalin dari Status terkini di atas. Catatan sesi: `docs/agentmemory/sessions/2026-11-06-pembaruan-readme.md`.
+
 ## APP-2026-11-06-1600 - Fokus berikutnya pasca ADR-0060: tipe nominal rahasia provisioning (ADR-0061; Selesai)
 
 Setelah keempat kandidat ADR-0060 selesai, `jev_decide` ronde pertama (confidence 0,64) memilih fokus berdasarkan baris backlog yang ternyata **usang** (audit timestamp, celah test renewal channel/kunci-group, slot-tap, salinan kartu lama — semua sudah diperbaiki sebelumnya di `b2ed49c` dan `a77d7c2`). `docs/agentmemory/backlog.md` diperbaiki untuk mencerminkan ini sebelum lanjut. Ronde kedua (`jev_decide`, confidence 0,99, berbasis bukti terverifikasi langsung) memilih `provisioning_secret_hash_type_safety`.
