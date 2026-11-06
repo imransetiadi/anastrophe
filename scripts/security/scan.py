@@ -213,14 +213,27 @@ def run_govulncheck(backend):
     return proc.stdout
 
 
-def swift_remote_packages(package_swift, pbxproj):
-    """App iOS harus tetap tanpa paket pihak ketiga sampai ada pemindai untuk ekosistem Swift."""
+# Direktori yang dilewati saat mencari Package.swift: build/checkout, bukan sumber (minor review akhir
+# ADR-0056 — sebelumnya hanya Packages/Package.swift yang diperiksa, jadi paket Swift lokal lain dengan
+# dependensi remote lolos tanpa terdeteksi).
+_SWIFT_SCAN_EXCLUDE = {".build", "build", "DerivedData", ".git", "worktrees"}
+
+
+def swift_packages_remote(repo):
+    """App iOS harus tetap tanpa paket pihak ketiga sampai ada pemindai untuk ekosistem Swift. Semua
+    `Package.swift` di repo diperiksa, bukan hanya satu path tetap."""
+    repo = pathlib.Path(repo)
+    found = []
     try:
-        found = []
-        if ".package(" in pathlib.Path(package_swift).read_text():
-            found.append(f"{package_swift}: dependensi .package(")
-        if "XCRemoteSwiftPackageReference" in pathlib.Path(pbxproj).read_text():
-            found.append(f"{pbxproj}: XCRemoteSwiftPackageReference")
+        pbxproj = repo / "Anastrophe.xcodeproj/project.pbxproj"
+        if pbxproj.exists() and "XCRemoteSwiftPackageReference" in pbxproj.read_text():
+            found.append(f"{pbxproj.relative_to(repo)}: XCRemoteSwiftPackageReference")
+        for pkg in sorted(repo.rglob("Package.swift")):
+            rel = pkg.relative_to(repo)
+            if _SWIFT_SCAN_EXCLUDE & set(rel.parts):
+                continue
+            if ".package(" in pkg.read_text():
+                found.append(f"{rel}: dependensi .package(")
         return found
     except OSError as e:
         raise ToolError(f"berkas proyek Swift tidak terbaca: {e}") from None
@@ -233,12 +246,28 @@ def osv_query(payload):
         return json.loads(resp.read().decode())
 
 
-def _requirement_names(path):
+def _requirement_names(path, _seen=None):
+    """Nama paket dari requirements.txt. Baris `-r lain.txt` / `--requirement lain.txt` diikuti rekursif,
+    relatif terhadap direktori berkas yang memuatnya (minor review akhir ADR-0056); tanpa ini, paket di
+    berkas yang di-include tidak pernah diperiksa OSV. _seen mencegah siklus -r yang saling mengarah."""
+    path = pathlib.Path(path)
+    seen = _seen if _seen is not None else set()
+    resolved = path.resolve()
+    if resolved in seen:
+        return []
+    seen.add(resolved)
     names = []
-    for line in pathlib.Path(path).read_text().splitlines():
+    for line in path.read_text().splitlines():
         line = line.split("#", 1)[0].strip()
-        if line and not line.startswith("-"):
-            names.append(re.split(r"[=<>!~\[;\s@]", line, maxsplit=1)[0])
+        if not line:
+            continue
+        m = re.match(r"-{1,2}r(?:equirement)?[\s=]+(.+)$", line)
+        if m:
+            names += _requirement_names(path.parent / m[1].strip(), seen)
+            continue
+        if line.startswith("-"):
+            continue
+        names.append(re.split(r"[=<>!~\[;\s@]", line, maxsplit=1)[0])
     return names
 
 
@@ -257,11 +286,12 @@ def python_advisories(requirements, query=osv_query, version_of=importlib.metada
                 skipped.append(f"{name} (tidak terpasang)")
                 continue
             payload = {"package": {"name": name, "ecosystem": "PyPI"}, "version": version}
+            raw = []
             # OSV bisa mengembalikan hanya next_page_token tanpa hasil; halaman diikuti sampai token habis.
             for _ in range(OSV_MAX_PAGES):
                 try:
                     resp = query(payload)
-                    vulnerable += [f"{name} {version}: {v['id']}" for v in resp.get("vulns") or []]
+                    raw += resp.get("vulns") or []
                     token = resp.get("next_page_token")
                 except (OSError, ValueError, KeyError, TypeError, AttributeError, http.client.HTTPException) as e:
                     raise ToolError(f"kueri OSV untuk {name} gagal: {e}") from None
@@ -270,30 +300,65 @@ def python_advisories(requirements, query=osv_query, version_of=importlib.metada
                 payload = {**payload, "page_token": token}
             else:
                 raise ToolError(f"kueri OSV untuk {name} tidak selesai sesudah {OSV_MAX_PAGES} halaman")
+            vulnerable += [f"{name} {version}: {vid}" for vid in _dedupe_aliases(raw)]
     return vulnerable, skipped
 
 
-def scan_deps(repo, out, govulncheck=run_govulncheck, query=osv_query, version_of=importlib.metadata.version):
-    """Mengembalikan True bila ada temuan dependensi."""
-    vulns = parse_govulncheck(govulncheck(repo / "backend"))
-    called = [v for v in vulns if v.called]
-    print(f"dependensi Go (govulncheck): {len(called)} kerentanan terpanggil", file=out)
-    status = {"fungsi": "terpanggil", "paket": "diimpor, fungsi rentan tidak terpanggil",
-              "modul": "di graf modul, paket tidak diimpor"}
+def _dedupe_aliases(vulns):
+    """Mengelompokkan entri OSV yang saling menjadi alias (mis. GHSA dan PYSEC untuk kerentanan yang sama)
+    dan mengembalikan satu id per kelompok, agar jumlah advisori tidak berlipat (minor review akhir
+    ADR-0056). CVE dipilih sebagai id kanonik bila ada di kelompoknya; selain itu, id yang leksikografis
+    terkecil, agar hasilnya deterministik."""
+    groups = []
     for v in vulns:
-        prefix = "  " if v.called else "  informasi: "
-        print(f"{prefix}{v.osv}  {v.module}  {status[v.level]}; perbaikan: {v.fixed or 'belum ada'}", file=out)
-    remote = swift_remote_packages(repo / "Packages/Package.swift", repo / "Anastrophe.xcodeproj/project.pbxproj")
-    print(f"paket Swift remote: {len(remote)}", file=out)
-    for r in remote:
-        print(f"  {r}", file=out)
-    vulnerable, skipped = python_advisories(sorted(repo.glob("scripts/*/requirements.txt")), query, version_of)
-    print(f"dependensi Python (OSV): {len(vulnerable)} advisori", file=out)
-    for v in vulnerable:
-        print(f"  {v}", file=out)
-    for s in skipped:
-        print(f"  informasi: {s} dilewati", file=out)
-    return bool(called or remote or vulnerable)
+        ids = {v["id"], *(v.get("aliases") or [])}
+        for g in groups:
+            if g & ids:
+                g |= ids
+                break
+        else:
+            groups.append(set(ids))
+    return [min(g, key=lambda i: (0 if i.startswith("CVE-") else 1, i)) for g in groups]
+
+
+def scan_deps(repo, out, govulncheck=run_govulncheck, query=osv_query, version_of=importlib.metadata.version):
+    """Mengembalikan True bila ada temuan dependensi. Tiga sub-pemeriksaan (Go, Swift, Python) berjalan
+    independen: satu yang gagal tetap melaporkan hasil dua lainnya, bukan menyembunyikannya (minor review
+    akhir ADR-0056). Galat dikumpulkan dan dilempar sebagai satu ToolError sesudah semuanya dicoba."""
+    found, errors = False, []
+    try:
+        vulns = parse_govulncheck(govulncheck(repo / "backend"))
+        called = [v for v in vulns if v.called]
+        print(f"dependensi Go (govulncheck): {len(called)} kerentanan terpanggil", file=out)
+        status = {"fungsi": "terpanggil", "paket": "diimpor, fungsi rentan tidak terpanggil",
+                  "modul": "di graf modul, paket tidak diimpor"}
+        for v in vulns:
+            prefix = "  " if v.called else "  informasi: "
+            print(f"{prefix}{v.osv}  {v.module}  {status[v.level]}; perbaikan: {v.fixed or 'belum ada'}", file=out)
+        found |= bool(called)
+    except ToolError as e:
+        errors.append(str(e))
+    try:
+        remote = swift_packages_remote(repo)
+        print(f"paket Swift remote: {len(remote)}", file=out)
+        for r in remote:
+            print(f"  {r}", file=out)
+        found |= bool(remote)
+    except ToolError as e:
+        errors.append(str(e))
+    try:
+        vulnerable, skipped = python_advisories(sorted(repo.glob("scripts/*/requirements.txt")), query, version_of)
+        print(f"dependensi Python (OSV): {len(vulnerable)} advisori", file=out)
+        for v in vulnerable:
+            print(f"  {v}", file=out)
+        for s in skipped:
+            print(f"  informasi: {s} dilewati", file=out)
+        found |= bool(vulnerable)
+    except ToolError as e:
+        errors.append(str(e))
+    if errors:
+        raise ToolError("; ".join(errors))
+    return found
 
 
 def _report(title, findings, out):
@@ -318,20 +383,31 @@ def main(argv=None, out=sys.stdout, err=sys.stderr, *, govulncheck=run_govulnche
     bundle = args.path if args.perintah == "build" else args.bundle
     # gitleaks berjalan dengan cwd = repo, jadi path relatif dari pemanggil diselesaikan lebih dulu.
     repo, config = args.repo.resolve(), args.config.resolve()
-    found = False
-    try:
-        if args.perintah in (None, "secrets"):
+    # Setiap bagian (secrets, deps, build) berjalan independen: satu yang gagal tidak menghentikan atau
+    # menyembunyikan hasil bagian lain (minor review akhir ADR-0056).
+    found, errors = False, []
+    if args.perintah in (None, "secrets"):
+        try:
             secrets = scan_secrets(repo, config)
             _report("secret (riwayat + staged)", secrets, out)
             found |= bool(secrets)
-        if args.perintah in (None, "deps"):
+        except ToolError as e:
+            errors.append(str(e))
+    if args.perintah in (None, "deps"):
+        try:
             found |= scan_deps(repo, out, govulncheck, osv_query, pip_version)
-        if bundle is not None:
+        except ToolError as e:
+            errors.append(str(e))
+    if bundle is not None:
+        try:
             built = scan_build(bundle, config)
             _report(f"secret (produk build {bundle.name})", built, out)
             found |= bool(built)
-    except ToolError as e:
-        print(f"scan.py: {e}", file=err)
+        except ToolError as e:
+            errors.append(str(e))
+    if errors:
+        for e in errors:
+            print(f"scan.py: {e}", file=err)
         return 2
     return 1 if found else 0
 

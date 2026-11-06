@@ -15,6 +15,11 @@ import (
 type requestInfo struct {
 	id      string
 	pattern string
+	// panicked diset recoverer saat handler panik sesudah header terkirim (ADR-0054 review akhir): header
+	// yang sudah terkirim membuat WriteHeader(500) recoverer jadi no-op, jadi statusRecorder tetap merekam
+	// status lama (mis. 200). accessLog memakai penanda ini untuk tetap mencatat permintaan sebagai 500 di
+	// log dan metrik, karena responsnya memang gagal meski header awal sempat terkirim.
+	panicked bool
 }
 
 type requestInfoKey struct{}
@@ -90,6 +95,9 @@ func accessLog(logger *slog.Logger, metrics *Metrics, next http.Handler) http.Ha
 			status := rec.status
 			if status == 0 && !aborted {
 				status = http.StatusOK // handler tidak menulis apa pun: net/http mengirim 200
+			}
+			if info.panicked {
+				status = http.StatusInternalServerError
 			}
 			elapsed := time.Since(start)
 			metrics.end(info.route(), status, elapsed)

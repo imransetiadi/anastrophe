@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -84,6 +85,29 @@ func TestMetodeSalahMenjadi405(t *testing.T) {
 	var p Problem
 	if err := json.Unmarshal(rec.Body.Bytes(), &p); err != nil || p.Type != "METHOD-NOT-ALLOWED" {
 		t.Fatalf("problem = %+v", p)
+	}
+}
+
+func TestPanicSesudahHeaderTercatatSebagaiKegagalan(t *testing.T) {
+	// Minor review akhir observabilitas (ADR-0054): bila handler sudah menulis header (mis. 200) sebelum
+	// panik, statusRecorder sudah merekam status itu dan WriteHeader(500) recoverer jadi no-op (header
+	// terkirim). Tanpa penanda terpisah, log akses dan metrik mencatat permintaan yang gagal sebagai sukses.
+	metrics := NewMetrics()
+	h := New(Config{}, Deps{Metrics: metrics, Routes: func(mux *http.ServeMux) {
+		mux.HandleFunc("GET /panik-sesudah-header", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			panic("boom sesudah header")
+		})
+	}})
+	serve(t, h, http.MethodGet, "/panik-sesudah-header")
+	var buf bytes.Buffer
+	metrics.write(&buf)
+	out := buf.String()
+	if strings.Contains(out, `status="200"`) {
+		t.Fatalf("metrik mencatat 200 walau handler panik:\n%s", out)
+	}
+	if !strings.Contains(out, `route="GET /panik-sesudah-header",status="500"} 1`) {
+		t.Fatalf("metrik tidak mencatat 500:\n%s", out)
 	}
 }
 

@@ -77,6 +77,11 @@ func readBody(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
 	var tooLarge *http.MaxBytesError
 	switch {
 	case errors.As(err, &tooLarge):
+		// w yang diteruskan ke sini biasanya statusRecorder (httpapi.New), bukan *http.response net/http
+		// persis, jadi mekanisme otomatis net/http untuk menutup koneksi sesudah MaxBytesError tidak
+		// berjalan (ia mencocokkan tipe ResponseWriter). Tanpa ini, klien bisa terus mengirim sisa body
+		// besar di koneksi yang sama (minor review akhir ADR-0054).
+		w.Header().Set("Connection", "close")
 		httpapi.WriteProblem(w, problem("REQ-TOO-LARGE", http.StatusRequestEntityTooLarge))
 		return nil, false
 	case err != nil:

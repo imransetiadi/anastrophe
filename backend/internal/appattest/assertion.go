@@ -26,8 +26,14 @@ type Assertion struct {
 // Hash ganda ini terbukti dengan assertion iOS 27 nyata (O-AA06). publicKey adalah titik P-256 tak
 // terkompresi dari Attestation.PublicKey. Challenge di dalam clientData diperiksa pemanggil.
 func (v *Verifier) VerifyAssertion(assertion, clientData, publicKey []byte, previousCounter uint32) (Assertion, error) {
+	if err := v.ready(); err != nil {
+		return Assertion{}, err
+	}
 	if len(assertion) > MaxAssertionSize {
 		return Assertion{}, invalid("format", errors.New("assertion terlalu besar"))
+	}
+	if len(clientData) == 0 {
+		return Assertion{}, invalid("format", errors.New("clientData kosong"))
 	}
 	obj, err := decodeCBOR(assertion)
 	if err != nil {

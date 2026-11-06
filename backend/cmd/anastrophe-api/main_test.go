@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -20,6 +21,23 @@ func TestRegistriWajibAdaKunci(t *testing.T) {
 	}
 	if mac, err := registryFromEnv(func(string) string { return strings.Repeat("ab", 32) }); err != nil || mac == nil {
 		t.Fatalf("kunci valid ditolak: %v", err)
+	}
+}
+
+// TestErrorLogKeSlogWarn (minor review akhir ADR-0054): http.Server.ErrorLog bawaan menulis ke os.Stderr
+// lewat paket log standar, di luar logger terstruktur app (format, redaksi request_id, dan tujuan log
+// terpusat). Galat net/http sendiri (mis. TLS handshake gagal) bisa memuat alamat IP klien, jadi harus
+// lewat logger yang sama dengan log akses, bukan jalur terpisah yang tak diawasi.
+func TestErrorLogKeSlogWarn(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	srv := newAPIServer(":0", http.NotFoundHandler(), logger)
+	if srv.ErrorLog == nil {
+		t.Fatal("ErrorLog tidak diset")
+	}
+	srv.ErrorLog.Print("galat jaringan percobaan")
+	if !strings.Contains(buf.String(), "level=WARN") || !strings.Contains(buf.String(), "galat jaringan percobaan") {
+		t.Fatalf("log = %q, ingin level WARN lewat logger app", buf.String())
 	}
 }
 
@@ -65,5 +83,29 @@ func TestFormatLog(t *testing.T) {
 	loggerFromEnv(func(string) string { return "" }, &buf).Info("uji")
 	if !strings.Contains(buf.String(), "level=INFO") || !strings.Contains(buf.String(), "msg=uji") {
 		t.Fatalf("log teks = %q", buf.String())
+	}
+}
+
+// TestFormatLogTidakPekaHurufBesar (minor review akhir ADR-0054): operator yang menulis ANASTROPHE_LOG_FORMAT
+// sebagai "JSON" atau "Json" sebelumnya jatuh diam-diam ke format teks (hanya perbandingan "json" persis).
+func TestFormatLogTidakPekaHurufBesar(t *testing.T) {
+	for _, v := range []string{"JSON", "Json", "json", " json ", "\tjson\n"} {
+		var buf bytes.Buffer
+		loggerFromEnv(func(k string) string {
+			if k == "ANASTROPHE_LOG_FORMAT" {
+				return v
+			}
+			return ""
+		}, &buf).Info("uji")
+		var m map[string]any
+		if err := json.Unmarshal(buf.Bytes(), &m); err != nil || m["msg"] != "uji" {
+			t.Fatalf("ANASTROPHE_LOG_FORMAT=%q: log = %q (%v), ingin JSON", v, buf.String(), err)
+		}
+	}
+	// Nilai tak dikenal tetap jatuh ke teks, bukan dianggap galat konfigurasi diam-diam.
+	var buf bytes.Buffer
+	loggerFromEnv(func(string) string { return "xml" }, &buf).Info("uji")
+	if !strings.Contains(buf.String(), "level=INFO") {
+		t.Fatalf("ANASTROPHE_LOG_FORMAT=xml: log = %q, ingin format teks", buf.String())
 	}
 }

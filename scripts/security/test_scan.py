@@ -383,8 +383,7 @@ class PemindaianDependensi(unittest.TestCase):
 
     def test_paket_swift_remote_gagal(self):
         repo = RepoDependensi(self, pbxproj="/* XCRemoteSwiftPackageReference \"contoh\" */\n")
-        self.assertTrue(scan.swift_remote_packages(repo.dir / "Packages/Package.swift",
-                                                   repo.dir / "Anastrophe.xcodeproj/project.pbxproj"))
+        self.assertTrue(scan.swift_packages_remote(repo.dir))
         kode, out, _ = self.jalankan(repo)
         self.assertEqual(kode, 1)
         self.assertIn("XCRemoteSwiftPackageReference", out)
@@ -460,6 +459,67 @@ class PemindaianDependensi(unittest.TestCase):
         self.assertEqual(kode, 0)
         self.assertEqual(kiriman, ["contoh"])
         self.assertIn("informasi: tidakada", out)
+
+    def test_requirements_mengikuti_dash_r(self):
+        # Minor review akhir ADR-0056: baris "-r lain.txt" sebelumnya dibuang sebagai opsi, bukan diikuti,
+        # jadi paket di berkas yang di-include lewat -r tidak pernah diperiksa OSV.
+        repo = RepoDependensi(self)
+        req = repo.dir / "scripts/alat/requirements.txt"
+        req.write_text("-r dasar.txt\nekstra==2.*\n")
+        (repo.dir / "scripts/alat/dasar.txt").write_text("contoh==1.*\n")
+        names = scan._requirement_names(req)
+        self.assertEqual(sorted(names), ["contoh", "ekstra"])
+        # -r berantai (dasar.txt sendiri meng-include lagi) juga diikuti, dan siklus tidak membuat tak terhingga.
+        (repo.dir / "scripts/alat/dasar.txt").write_text("-r dasar.txt\ncontoh==1.*\n")
+        self.assertEqual(sorted(scan._requirement_names(req)), ["contoh", "ekstra"])
+
+    def test_package_swift_lain_ikut_diperiksa(self):
+        # Minor review akhir ADR-0056: hanya Packages/Package.swift yang diperiksa, jadi paket Swift lokal lain
+        # dengan dependensi remote (mis. target lab terpisah) lolos tanpa terdeteksi.
+        repo = RepoDependensi(self)
+        (repo.dir / "Alat").mkdir()
+        (repo.dir / "Alat/Package.swift").write_text(
+            "let package = Package(dependencies: [.package(url: \"https://contoh.invalid/x\", from: \"1.0.0\")])\n")
+        remote = scan.swift_packages_remote(repo.dir)
+        self.assertTrue(any("Alat/Package.swift" in r for r in remote))
+        kode, out, _ = self.jalankan(repo)
+        self.assertEqual(kode, 1)
+        self.assertIn("Alat/Package.swift", out)
+
+    def test_satu_pemeriksaan_gagal_tidak_menghentikan_sisanya(self):
+        # Minor review akhir ADR-0056: sebelumnya satu ToolError di bagian mana pun (mis. secrets) langsung
+        # exit 2 tanpa menjalankan bagian lain (deps), menyembunyikan temuan nyata yang seharusnya tetap
+        # dilaporkan. Setiap bagian (secrets, deps, build) wajib berjalan dan melaporkan hasilnya sendiri.
+        repo = RepoDependensi(self, pbxproj="/* XCRemoteSwiftPackageReference \"contoh\" */\n")
+        out, err = io.StringIO(), io.StringIO()
+        with mock.patch.object(scan, "scan_secrets", side_effect=scan.ToolError("gitleaks tidak ditemukan")):
+            kode = scan.main(["--repo", str(repo.dir)], out=out, err=err,
+                             govulncheck=lambda backend: aliran_govulncheck(), osv_query=lambda payload: {},
+                             pip_version=versi_contoh)
+        self.assertEqual(kode, 2)
+        self.assertIn("gitleaks tidak ditemukan", err.getvalue())
+        # deps tetap jalan dan temuannya tetap dilaporkan walau secrets gagal.
+        out_value = out.getvalue()
+        self.assertIn("govulncheck", out_value)
+        self.assertIn("XCRemoteSwiftPackageReference", out_value)
+
+    def test_osv_alias_tidak_dicetak_dobel(self):
+        # Minor review akhir ADR-0056: satu kerentanan bisa dikembalikan OSV sebagai dua id (mis. GHSA dan
+        # PYSEC) yang saling menjadi alias; tanpa pengelompokan, keduanya tercetak sebagai dua advisori.
+        resp = {"vulns": [
+            {"id": "GHSA-uji-0001", "aliases": ["PYSEC-2099-1"]},
+            {"id": "PYSEC-2099-1", "aliases": ["GHSA-uji-0001"]},
+        ]}
+        kode, out, _ = self.jalankan(RepoDependensi(self), query=lambda payload: resp)
+        self.assertEqual(kode, 1)
+        self.assertEqual(out.count("GHSA-uji-0001") + out.count("PYSEC-2099-1"), 1)
+
+    def test_osv_alias_berbeda_tetap_dua(self):
+        resp = {"vulns": [{"id": "GHSA-uji-0002"}, {"id": "GHSA-uji-0003"}]}
+        kode, out, _ = self.jalankan(RepoDependensi(self), query=lambda payload: resp)
+        self.assertEqual(kode, 1)
+        self.assertIn("GHSA-uji-0002", out)
+        self.assertIn("GHSA-uji-0003", out)
 
 
 if __name__ == "__main__":

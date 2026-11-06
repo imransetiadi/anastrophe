@@ -22,7 +22,8 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
   - ADR-0047: kedaluwarsa permintaan `PENDING_APPROVAL` (batas 4 per kartu sudah diterapkan), JEV 0,51.
   - Penyambungan App Attest (ADR-0053, seri JEV 0,47): pengikatan kunci attested ke `device_id` (terkait ADR-0041/0046), endpoint yang wajib attestation, bypass dev, dan kategori produksi.
 
-  - `jev_gate` unit audit aksesibilitas (ADR-0057) dijalankan 2026-11-06, dua run, **eskalasi** kedua kali (composite 0,66 lalu 0,58; 0 klaim `contradicted`). Menunggu keputusan pengguna: terima penutupan berdasarkan bukti uji nyata (394/375 test paket, 37/37 dan 36/37→37/37 UI test, 2/2 mutasi, build Release bersih), atau minta review manusia/subagent atas `AccessibilityAudit.swift` (terlalu besar untuk payload gate). Lihat `docs/adr/jev-log/2026-11-06-audit-aksesibilitas-gate.json`.
+  - ~~`jev_gate` unit audit aksesibilitas (ADR-0057) eskalasi~~ — **diselesaikan 2026-11-06**: pengguna menerima penutupan berdasarkan bukti uji nyata yang sudah tercatat. Status unit: Selesai.
+  - ~~ADR-0060: fokus kerja berikutnya, JEV 0,38 (eskalasi)~~ — **diselesaikan 2026-11-06**: pengguna menyetujui keempat kandidat (`app_attest_hardening`, `observability_hardening`, `error_catalog_alignment`, `security_scan_hardening`) untuk dikerjakan berurutan.
   - Tinjauan 21 gate JEV (19 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan, verifier App Attest, sisa Keychain instal ulang, observabilitas backend, uji beban API, pemindaian secret dan dependensi (`docs/adr/jev-log/*-gate.json`).
   - Perbarui `cryptography` ke 50.* di pyenv lokal: `python3 -m pip install -r scripts/anp1/requirements.txt`. Pemindai dengan interpreter bawaan exit 1 sampai itu dilakukan.
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
@@ -51,6 +52,83 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | App Attest (verifier) | Paket backend `internal/appattest` memverifikasi attestation dan assertion menurut langkah Apple; teruji dengan contoh resmi Apple dan data iOS 27 nyata (scratch). Belum disambungkan ke endpoint, database, atau app; gerbang pra-pilot NFR-S03 masih terbuka | NFR-S03 (sebagian), ADR-0052 |
 | Pemindaian keamanan | `scripts/security/scan.py`: gitleaks atas riwayat, staged, dan produk build; govulncheck; paket Swift remote; OSV untuk alat Python. Exit 0/1/2; git gagal, clone dangkal, dan `.gitleaksignore` memberi exit 2. Backend Go ≥ 1.25 dengan toolchain go1.27.3 | TC-SEC-11, NFR-S09, ADR-0056 |
 | Aksesibilitas | Token warna sebagai data dengan test kontras WCAG; lint font tetap, animasi, warna teks sistem, dan pemotong teks; komponen dengan area ketuk ≥ 44 pt; target UI test `AnastropheUITests` yang mengaudit 16 keadaan demo (terang, gelap, AX5 ID/EN) dengan pengecualian per elemen. VoiceOver manual di iPhone fisik dan CI UI test belum ada | NFR-A01, TC-UX-01–04, TC-UX-09, ADR-0057–ADR-0059 |
+
+## SEC-2026-11-06-0600 - Pengerasan pemindaian keamanan (ADR-0060 `security_scan_hardening`; Selesai)
+
+Unit keempat dan terakhir ADR-0060. TDD, RED→GREEN→mutasi, di `scripts/security/scan.py`.
+
+- **`-r` requirements diikuti:** `_requirement_names` sekarang rekursif mengikuti baris `-r`/`--requirement`, relatif terhadap direktori berkas yang memuatnya, dengan guard siklus (`_seen`). Test `test_requirements_mengikuti_dash_r` (termasuk kasus siklus -r yang saling mengarah).
+- **Semua `Package.swift` diperiksa:** `swift_remote_packages(path, path)` diganti `swift_packages_remote(repo)` yang menjelajah seluruh repo (`rglob`), mengecualikan `.build`, `build`, `DerivedData`, `.git`, `worktrees`. Test `test_package_swift_lain_ikut_diperiksa`.
+- **Sub-pemeriksaan independen:** `scan_deps` (Go/Swift/Python) dan `main` (secrets/deps/build) masing-masing menjalankan setiap bagian dalam try/except `ToolError` sendiri, mengumpulkan pesan galat, dan tetap mencetak hasil bagian yang berhasil sebelum keluar exit 2 di akhir. Sebelumnya satu `ToolError` di bagian mana pun langsung menghentikan sisanya tanpa melaporkan apa pun. Test `test_satu_pemeriksaan_gagal_tidak_menghentikan_sisanya`.
+- **Alias OSV dikelompokkan:** `_dedupe_aliases` baru menyatukan entri yang saling menjadi alias (mis. GHSA dan PYSEC untuk kerentanan sama), memilih CVE sebagai id kanonik bila ada. Test `test_osv_alias_tidak_dicetak_dobel`, `test_osv_alias_berbeda_tetap_dua`.
+
+**Insiden kecil selama kerja:** satu mutasi-uji (`git checkout -- scan.py`) tanpa commit sebelumnya sempat menghapus seluruh perubahan di file itu (bukan hanya baris yang dimutasi), karena perubahan belum di-commit saat checkout dijalankan. Diperbaiki dengan menerapkan ulang keempat perubahan dari awal; pelajaran: commit dulu sebelum menguji mutasi lewat `git checkout`, atau pakai diff manual/stash.
+
+Uji: `python3 -m unittest discover -s scripts/security -v` → 47 test lulus. Verifikasi nyata: `python3 scripts/security/scan.py deps` dan `scan.py` penuh di repo ini sendiri, exit 0, tanpa pemindaian ganda `.claude/worktrees`.
+
+Rujukan: ADR-0056, ADR-0060, NFR-S09, TC-SEC-11. Ini menutup keempat unit ADR-0060 yang disetujui pengguna.
+
+## DOC-2026-11-06-0500 - Katalog error dicocokkan dengan teks app (ADR-0060 `error_catalog_alignment`; Selesai)
+
+Unit ketiga ADR-0060 (dokumen murni, tanpa kode). Audit baris demi baris SDD §15 terhadap `Localizable.xcstrings` dan kode pemetaan (`EnrollmentMessages.swift`, `AddCardModel.swift`, `CardRemover.swift`).
+
+Hasil dari 33 baris katalog:
+- **15 cocok persis** tanpa perubahan.
+- **5 wording diperbarui di SDD §15** (bukan di app — string app sudah diaudit dan dikunci oleh unit aksesibilitas ADR-0057, jadi SDD yang menyusul ke kode): `CH-NOT-ELIGIBLE` ("perangkat/wilayah" → "perangkat atau wilayah"), `CH-BT-OFF`/`CH-BT-DENIED` (teks singkat SDD diganti teks literal app), `PRS-DENIED-ZONE` ("di pintu ini" → "untuk pintu ini"), `PRS-SUSPENDED` (SDD terlalu ringkas dibanding app), `CRED-EXPIRED` (app punya kalimat pembuka tambahan).
+- **5 memang tanpa teks pengguna by design**, konsisten dengan app (kolom pesan "—" di SDD).
+- **1 belum berlaku di R1** (OTP).
+- **3 kode tanpa teks tersendiri** (`ENR-NOT-FOUND`, `ENR-INVALID-KEY`, `ENR-INVALID-CHANNEL`): jatuh ke `add.error.generic`. Ditandai catatan kaki di SDD §15, dicatat di backlog sebagai kandidat penambahan string (dampak kecil, aksi sama).
+- **4 kode mendekati tapi tidak identik** (`CRED-NOT-FOUND`, `CRED-NOT-RENEWABLE`, `CRED-PROOF-INVALID`, `DEV-KEY-MISSING`): app memakai `card.reason.*`/`card.renewal_offline` di konteks badge daftar kartu, bukan pesan di titik kegagalan. Dicatat di backlog sebagai pertanyaan produk terbuka (perlu pesan seketika atau cukup status kartu), bukan diputuskan sepihak di sini.
+
+Tidak ada kode app yang diubah (string UI sudah diaudit aksesibilitas; mengubahnya berisiko merusak pengecualian/screenshot ADR-0057). SDD §15 dan QA §11.1 TC-UX-09 diperbarui dengan rincian di atas. Versi SDD 2.36.
+
+Rujukan: ADR-0060, NFR-A01, NFR-C01, TC-UX-09. Verifikasi: `python3 scripts/docs/check_docs.py .` → problems 0.
+
+## API-2026-11-06-0400 - Pengerasan observabilitas backend (ADR-0060 `observability_hardening`; Selesai)
+
+Unit kedua ADR-0060. TDD, RED→GREEN→mutasi:
+
+- **413 tidak menutup koneksi:** `readBody` (dipakai `credentials.go`, `renew.go`, `delete.go`) kini men-set `Connection: close` eksplisit sebelum `WriteProblem` saat `MaxBytesError`, karena `statusRecorder` pembungkus bukan `*http.response` persis sehingga penandaan otomatis net/http untuk menutup koneksi tidak berjalan. Test `TestBodyTerlaluBesarDitolak413` diperluas (RED: header `Connection` kosong).
+- **Panic sesudah header tercatat 200:** `requestInfo.panicked` baru diset `recoverer` saat menangkap panik; `accessLog` memaksa status log dan metrik ke 500 bila `panicked`, walau `statusRecorder` sudah membekukan status lama karena header sudah terkirim sebelum panik. Test baru `TestPanicSesudahHeaderTercatatSebagaiKegagalan` (RED: metrik mencatat 200). Mutasi (hapus `info.panicked = true`) mengembalikan kegagalan test, membuktikan tangkapan regresi.
+- **`ErrorLog` http.Server:** fungsi baru `newAPIServer` men-set `ErrorLog` ke `slog.NewLogLogger(logger.Handler(), slog.LevelWarn)`, menggantikan bawaan yang menulis ke stderr lewat paket `log` standar, di luar format dan tujuan log terpusat app. Test `TestErrorLogKeSlogWarn`.
+- **`ANASTROPHE_LOG_FORMAT` peka huruf besar:** `loggerFromEnv` memakai `strings.EqualFold` + `TrimSpace`; `JSON`/`Json`/` json ` semua dikenali, nilai tak dikenal tetap teks. Test `TestFormatLogTidakPekaHurufBesar`.
+
+Ditahan di backlog (di luar lingkup unit berdiri sendiri): test wiring `request_id` produksi end-to-end, dan redirect trailing-slash CONNECT.
+
+Uji: `go test ./... -count=1` seluruh backend (13 paket) lulus; `go vet ./...` bersih. Rujukan: ADR-0054, ADR-0060, NFR-O01. Backlog diperbarui.
+
+## API-2026-11-06-0300 - Pengerasan verifier App Attest (ADR-0060 `app_attest_hardening`; Selesai)
+
+Unit pertama dari empat kandidat ADR-0060 yang disetujui pengguna. Lingkup: perbaikan berdiri sendiri di `backend/internal/appattest` yang tidak menyentuh keputusan penyambungan endpoint (tetap dieskalasi).
+
+TDD, RED→GREEN→mutasi:
+- `TestVerifierNilValueTidakPanik` (RED: panik SIGSEGV di `v.now()`, line 145) → method `ready()` baru menolak Verifier yang tidak lewat `NewVerifier` (rpIDHash/now nil) dengan galat `config`, dipanggil di awal `VerifyAttestation` dan `VerifyAssertion`. Mutasi (hapus panggilan `ready()`) mengembalikan panik, membuktikan test menangkap regresi.
+- `TestClientDataHashKosongDitolak` (RED: alasan `nonce` yang ambigu) → `clientDataHash`/`clientData` kosong kini ditolak eksplisit dengan alasan `format`.
+- Diperiksa dan ditutup tanpa perubahan kode: `p256PublicKey` field X/Y ecdsa — `go vet` di go1.27.3 tidak menunjukkan peringatan deprecation saat ini.
+- **Tidak diimplementasikan** (perlu riset/keputusan tambahan): penolakan platform credCert non-`iphoneos` (OID `1.2.840.113635.100.8.7`) — klaim OID ini tidak punya bukti REA (E/O-id) di `RESEARCH_EVIDENCE.md`, jadi tidak dikode tanpa verifikasi lebih dulu (CLAUDE.md: klaim faktual baru wajib `jev_verify`). `Config.Categories` wajib di produksi dan item penyambungan lain tetap di backlog karena tumpang tindih dengan keputusan App Attest yang sudah dieskalasi.
+
+Uji: `go test ./internal/appattest/... -count=1` lulus (termasuk fuzz seed); `go build ./... && go vet ./...` bersih; `go test ./... -count=1` seluruh backend (13 paket) lulus dengan PostgreSQL lokal nyata (bukan skip diam-diam, diverifikasi lewat `-v` di `internal/store`).
+
+Rujukan: ADR-0052, ADR-0060, NFR-S03. Backlog diperbarui (`docs/agentmemory/backlog.md`).
+
+## JEV-2026-11-06-0200 - Resolusi dua eskalasi: gate ADR-0057 dan fokus ADR-0060 (Selesai)
+
+Pengguna meng-approve semua pekerjaan yang tereskalasi di entri sebelumnya (`JEV-2026-11-06-0100`, `APP-2026-11-06-0000`):
+
+- **ADR-0057 (gate):** diterima — penutupan unit aksesibilitas berdasarkan bukti uji nyata yang sudah tercatat (Swift host 394 test, simulator paket 375 test, UI test audit 37/37 dan 36/37→37/37 di dua perangkat, 2/2 mutasi, build Release bersih, `check_docs.py` 0). Ditulis sebagai bagian baru "Penutupan unit" di `docs/adr/0057-fokus-audit-aksesibilitas.md`. Status unit: **Selesai**.
+- **ADR-0060 (fokus berikutnya):** disetujui — bukan memilih satu kandidat, melainkan keempatnya dikerjakan berurutan sesuai probabilitas JEV: `app_attest_hardening` (ADR-0052), `observability_hardening` (ADR-0054), `error_catalog_alignment` (SDD §15), `security_scan_hardening` (ADR-0056). Status ADR: **Diterima**.
+
+Tidak ada kode yang berubah di entri ini; perubahan terbatas pada status ADR, backlog, dan log ini. Keempat unit kerja menyusul sebagai entri terpisah.
+
+## JEV-2026-11-06-0100 - Fokus kerja berikutnya pasca audit aksesibilitas (Eskalasi; menunggu keputusan pengguna)
+
+Lanjutan entri APP-2026-11-06-0000: sesudah gate ADR-0057 dicatat sebagai eskalasi, dicari fokus kerja berikutnya yang tidak tumpang tindih dengan keputusan yang sudah dieskalasi (ADR-0017, 0022, 0038, 0041, 0046, 0047, penyambungan App Attest) dan tidak butuh iPhone fisik/reader.
+
+- `jev_decide` dijalankan dengan empat kandidat dari `docs/agentmemory/backlog.md`: `app_attest_hardening` (pengerasan verifier App Attest ADR-0052, berdiri sendiri dari keputusan penyambungan), `observability_hardening` (ADR-0054), `security_scan_hardening` (ADR-0056), `error_catalog_alignment` (pesan galat vs SDD §15). Semua requirement *supported* di keempat kandidat; tidak ada yang *contradicted*.
+- Hasil: `app_attest_hardening` terpilih dengan confidence **0,38** (escaped: false). Confidence < 0,60 (ADR-0018) → **eskalasi ke pengguna**, meski JEV sendiri tidak memakai escape hatch. Rendahnya keyakinan mencerminkan empat kandidat yang sama validnya, bukan kandidat yang cacat.
+- Dicatat sebagai [ADR-0060](docs/adr/0060-fokus-berikutnya-pasca-aksesibilitas.md) (status: diusulkan, eskalasi), log mentah di `docs/adr/jev-log/2026-11-06-fokus-berikutnya.output.json`.
+
+Tidak ada kode yang berubah dari keputusan ini. Menunggu pengguna memilih salah satu dari empat kandidat atau menunjuk fokus lain.
 
 ## APP-2026-11-06-0000 - Gate penutupan audit aksesibilitas (Eskalasi; menunggu keputusan pengguna)
 

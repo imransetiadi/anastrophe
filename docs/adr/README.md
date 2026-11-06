@@ -63,3 +63,4 @@ Keputusan arsitektur & produk Anastrophe. Format mengikuti skill `domain-modelin
 | [ADR-0057](0057-fokus-audit-aksesibilitas.md) | Fokus berikutnya: audit aksesibilitas app (NFR-A01, TC-UX-01–04/09) | Provisional (ditinjau M2) | `audit_aksesibilitas` | 0.70 |
 | [ADR-0058](0058-cakupan-token-warna-tint-app.md) | Cakupan token warna dan tint app `secondary` (NFR-A01, TC-UX-03) | Diterima | `token_semua_tint_secondary` | 0.95 |
 | [ADR-0059](0059-pengecualian-kontras-per-elemen.md) | Kebijakan isu kontras audit: pengecualian per elemen dengan bukti (TC-UX-01) | Diterima | `pengecualian_per_elemen_bukti` | 0.93 |
+| [ADR-0060](0060-fokus-berikutnya-pasca-aksesibilitas.md) | Fokus berikutnya pasca audit aksesibilitas (keempat kandidat disetujui) | Diterima — pengguna menyetujui semua kandidat (eskalasi diselesaikan manusia) | `app_attest_hardening` + 3 lainnya | 0.38 |

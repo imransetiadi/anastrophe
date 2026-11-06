@@ -530,6 +530,13 @@ func TestBodyTerlaluBesarDitolak413(t *testing.T) {
 	if rec.Code != http.StatusRequestEntityTooLarge || problemType(t, rec) != "REQ-TOO-LARGE" {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
 	}
+	// Minor review akhir observabilitas (ADR-0054): respons dibungkus statusRecorder (httpapi.New), yang
+	// bukan *http.response, jadi net/http tidak otomatis menandai koneksi untuk ditutup sesudah
+	// MaxBytesError (mekanisme itu memeriksa tipe ResponseWriter persis). Tanpa Connection: close eksplisit,
+	// klien bisa terus mengirim sisa body besar di koneksi yang sama (boros sumber daya server).
+	if got := rec.Header().Get("Connection"); got != "close" {
+		t.Fatalf("header Connection = %q, ingin \"close\"", got)
+	}
 }
 
 func TestHashPermintaanKanonik(t *testing.T) {

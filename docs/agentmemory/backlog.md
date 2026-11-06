@@ -33,10 +33,11 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
 
 ## Terbuka
 
-- **Aksesibilitas (ADR-0057; rencana selesai, penutupan unit tertunda):**
-  - `jev_gate` dijalankan 2026-11-06 (dua run, bukti bertambah di run kedua): **eskalasi** kedua kali (composite 0,66 lalu 0,58; limiting rubric `test_gap` lalu `correctness`; 0 klaim `contradicted` di kedua run). Menunggu keputusan pengguna: terima penutupan berdasarkan bukti uji nyata yang sudah tercatat, atau minta review akhir manusia/subagent atas `AnastropheUITests/AccessibilityAudit.swift` (harness +829 baris, di luar batas payload gate). Log: `docs/adr/jev-log/2026-11-06-audit-aksesibilitas-gate.json`, sesi: `sessions/2026-11-06-audit-aksesibilitas-gate.md`.
-  - Pemeriksaan VoiceOver manual di iPhone fisik (sisi H TC-UX-01), TC-UX-05 dengan Reduce Motion aktif, dan CI untuk UI test.
-  - Pesan galat belum dicocokkan butir per butir dengan katalog SDD §15 (butir terakhir checklist design system §9).
+- **Fokus berikutnya (ADR-0060, diterima 2026-11-06):** pengguna menyetujui keempat kandidat untuk dikerjakan berurutan: `app_attest_hardening` (ADR-0052), `observability_hardening` (ADR-0054), `error_catalog_alignment` (SDD §15), `security_scan_hardening` (ADR-0056).
+- **Aksesibilitas (ADR-0057; Selesai 2026-11-06):**
+  - `jev_gate` eskalasi dua kali (composite 0,66 lalu 0,58; 0 klaim `contradicted`) karena harness `AccessibilityAudit.swift` melebihi batas payload gate. **Pengguna menerima penutupan** berdasarkan bukti uji nyata yang sudah tercatat (lihat ADR-0057 §"Penutupan unit").
+  - Sisa tertunda: pemeriksaan VoiceOver manual di iPhone fisik (sisi H TC-UX-01), TC-UX-05 dengan Reduce Motion aktif, dan CI untuk UI test.
+  - Pesan galat belum dicocokkan butir per butir dengan katalog SDD §15 (lihat `error_catalog_alignment` di ADR-0060).
   - Audit Apple di riwayat AX5 halaman 2 (iPhone 17e) selalu habis waktu dan kini lulus lewat audit ulang sesudah isi digeser 48 pt. Bila pola ini muncul di posisi lain, selidiki penyebabnya, mis. jumlah baris riwayat demo.
 - **Test BLE flaky:** `autentikasiBatalMembatalkanPemindaian` sesekali gagal (`scanCount == 0 || scanWasCancelled`) saat mesin sangat sibuk, lalu lulus 6/6 saat diulang. Pembatalan pindai belum tercatat sebelum aliran selesai.
 
@@ -107,15 +108,17 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
   - `TestSapuanMenulisAuditBerurutanPerRantai` menangkap mutasi "tanpa urut" ±69/70 kali (4+4 UUID acak kadang sudah terurut).
   - Lanjutan `PENDING_APPROVAL` di jalur undangan belum dikunci. Cabang ini tak terjangkau saat ini, dan pengerasannya cukup 3 baris seperti jalur kartu.
   - Sisa risiko: kunci rantai memakai `hashtext(chain)`, sedangkan urutan memakai nama rantai; tabrakan hash (±2⁻³² per pasangan) masih bisa memicu 40P01 yang dideteksi PostgreSQL.
-- **App Attest — wajib di unit penyambungan (minor review akhir, ADR-0052):**
-  - **Challenge sekali pakai:** server menerbitkan dan mengonsumsinya sendiri. `VerifyAttestation` saat ini menerima `clientDataHash` kosong, dan `VerifyAssertion` tidak memeriksa challenge di `clientData`. Pertimbangkan wrapper yang menghitung `SHA256(challenge)` dan callback pemeriksa challenge, dengan test challenge basi.
-  - **Penyimpanan per perangkat:** kunci publik dan counter disimpan per perangkat, dan counter diperbarui atomik (compare-and-swap) untuk menolak replay bersamaan.
-  - **Receipt:** belum terautentikasi (di luar nonce), jadi jangan dipakai sampai validasi receipt (U15).
-  - **Kategori:** `Config.Categories` wajib diisi di produksi. Saat ini kategori 0 (invalid) dan 7–9 diterima bila daftar kosong.
-  - **Platform:** tolak platform credCert selain `iphoneos` (OID `1.2.840.113635.100.8.7`), karena attestation macOS butuh cek `aclBlob`.
-  - **`Verifier` nilai nol:** panic di `v.now`. Wajibkan `NewVerifier` atau jaga nilai nol.
-  - **Uji H (U14):** capture attestation + assertion dari build bertanda tangan dengan App ID Anastrophe, termasuk iOS 26.x.
-  - **Catatan kecil:** `p256PublicKey` memakai field `X`/`Y` ecdsa yang ditandai deprecated di toolchain baru (alternatif: SPKI tetap + `x509.ParsePKIXPublicKey`).
+- **App Attest — pengerasan verifier selesai (ADR-0060 `app_attest_hardening`, 2026-11-06):**
+  - **`Verifier` nilai nol** tidak lagi panik: `ready()` menolak Verifier yang tidak lewat `NewVerifier` (rpIDHash/now nil) dengan galat `config`, bukan panik di `v.now`. Test `TestVerifierNilValueTidakPanik`; mutasi (hapus guard) tertangkap.
+  - **`clientDataHash`/`clientData` kosong** kini ditolak eksplisit dengan alasan `format`, bukan gagal kebetulan di langkah nonce. Test `TestClientDataHashKosongDitolak`.
+  - **`p256PublicKey` field X/Y deprecated:** diperiksa `go vet` di toolchain go1.27.3 — tidak ada peringatan deprecation saat ini. Dibiarkan, catatan ini ditutup sampai toolchain benar-benar menandainya.
+  - Sisa, **masih wajib di unit penyambungan** (di luar lingkup unit berdiri sendiri ini, karena butuh keputusan arsitektur penyambungan endpoint yang sudah dieskalasi):
+    - **Challenge sekali pakai:** server menerbitkan dan mengonsumsinya sendiri (wrapper `SHA256(challenge)` + callback pemeriksa, test challenge basi).
+    - **Penyimpanan per perangkat:** kunci publik dan counter per perangkat, counter diperbarui atomik (compare-and-swap).
+    - **Receipt:** belum terautentikasi, jangan dipakai sampai validasi receipt (U15).
+    - **Kategori:** `Config.Categories` wajib diisi di produksi — ditahan karena mengubah perilaku `NewVerifier` tanpa keputusan eksplisit pengguna, dan tumpang tindih dengan keputusan penyambungan.
+    - **Platform:** klaim "tolak platform credCert selain `iphoneos` (OID `1.2.840.113635.100.8.7`)" **tidak diimplementasikan** — tidak ada bukti REA (E/O-id) di `RESEARCH_EVIDENCE.md` untuk OID ini; App Attest resmi hanya iOS/iPadOS/tvOS (macOS pakai mekanisme lain), jadi risikonya rendah, tapi klaim OID itu sendiri butuh `jev_verify` atau riset ulang sebelum dikode.
+    - **Uji H (U14):** capture attestation + assertion dari build bertanda tangan App ID Anastrophe, iOS 26.x — butuh iPhone fisik.
 - **Pembersihan instal ulang (minor review akhir, ADR-0053):**
   - **Gagal-hapus + enrolment:** bila penghapusan gagal lalu pengguna melakukan enrolment di sesi yang sama, `deviceID()` membuat penanda dan sisa tidak lagi dicoba. Bisa ditutup dengan memanggil pembersihan di awal enrolment, sebelum `deviceID()`.
   - **Store bersama:** pembersihan bergantung pada satu `SecretStore` yang dipakai semua store di `live()`, dan bawaan protokol `false` membuat pembungkus bisa diam-diam tidak ikut. Tambahkan komentar aturan store bersama, atau hapus bawaan itu.
@@ -129,14 +132,14 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
     - `.task` bisa membuat `AppServices` kedua sesudah scene tersambung ulang;
     - proteksi SQLite bawaan Core Data mungkin menimpa klaim `.complete` di SDD §5.3;
     - deteksi restore di SDD tidak cocok dengan store kartu yang dikecualikan dari backup.
-- **Observabilitas backend (minor review akhir, ADR-0054):**
-  - **Test wiring produksi:** wiring `request_id` produksi (`loggerFromEnv` + `WithRequestID`) belum dipin test end-to-end. Reviewer memverifikasinya lewat uji asap.
-  - **CONNECT:** redirect trailing-slash pada CONNECT bisa menjadikan path mentah sebagai pola. Ini laten sampai ada rute subtree; perlakukan CONNECT sebagai `/` atau batasi jumlah rute di `Metrics`.
-  - **Panic sesudah header:** panic sesudah header ditulis tercatat sebagai 200. Tandai `panicked` di recoverer agar terhitung 500.
-  - **413:** 413 tidak lagi menutup koneksi, karena `statusRecorder` menyembunyikan `requestTooLarge`. Set `Connection: close` di `readBody` saat `MaxBytesError`.
-  - **Rekomendasi:**
-    - `ErrorLog` `http.Server` ke slog level Warn, karena log net/http sendiri bisa memuat IP saat panic lolos middleware;
-    - `ANASTROPHE_LOG_FORMAT` tidak peka huruf besar, atau tolak nilai tak dikenal.
+- **Observabilitas backend — pengerasan selesai (ADR-0060 `observability_hardening`, 2026-11-06):**
+  - **Panic sesudah header:** selesai. `requestInfo.panicked` diset `recoverer` saat panik ditangkap; `accessLog` memaksa status log/metrik ke 500 bila `panicked`, walau `statusRecorder` sudah merekam status lama (header terkirim). Test `TestPanicSesudahHeaderTercatatSebagaiKegagalan`; mutasi (hapus `info.panicked = true`) tertangkap.
+  - **413:** selesai. `readBody` (`backend/internal/enroll/credentials.go`) men-set header `Connection: close` eksplisit sebelum `WriteProblem` saat `MaxBytesError`, karena `statusRecorder` bukan `*http.response` persis sehingga mekanisme otomatis net/http tidak berjalan. Test `TestBodyTerlaluBesarDitolak413` diperluas; dipakai bersama oleh `renew.go` dan `delete.go`.
+  - **`ErrorLog`:** selesai. `newAPIServer` (baru, `anastrophe-api/main.go`) men-set `http.Server.ErrorLog` ke `slog.NewLogLogger(logger.Handler(), slog.LevelWarn)`, bukan log standar ke stderr di luar jalur terpusat. Test `TestErrorLogKeSlogWarn`.
+  - **`ANASTROPHE_LOG_FORMAT`:** selesai. `loggerFromEnv` memakai `strings.EqualFold` + `TrimSpace`, jadi `JSON`/`Json`/` json ` semua dikenali; nilai tak dikenal tetap jatuh ke teks (bukan galat diam-diam). Test `TestFormatLogTidakPekaHurufBesar`.
+  - Masih terbuka (di luar lingkup unit berdiri sendiri ini):
+    - **Test wiring produksi:** wiring `request_id` produksi (`loggerFromEnv` + `WithRequestID`) belum dipin test end-to-end (uji asap).
+    - **CONNECT:** redirect trailing-slash pada CONNECT bisa menjadikan path mentah sebagai pola. Laten sampai ada rute subtree; perlakukan CONNECT sebagai `/` atau batasi jumlah rute di `Metrics`.
 - **Uji beban (temuan baseline lab, ADR-0055):**
   - **Rute gabungan:** challenge dan renew berbagi pola `POST /v1/credentials/{action}`, sehingga latensinya tidak bisa dibedakan di `/metrics`. Pertimbangkan rute terpisah atau label aksi terbatas.
   - **Enrolment melambat pada c=32:** p95 naik dari 5 ke 25 ms (baseline ulang sesudah review akhir). Kandidat penyebab: serialisasi rantai audit per gedung (semua beban di satu gedung), penandatanganan CA perangkat lunak, dan CPU yang dipakai bersama. Butuh profil (pprof, wait event PostgreSQL) di lingkungan Load dan skenario multi-gedung.
@@ -151,17 +154,21 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
     - memori recorder tumbuh tanpa batas pada uji rendam (simpan histogram, bukan semua sampel);
     - laporan mentah baseline hanya tersimpan lokal;
     - koreksi coordinated omission: ukur latensi dari jadwal token (open-loop), agar latensi dekat titik jenuh tidak terlalu optimistis.
-- **Pemindaian keamanan (ADR-0056):**
-  - **Lingkungan lokal:** perbarui `cryptography` ke 50.* di interpreter pyenv (`python3 -m pip install -r scripts/anp1/requirements.txt`). Pemindai dengan interpreter bawaan tetap exit 1 sampai itu dilakukan.
-  - **CI dan hook:** jalankan `scripts/security/scan.py` sebagai langkah CI begitu CI ada, dengan checkout riwayat penuh (`fetch-depth: 0`) dan `pip install -r scripts/*/requirements.txt` lebih dulu. Hook pre-commit (`gitleaks git --staged --redact .`) bersifat opsional dan tidak dipasang otomatis.
-  - **Minor review akhir:**
-    - include `-r` di berkas requirements belum diikuti;
-    - cabang `.package(` belum punya test, dan hanya `Packages/Package.swift` yang dibaca (paket lokal lain dengan dependensi remote akan lolos);
-    - satu pemeriksaan yang gagal menghentikan pemeriksaan sisanya, dan exit 2 menutupi temuan nyata;
+- **Pemindaian keamanan — pengerasan selesai (ADR-0060 `security_scan_hardening`, 2026-11-06):**
+  - **`-r` di requirements kini diikuti**, rekursif dan relatif terhadap direktori berkas yang memuatnya, dengan guard siklus. Test `test_requirements_mengikuti_dash_r`.
+  - **Semua `Package.swift` di repo kini diperiksa** (`swift_packages_remote`, bukan hanya `Packages/Package.swift`), kecuali direktori build/checkout (`.build`, `build`, `DerivedData`, `.git`, `worktrees`). Test `test_package_swift_lain_ikut_diperiksa`.
+  - **Satu sub-pemeriksaan gagal tidak lagi menghentikan yang lain**: `scan_deps` (Go/Swift/Python) dan `main` (secrets/deps/build) masing-masing mencoba setiap bagian independen, mengumpulkan galat, dan tetap melaporkan hasil bagian yang berhasil sebelum keluar exit 2. Test `test_satu_pemeriksaan_gagal_tidak_menghentikan_sisanya`.
+  - **Alias OSV dikelompokkan** (`_dedupe_aliases`): CVE dipilih sebagai id kanonik bila ada; satu kerentanan yang dikembalikan sebagai GHSA dan PYSEC kini tercetak sekali. Test `test_osv_alias_tidak_dicetak_dobel`, `test_osv_alias_berbeda_tetap_dua`.
+  - Verifikasi nyata: `python3 scripts/security/scan.py deps` dan `scan.py` (penuh) di repo ini sendiri, exit 0, tanpa regresi path (`.claude/worktrees` tidak ikut terpindai ganda). 47 test unit lulus (`python3 -m unittest discover -s scripts/security -v`).
+  - **Masih terbuka** (di luar lingkup unit berdiri sendiri ini):
+    - **Lingkungan lokal:** perbarui `cryptography` ke 50.* di interpreter pyenv (`python3 -m pip install -r scripts/anp1/requirements.txt`). Pemindai dengan interpreter bawaan tetap exit 1 sampai itu dilakukan.
+    - **CI dan hook:** jalankan `scripts/security/scan.py` sebagai langkah CI begitu CI ada, dengan checkout riwayat penuh (`fetch-depth: 0`) dan `pip install -r scripts/*/requirements.txt` lebih dulu. Hook pre-commit (`gitleaks git --staged --redact .`) bersifat opsional dan tidak dipasang otomatis.
     - `scan_level` govulncheck tidak dicek (versi terpin memakai `symbol`).
-  - **Cakupan yang belum ada:** blob biner di riwayat (mis. `.p12` yang ter-commit), isi commit merge, pesan commit, dan arsip terkompresi di dalam produk build.
-  - **Alias OSV:** satu CVE bisa tercetak dua kali (GHSA dan PYSEC). Kelompokkan menurut `aliases` agar jumlah advisori tidak berlipat.
+    - **Cakupan yang belum ada:** blob biner di riwayat (mis. `.p12` yang ter-commit), isi commit merge, pesan commit, dan arsip terkompresi di dalam produk build.
   - **Keparahan Go:** govulncheck tidak memberi skor, jadi kebijakannya "terpanggil = gagal". Tinjau ulang bila ada sumber keparahan yang andal.
   - **Masih terbuka:** audit `.ipa` bertanda tangan (TC-SEC-07), MASVS (TC-SEC-06), SAST, dan pentest eksternal (TC-SEC-12).
+- **Katalog error — selesai (ADR-0060 `error_catalog_alignment`, 2026-11-06):** audit baris demi baris SDD §15 vs teks app nyata, hasil di QA TC-UX-09 butir 9. 15/33 baris sudah cocok persis; 5 wording diperbarui di SDD agar sama persis dengan app (`CH-NOT-ELIGIBLE`, `CH-BT-OFF`/`CH-BT-DENIED`, `PRS-DENIED-ZONE`, `PRS-SUSPENDED`, `CRED-EXPIRED`); 5 memang tanpa teks pengguna by design; 1 belum berlaku (OTP).
+  - **3 kode tanpa teks tersendiri** (`ENR-NOT-FOUND`, `ENR-INVALID-KEY`, `ENR-INVALID-CHANNEL`): jatuh ke `add.error.generic`. Dampak kecil (aksi "coba lagi" sama), tapi bisa ditambah string khusus bila operator butuh pesan lebih spesifik saat triage lapangan.
+  - **4 kode mendekati tapi tidak identik dengan string yang ada** (`CRED-NOT-FOUND`, `CRED-NOT-RENEWABLE`, `CRED-PROOF-INVALID`, `DEV-KEY-MISSING`): app memakai `card.reason.*`/`card.renewal_offline` di konteks badge daftar kartu, bukan pesan di titik kegagalan (mis. saat perpanjangan gagal di latar belakang, tidak ada UI langsung yang menampilkan pesan — statusnya baru terlihat lain kali kartu dibuka). Perlu keputusan produk: apakah kegagalan ini butuh pesan seketika atau cukup tercermin di status kartu seperti sekarang.
 - **Test flaky:** `BLETapTests.autentikasiBatalMembatalkanPemindaian` sesekali gagal (pembatalan pemindaian bergantung waktu); lulus 6/6 saat diulang.
 - **Riwayat tap:** judul baris "Ditolak · alasan" dirakit di kode (M8; dikerjakan saat bahasa ketiga ditambahkan); VoiceOver baris Status belum diperiksa dengan Accessibility Inspector.
