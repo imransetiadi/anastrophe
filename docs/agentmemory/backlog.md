@@ -154,16 +154,17 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
     - memori recorder tumbuh tanpa batas pada uji rendam (simpan histogram, bukan semua sampel);
     - laporan mentah baseline hanya tersimpan lokal;
     - koreksi coordinated omission: ukur latensi dari jadwal token (open-loop), agar latensi dekat titik jenuh tidak terlalu optimistis.
-- **Pemindaian keamanan (ADR-0056):**
-  - **Lingkungan lokal:** perbarui `cryptography` ke 50.* di interpreter pyenv (`python3 -m pip install -r scripts/anp1/requirements.txt`). Pemindai dengan interpreter bawaan tetap exit 1 sampai itu dilakukan.
-  - **CI dan hook:** jalankan `scripts/security/scan.py` sebagai langkah CI begitu CI ada, dengan checkout riwayat penuh (`fetch-depth: 0`) dan `pip install -r scripts/*/requirements.txt` lebih dulu. Hook pre-commit (`gitleaks git --staged --redact .`) bersifat opsional dan tidak dipasang otomatis.
-  - **Minor review akhir:**
-    - include `-r` di berkas requirements belum diikuti;
-    - cabang `.package(` belum punya test, dan hanya `Packages/Package.swift` yang dibaca (paket lokal lain dengan dependensi remote akan lolos);
-    - satu pemeriksaan yang gagal menghentikan pemeriksaan sisanya, dan exit 2 menutupi temuan nyata;
+- **Pemindaian keamanan — pengerasan selesai (ADR-0060 `security_scan_hardening`, 2026-11-06):**
+  - **`-r` di requirements kini diikuti**, rekursif dan relatif terhadap direktori berkas yang memuatnya, dengan guard siklus. Test `test_requirements_mengikuti_dash_r`.
+  - **Semua `Package.swift` di repo kini diperiksa** (`swift_packages_remote`, bukan hanya `Packages/Package.swift`), kecuali direktori build/checkout (`.build`, `build`, `DerivedData`, `.git`, `worktrees`). Test `test_package_swift_lain_ikut_diperiksa`.
+  - **Satu sub-pemeriksaan gagal tidak lagi menghentikan yang lain**: `scan_deps` (Go/Swift/Python) dan `main` (secrets/deps/build) masing-masing mencoba setiap bagian independen, mengumpulkan galat, dan tetap melaporkan hasil bagian yang berhasil sebelum keluar exit 2. Test `test_satu_pemeriksaan_gagal_tidak_menghentikan_sisanya`.
+  - **Alias OSV dikelompokkan** (`_dedupe_aliases`): CVE dipilih sebagai id kanonik bila ada; satu kerentanan yang dikembalikan sebagai GHSA dan PYSEC kini tercetak sekali. Test `test_osv_alias_tidak_dicetak_dobel`, `test_osv_alias_berbeda_tetap_dua`.
+  - Verifikasi nyata: `python3 scripts/security/scan.py deps` dan `scan.py` (penuh) di repo ini sendiri, exit 0, tanpa regresi path (`.claude/worktrees` tidak ikut terpindai ganda). 47 test unit lulus (`python3 -m unittest discover -s scripts/security -v`).
+  - **Masih terbuka** (di luar lingkup unit berdiri sendiri ini):
+    - **Lingkungan lokal:** perbarui `cryptography` ke 50.* di interpreter pyenv (`python3 -m pip install -r scripts/anp1/requirements.txt`). Pemindai dengan interpreter bawaan tetap exit 1 sampai itu dilakukan.
+    - **CI dan hook:** jalankan `scripts/security/scan.py` sebagai langkah CI begitu CI ada, dengan checkout riwayat penuh (`fetch-depth: 0`) dan `pip install -r scripts/*/requirements.txt` lebih dulu. Hook pre-commit (`gitleaks git --staged --redact .`) bersifat opsional dan tidak dipasang otomatis.
     - `scan_level` govulncheck tidak dicek (versi terpin memakai `symbol`).
-  - **Cakupan yang belum ada:** blob biner di riwayat (mis. `.p12` yang ter-commit), isi commit merge, pesan commit, dan arsip terkompresi di dalam produk build.
-  - **Alias OSV:** satu CVE bisa tercetak dua kali (GHSA dan PYSEC). Kelompokkan menurut `aliases` agar jumlah advisori tidak berlipat.
+    - **Cakupan yang belum ada:** blob biner di riwayat (mis. `.p12` yang ter-commit), isi commit merge, pesan commit, dan arsip terkompresi di dalam produk build.
   - **Keparahan Go:** govulncheck tidak memberi skor, jadi kebijakannya "terpanggil = gagal". Tinjau ulang bila ada sumber keparahan yang andal.
   - **Masih terbuka:** audit `.ipa` bertanda tangan (TC-SEC-07), MASVS (TC-SEC-06), SAST, dan pentest eksternal (TC-SEC-12).
 - **Katalog error — selesai (ADR-0060 `error_catalog_alignment`, 2026-11-06):** audit baris demi baris SDD §15 vs teks app nyata, hasil di QA TC-UX-09 butir 9. 15/33 baris sudah cocok persis; 5 wording diperbarui di SDD agar sama persis dengan app (`CH-NOT-ELIGIBLE`, `CH-BT-OFF`/`CH-BT-DENIED`, `PRS-DENIED-ZONE`, `PRS-SUSPENDED`, `CRED-EXPIRED`); 5 memang tanpa teks pengguna by design; 1 belum berlaku (OTP).

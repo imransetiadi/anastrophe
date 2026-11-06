@@ -53,6 +53,21 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Pemindaian keamanan | `scripts/security/scan.py`: gitleaks atas riwayat, staged, dan produk build; govulncheck; paket Swift remote; OSV untuk alat Python. Exit 0/1/2; git gagal, clone dangkal, dan `.gitleaksignore` memberi exit 2. Backend Go ≥ 1.25 dengan toolchain go1.27.3 | TC-SEC-11, NFR-S09, ADR-0056 |
 | Aksesibilitas | Token warna sebagai data dengan test kontras WCAG; lint font tetap, animasi, warna teks sistem, dan pemotong teks; komponen dengan area ketuk ≥ 44 pt; target UI test `AnastropheUITests` yang mengaudit 16 keadaan demo (terang, gelap, AX5 ID/EN) dengan pengecualian per elemen. VoiceOver manual di iPhone fisik dan CI UI test belum ada | NFR-A01, TC-UX-01–04, TC-UX-09, ADR-0057–ADR-0059 |
 
+## SEC-2026-11-06-0600 - Pengerasan pemindaian keamanan (ADR-0060 `security_scan_hardening`; Selesai)
+
+Unit keempat dan terakhir ADR-0060. TDD, RED→GREEN→mutasi, di `scripts/security/scan.py`.
+
+- **`-r` requirements diikuti:** `_requirement_names` sekarang rekursif mengikuti baris `-r`/`--requirement`, relatif terhadap direktori berkas yang memuatnya, dengan guard siklus (`_seen`). Test `test_requirements_mengikuti_dash_r` (termasuk kasus siklus -r yang saling mengarah).
+- **Semua `Package.swift` diperiksa:** `swift_remote_packages(path, path)` diganti `swift_packages_remote(repo)` yang menjelajah seluruh repo (`rglob`), mengecualikan `.build`, `build`, `DerivedData`, `.git`, `worktrees`. Test `test_package_swift_lain_ikut_diperiksa`.
+- **Sub-pemeriksaan independen:** `scan_deps` (Go/Swift/Python) dan `main` (secrets/deps/build) masing-masing menjalankan setiap bagian dalam try/except `ToolError` sendiri, mengumpulkan pesan galat, dan tetap mencetak hasil bagian yang berhasil sebelum keluar exit 2 di akhir. Sebelumnya satu `ToolError` di bagian mana pun langsung menghentikan sisanya tanpa melaporkan apa pun. Test `test_satu_pemeriksaan_gagal_tidak_menghentikan_sisanya`.
+- **Alias OSV dikelompokkan:** `_dedupe_aliases` baru menyatukan entri yang saling menjadi alias (mis. GHSA dan PYSEC untuk kerentanan sama), memilih CVE sebagai id kanonik bila ada. Test `test_osv_alias_tidak_dicetak_dobel`, `test_osv_alias_berbeda_tetap_dua`.
+
+**Insiden kecil selama kerja:** satu mutasi-uji (`git checkout -- scan.py`) tanpa commit sebelumnya sempat menghapus seluruh perubahan di file itu (bukan hanya baris yang dimutasi), karena perubahan belum di-commit saat checkout dijalankan. Diperbaiki dengan menerapkan ulang keempat perubahan dari awal; pelajaran: commit dulu sebelum menguji mutasi lewat `git checkout`, atau pakai diff manual/stash.
+
+Uji: `python3 -m unittest discover -s scripts/security -v` → 47 test lulus. Verifikasi nyata: `python3 scripts/security/scan.py deps` dan `scan.py` penuh di repo ini sendiri, exit 0, tanpa pemindaian ganda `.claude/worktrees`.
+
+Rujukan: ADR-0056, ADR-0060, NFR-S09, TC-SEC-11. Ini menutup keempat unit ADR-0060 yang disetujui pengguna.
+
 ## DOC-2026-11-06-0500 - Katalog error dicocokkan dengan teks app (ADR-0060 `error_catalog_alignment`; Selesai)
 
 Unit ketiga ADR-0060 (dokumen murni, tanpa kode). Audit baris demi baris SDD §15 terhadap `Localizable.xcstrings` dan kode pemetaan (`EnrollmentMessages.swift`, `AddCardModel.swift`, `CardRemover.swift`).
