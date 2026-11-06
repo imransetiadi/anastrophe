@@ -53,6 +53,19 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
 | Pemindaian keamanan | `scripts/security/scan.py`: gitleaks atas riwayat, staged, dan produk build; govulncheck; paket Swift remote; OSV untuk alat Python. Exit 0/1/2; git gagal, clone dangkal, dan `.gitleaksignore` memberi exit 2. Backend Go ≥ 1.25 dengan toolchain go1.27.3 | TC-SEC-11, NFR-S09, ADR-0056 |
 | Aksesibilitas | Token warna sebagai data dengan test kontras WCAG; lint font tetap, animasi, warna teks sistem, dan pemotong teks; komponen dengan area ketuk ≥ 44 pt; target UI test `AnastropheUITests` yang mengaudit 16 keadaan demo (terang, gelap, AX5 ID/EN) dengan pengecualian per elemen. VoiceOver manual di iPhone fisik dan CI UI test belum ada | NFR-A01, TC-UX-01–04, TC-UX-09, ADR-0057–ADR-0059 |
 
+## API-2026-11-06-0400 - Pengerasan observabilitas backend (ADR-0060 `observability_hardening`; Selesai)
+
+Unit kedua ADR-0060. TDD, RED→GREEN→mutasi:
+
+- **413 tidak menutup koneksi:** `readBody` (dipakai `credentials.go`, `renew.go`, `delete.go`) kini men-set `Connection: close` eksplisit sebelum `WriteProblem` saat `MaxBytesError`, karena `statusRecorder` pembungkus bukan `*http.response` persis sehingga penandaan otomatis net/http untuk menutup koneksi tidak berjalan. Test `TestBodyTerlaluBesarDitolak413` diperluas (RED: header `Connection` kosong).
+- **Panic sesudah header tercatat 200:** `requestInfo.panicked` baru diset `recoverer` saat menangkap panik; `accessLog` memaksa status log dan metrik ke 500 bila `panicked`, walau `statusRecorder` sudah membekukan status lama karena header sudah terkirim sebelum panik. Test baru `TestPanicSesudahHeaderTercatatSebagaiKegagalan` (RED: metrik mencatat 200). Mutasi (hapus `info.panicked = true`) mengembalikan kegagalan test, membuktikan tangkapan regresi.
+- **`ErrorLog` http.Server:** fungsi baru `newAPIServer` men-set `ErrorLog` ke `slog.NewLogLogger(logger.Handler(), slog.LevelWarn)`, menggantikan bawaan yang menulis ke stderr lewat paket `log` standar, di luar format dan tujuan log terpusat app. Test `TestErrorLogKeSlogWarn`.
+- **`ANASTROPHE_LOG_FORMAT` peka huruf besar:** `loggerFromEnv` memakai `strings.EqualFold` + `TrimSpace`; `JSON`/`Json`/` json ` semua dikenali, nilai tak dikenal tetap teks. Test `TestFormatLogTidakPekaHurufBesar`.
+
+Ditahan di backlog (di luar lingkup unit berdiri sendiri): test wiring `request_id` produksi end-to-end, dan redirect trailing-slash CONNECT.
+
+Uji: `go test ./... -count=1` seluruh backend (13 paket) lulus; `go vet ./...` bersih. Rujukan: ADR-0054, ADR-0060, NFR-O01. Backlog diperbarui.
+
 ## API-2026-11-06-0300 - Pengerasan verifier App Attest (ADR-0060 `app_attest_hardening`; Selesai)
 
 Unit pertama dari empat kandidat ADR-0060 yang disetujui pengguna. Lingkup: perbaikan berdiri sendiri di `backend/internal/appattest` yang tidak menyentuh keputusan penyambungan endpoint (tetap dieskalasi).

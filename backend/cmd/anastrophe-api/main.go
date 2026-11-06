@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -115,12 +116,7 @@ func run() error {
 		addr = ":8080"
 	}
 	metrics := httpapi.NewMetrics()
-	server := &http.Server{
-		Addr:              addr,
-		WriteTimeout:      httpapi.RequestTimeout + 5*time.Second,
-		Handler:           httpapi.New(httpapi.Config{EnabledChannels: enabledChannels}, httpapi.Deps{Routes: handlers.Register, Logger: logger, Metrics: metrics}),
-		ReadHeaderTimeout: 5 * time.Second,
-	}
+	server := newAPIServer(addr, httpapi.New(httpapi.Config{EnabledChannels: enabledChannels}, httpapi.Deps{Routes: handlers.Register, Logger: logger, Metrics: metrics}), logger)
 	metricsServer := newMetricsServer(os.Getenv("ANASTROPHE_METRICS_ADDR"), metrics)
 	// SIGTERM (deploy/failover ADR-0014): berhenti menerima permintaan baru dan tunggu
 	// permintaan berjalan selesai, agar transaksi tidak terputus di tengah.
@@ -157,14 +153,29 @@ func run() error {
 	}
 }
 
-// loggerFromEnv memilih format log (ANASTROPHE_LOG_FORMAT=json untuk log terpusat, selain itu teks) dan
-// membungkusnya agar log dengan context permintaan membawa request_id (ADR-0054).
+// loggerFromEnv memilih format log (ANASTROPHE_LOG_FORMAT=json untuk log terpusat, selain itu teks; nilai
+// tidak peka huruf besar/kecil dan spasi tepi diabaikan, minor review akhir ADR-0054) dan membungkusnya agar
+// log dengan context permintaan membawa request_id.
 func loggerFromEnv(getenv func(string) string, w io.Writer) *slog.Logger {
 	var h slog.Handler = slog.NewTextHandler(w, nil)
-	if getenv("ANASTROPHE_LOG_FORMAT") == "json" {
+	if strings.EqualFold(strings.TrimSpace(getenv("ANASTROPHE_LOG_FORMAT")), "json") {
 		h = slog.NewJSONHandler(w, nil)
 	}
 	return slog.New(httpapi.WithRequestID(h))
+}
+
+// newAPIServer merakit http.Server publik. ErrorLog diarahkan ke logger app di level Warn (minor review
+// akhir ADR-0054): bawaannya menulis ke os.Stderr lewat paket log standar, di luar format dan tujuan log
+// terpusat yang sama dengan log akses, padahal galat net/http sendiri (mis. TLS handshake gagal) bisa memuat
+// alamat IP klien.
+func newAPIServer(addr string, handler http.Handler, logger *slog.Logger) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		WriteTimeout:      httpapi.RequestTimeout + 5*time.Second,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ErrorLog:          slog.NewLogLogger(logger.Handler(), slog.LevelWarn),
+	}
 }
 
 // newMetricsServer membuat listener internal yang hanya melayani GET /metrics; nil bila addr kosong.

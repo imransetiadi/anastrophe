@@ -132,14 +132,14 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
     - `.task` bisa membuat `AppServices` kedua sesudah scene tersambung ulang;
     - proteksi SQLite bawaan Core Data mungkin menimpa klaim `.complete` di SDD §5.3;
     - deteksi restore di SDD tidak cocok dengan store kartu yang dikecualikan dari backup.
-- **Observabilitas backend (minor review akhir, ADR-0054):**
-  - **Test wiring produksi:** wiring `request_id` produksi (`loggerFromEnv` + `WithRequestID`) belum dipin test end-to-end. Reviewer memverifikasinya lewat uji asap.
-  - **CONNECT:** redirect trailing-slash pada CONNECT bisa menjadikan path mentah sebagai pola. Ini laten sampai ada rute subtree; perlakukan CONNECT sebagai `/` atau batasi jumlah rute di `Metrics`.
-  - **Panic sesudah header:** panic sesudah header ditulis tercatat sebagai 200. Tandai `panicked` di recoverer agar terhitung 500.
-  - **413:** 413 tidak lagi menutup koneksi, karena `statusRecorder` menyembunyikan `requestTooLarge`. Set `Connection: close` di `readBody` saat `MaxBytesError`.
-  - **Rekomendasi:**
-    - `ErrorLog` `http.Server` ke slog level Warn, karena log net/http sendiri bisa memuat IP saat panic lolos middleware;
-    - `ANASTROPHE_LOG_FORMAT` tidak peka huruf besar, atau tolak nilai tak dikenal.
+- **Observabilitas backend — pengerasan selesai (ADR-0060 `observability_hardening`, 2026-11-06):**
+  - **Panic sesudah header:** selesai. `requestInfo.panicked` diset `recoverer` saat panik ditangkap; `accessLog` memaksa status log/metrik ke 500 bila `panicked`, walau `statusRecorder` sudah merekam status lama (header terkirim). Test `TestPanicSesudahHeaderTercatatSebagaiKegagalan`; mutasi (hapus `info.panicked = true`) tertangkap.
+  - **413:** selesai. `readBody` (`backend/internal/enroll/credentials.go`) men-set header `Connection: close` eksplisit sebelum `WriteProblem` saat `MaxBytesError`, karena `statusRecorder` bukan `*http.response` persis sehingga mekanisme otomatis net/http tidak berjalan. Test `TestBodyTerlaluBesarDitolak413` diperluas; dipakai bersama oleh `renew.go` dan `delete.go`.
+  - **`ErrorLog`:** selesai. `newAPIServer` (baru, `anastrophe-api/main.go`) men-set `http.Server.ErrorLog` ke `slog.NewLogLogger(logger.Handler(), slog.LevelWarn)`, bukan log standar ke stderr di luar jalur terpusat. Test `TestErrorLogKeSlogWarn`.
+  - **`ANASTROPHE_LOG_FORMAT`:** selesai. `loggerFromEnv` memakai `strings.EqualFold` + `TrimSpace`, jadi `JSON`/`Json`/` json ` semua dikenali; nilai tak dikenal tetap jatuh ke teks (bukan galat diam-diam). Test `TestFormatLogTidakPekaHurufBesar`.
+  - Masih terbuka (di luar lingkup unit berdiri sendiri ini):
+    - **Test wiring produksi:** wiring `request_id` produksi (`loggerFromEnv` + `WithRequestID`) belum dipin test end-to-end (uji asap).
+    - **CONNECT:** redirect trailing-slash pada CONNECT bisa menjadikan path mentah sebagai pola. Laten sampai ada rute subtree; perlakukan CONNECT sebagai `/` atau batasi jumlah rute di `Metrics`.
 - **Uji beban (temuan baseline lab, ADR-0055):**
   - **Rute gabungan:** challenge dan renew berbagi pola `POST /v1/credentials/{action}`, sehingga latensinya tidak bisa dibedakan di `/metrics`. Pertimbangkan rute terpisah atau label aksi terbatas.
   - **Enrolment melambat pada c=32:** p95 naik dari 5 ke 25 ms (baseline ulang sesudah review akhir). Kandidat penyebab: serialisasi rantai audit per gedung (semua beban di satu gedung), penandatanganan CA perangkat lunak, dan CPU yang dipakai bersama. Butuh profil (pprof, wait event PostgreSQL) di lingkungan Load dan skenario multi-gedung.

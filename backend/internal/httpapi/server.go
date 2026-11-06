@@ -84,6 +84,7 @@ func recoverer(logger *slog.Logger, next http.Handler) http.Handler {
 				route := "/"
 				if info := requestInfoFrom(r.Context()); info != nil {
 					route = info.route()
+					info.panicked = true
 				}
 				// Nilai panik dan path mentah tidak di-log: bisa memuat data sensitif atau id (aturan 6).
 				logger.ErrorContext(r.Context(), "panic in handler", "route", route)
