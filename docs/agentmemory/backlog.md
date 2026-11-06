@@ -33,6 +33,7 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
 
 ## Terbuka
 
+- **Fokus berikutnya (ADR-0060, eskalasi, JEV 0,38):** menunggu pengguna memilih antara `app_attest_hardening` (verifier App Attest, ADR-0052), `observability_hardening` (ADR-0054), `security_scan_hardening` (ADR-0056), atau `error_catalog_alignment` (pesan galat vs SDD §15) sebagai unit kerja berikutnya.
 - **Aksesibilitas (ADR-0057; rencana selesai, penutupan unit tertunda):**
   - `jev_gate` dijalankan 2026-11-06 (dua run, bukti bertambah di run kedua): **eskalasi** kedua kali (composite 0,66 lalu 0,58; limiting rubric `test_gap` lalu `correctness`; 0 klaim `contradicted` di kedua run). Menunggu keputusan pengguna: terima penutupan berdasarkan bukti uji nyata yang sudah tercatat, atau minta review akhir manusia/subagent atas `AnastropheUITests/AccessibilityAudit.swift` (harness +829 baris, di luar batas payload gate). Log: `docs/adr/jev-log/2026-11-06-audit-aksesibilitas-gate.json`, sesi: `sessions/2026-11-06-audit-aksesibilitas-gate.md`.
   - Pemeriksaan VoiceOver manual di iPhone fisik (sisi H TC-UX-01), TC-UX-05 dengan Reduce Motion aktif, dan CI untuk UI test.
