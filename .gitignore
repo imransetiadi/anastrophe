@@ -46,3 +46,6 @@ docs/agentmemory/.trash/
 
 # Worktree git lokal untuk subagent (checkout penuh, bukan bagian dari sejarah repo utama)
 /.claude/worktrees/
+
+# Scratch kerja skill superpowers (progress, log test, diff review per sesi)
+/.superpowers/
