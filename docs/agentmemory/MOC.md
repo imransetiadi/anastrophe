@@ -11,6 +11,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Sesi
 
+- [2026-11-07 — Fokus berikutnya pasca ADR-0062: presedensi galat audit deferred](sessions/2026-11-07-audit-deferred-flush-precedence.md)
 - [2026-11-07 — Fokus berikutnya pasca ADR-0061: race pembatalan pindai BLE](sessions/2026-11-07-ble-scan-cancel-race.md)
 - [2026-11-06 — Pembaruan README](sessions/2026-11-06-pembaruan-readme.md)
 - [2026-11-06 — Fokus berikutnya pasca ADR-0060: tipe nominal rahasia provisioning](sessions/2026-11-06-tipe-rahasia-provisioning.md)
@@ -39,6 +40,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Keputusan
 
+- [ADR-0063 — Fokus berikutnya: presedensi galat `withDeferredAudits` dan guard audit tak di-flush](decisions/ADR-0063-fokus-berikutnya-audit-deferred-flush-precedence.md) · JEV 0,85
 - [ADR-0062 — Fokus berikutnya: race pembatalan pindai BLE (test flaky)](decisions/ADR-0062-fokus-berikutnya-ble-scan-cancel-race.md) · JEV 1,0
 - [ADR-0061 — Fokus berikutnya: tipe nominal rahasia provisioning vs hash-nya](decisions/ADR-0061-fokus-berikutnya-tipe-rahasia-provisioning.md) · JEV 0,99
 - [ADR-0059 — Isu kontras audit: pengecualian per elemen dengan bukti](decisions/ADR-0059-pengecualian-kontras-per-elemen.md) · JEV 0,93

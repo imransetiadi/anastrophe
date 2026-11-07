@@ -291,7 +291,13 @@ func (t *Tx) LockInstanceOfCredential(ctx context.Context, credID []byte) error 
 
 // InTx menjalankan fn dalam satu transaksi; galat dari fn membatalkan semuanya.
 func (s *Store) InTx(ctx context.Context, fn func(tx *Tx) error) error {
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error { return fn(&Tx{tx: tx}) })
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		t := &Tx{tx: tx}
+		if err := fn(t); err != nil {
+			return err
+		}
+		return t.checkFlushed()
+	})
 }
 
 // CardStatusByToken mengembalikan status card instance bila hash token cocok (ADR-0037). Id tak dikenal,
