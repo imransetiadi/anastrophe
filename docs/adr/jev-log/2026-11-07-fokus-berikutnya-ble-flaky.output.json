@@ -1,0 +1,42 @@
+{
+  "tool": "jev_decide",
+  "model": "jev-1.14.0",
+  "provider": "typesafe",
+  "recommendation": {
+    "selected": "ble_flaky_test_fix",
+    "escaped": false,
+    "confidence": 1,
+    "probabilities": {
+      "ble_flaky_test_fix": 1,
+      "provisioning_concurrency_test_hardening": 0,
+      "ask_user": 0,
+      "investigate": 0,
+      "none": 0
+    },
+    "contradicted_requirements": []
+  },
+  "requirements_checked": 3,
+  "checks": [
+    { "candidate": "ble_flaky_test_fix", "requirement": 0, "answer": "supported" },
+    { "candidate": "ble_flaky_test_fix", "requirement": 1, "answer": "supported" },
+    { "candidate": "ble_flaky_test_fix", "requirement": 2, "answer": "supported" },
+    { "candidate": "provisioning_concurrency_test_hardening", "requirement": 0, "answer": "supported" },
+    { "candidate": "provisioning_concurrency_test_hardening", "requirement": 1, "answer": "supported" },
+    { "candidate": "provisioning_concurrency_test_hardening", "requirement": 2, "answer": "contradicted" }
+  ],
+  "warnings": [],
+  "usage": { "input_tokens": 2344, "output_tokens": 320 },
+  "request": {
+    "decision": "Fokus unit improvement berikutnya di Anastrophe (R1), memilih di antara dua kandidat sisa dari ADR-0061 yang sudah diverifikasi ulang langsung terhadap kode saat ini (2026-11-07).",
+    "candidates": [
+      { "id": "ble_flaky_test_fix", "description": "Perbaiki BLETapTests.autentikasiBatalMembatalkanPemindaian (ANChannelBLE) agar tidak pakai assertion OR-toleran scanCount==0||scanWasCancelled; catat pembatalan pindai secara deterministik sebelum aliran selesai, TDD, tanpa ubah perilaku runtime BLE." },
+      { "id": "provisioning_concurrency_test_hardening", "description": "Ganti time.Sleep(300ms) di tiga test backend Go (store/hardening_test.go x2, enroll/status_test.go) dengan sinkronisasi eksplisit (polling pg_stat_activity atau setara) agar test race benar-benar menguji balapan, tidak lulus semu di runner lambat." }
+    ],
+    "requirements": [
+      "Kandidat tidak mengubah kontrak jaringan/API atau katalog error SDD §15",
+      "Kandidat adalah unit test-hardening berdiri sendiri tanpa perlu dokumen spesifikasi/rencana terpisah",
+      "Kandidat bersinggungan dengan jalur yang diatur aturan keras CLAUDE.md (mis. timing/cancellation presentment kanal in-app)"
+    ],
+    "escalate_on_contradiction": true
+  }
+}

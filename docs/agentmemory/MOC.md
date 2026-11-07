@@ -11,6 +11,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Sesi
 
+- [2026-11-07 — Fokus berikutnya pasca ADR-0061: race pembatalan pindai BLE](sessions/2026-11-07-ble-scan-cancel-race.md)
 - [2026-11-06 — Pembaruan README](sessions/2026-11-06-pembaruan-readme.md)
 - [2026-11-06 — Fokus berikutnya pasca ADR-0060: tipe nominal rahasia provisioning](sessions/2026-11-06-tipe-rahasia-provisioning.md)
 - [2026-11-06 — Gate penutupan audit aksesibilitas (eskalasi)](sessions/2026-11-06-audit-aksesibilitas-gate.md)
@@ -38,6 +39,7 @@ Aturan: tidak ada secret, kredensial, token, kontak pengguna, atau identitas kar
 
 ## Keputusan
 
+- [ADR-0062 — Fokus berikutnya: race pembatalan pindai BLE (test flaky)](decisions/ADR-0062-fokus-berikutnya-ble-scan-cancel-race.md) · JEV 1,0
 - [ADR-0061 — Fokus berikutnya: tipe nominal rahasia provisioning vs hash-nya](decisions/ADR-0061-fokus-berikutnya-tipe-rahasia-provisioning.md) · JEV 0,99
 - [ADR-0059 — Isu kontras audit: pengecualian per elemen dengan bukti](decisions/ADR-0059-pengecualian-kontras-per-elemen.md) · JEV 0,93
 - [ADR-0058 — Cakupan token warna dan tint app `secondary`](decisions/ADR-0058-cakupan-token-warna-tint-app.md) · JEV 0,95

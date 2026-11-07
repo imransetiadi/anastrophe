@@ -1,5 +1,18 @@
 # Memory — catatan perubahan Anastrophe
 
+## APP-2026-11-07-1630 - Fokus berikutnya pasca ADR-0061: race pembatalan pindai BLE (ADR-0062; Selesai)
+
+`docs/agentmemory/backlog.md` mencatat dua kandidat sisa dari ADR-0061: `ble_flaky_test_fix` dan `provisioning_concurrency_test_hardening`. Keduanya diverifikasi ulang langsung terhadap kode (masih valid persis seperti dicatat), lalu `jev_decide` memilih `ble_flaky_test_fix` (confidence 1,0, tanpa requirement *contradicted* untuk kandidat terpilih) — Diterima tanpa eskalasi (ADR-0018).
+
+**Akar masalah** `BLETapTests.autentikasiBatalMembatalkanPemindaian` (assertion OR-toleran `scanCount == 0 || scanWasCancelled`): `async let scanned` di `BLETapCoordinator.run()` (`ANChannelBLE`) dibatalkan & di-`await` implisit Swift di akhir scope `run()`, yaitu *setelah* `finish(out, with: .cancelled)` sudah menutup stream lewat `out.finish()`. Pengamat stream (test) bisa memeriksa `scanWasCancelled` sebelum handler pembatalan `scan()` sempat jalan — race urutan nyata, bukan sekadar mesin sibuk.
+
+**Perbaikan:** `async let scanned` diganti `Task` eksplisit (`scanTask`); kedua jalur keluar dini (autentikasi gagal, provider gagal/app ke background) memanggil `scanTask.cancel(); _ = await scanTask.result` sebelum `finish()`. Jalur sukses memakai `try await scanTask.value`. Assertion test diperketat ke `#expect(h.central.scanWasCancelled)` tanpa toleransi OR. Perilaku runtime presentment BLE (ADR-0019) tidak berubah.
+
+Uji: `swift build` dan `swift test` penuh (semua target) lulus tanpa regresi; `ANChannelBLETests` 25× berturut-turut (host) lulus semua; `xcodebuild -scheme AnastropheKit-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:ANChannelBLETests test` → `TEST SUCCEEDED`; `python3 scripts/docs/check_docs.py .` → 0 masalah. Log JEV: `docs/adr/jev-log/2026-11-07-fokus-berikutnya-ble-flaky.output.json`. Catatan sesi: `docs/agentmemory/sessions/2026-11-07-ble-scan-cancel-race.md`.
+
+`provisioning_concurrency_test_hardening` tetap kandidat valid untuk fokus berikutnya.
+
+
 Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per sesi, keputusan, dan pelajaran yang saling bertaut ada di vault Obsidian [`docs/agentmemory/`](docs/agentmemory/MOC.md).
 
 **Aturan pencatatan**
@@ -25,6 +38,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
   - ~~`jev_gate` unit audit aksesibilitas (ADR-0057) eskalasi~~ — **diselesaikan 2026-11-06**: pengguna menerima penutupan berdasarkan bukti uji nyata yang sudah tercatat. Status unit: Selesai.
   - ~~ADR-0060: fokus kerja berikutnya, JEV 0,38 (eskalasi)~~ — **diselesaikan 2026-11-06**: pengguna menyetujui keempat kandidat (`app_attest_hardening`, `observability_hardening`, `error_catalog_alignment`, `security_scan_hardening`) untuk dikerjakan berurutan.
   - ~~ADR-0061: fokus berikutnya pasca ADR-0060~~ — **selesai 2026-11-06**: `provisioning_secret_hash_type_safety` (JEV 0,99, diterima tanpa eskalasi keputusan; `jev_gate` penutupannya tereskalasi tapi diterima berdasarkan bukti uji nyata, lihat APP-2026-11-06-1600). `ble_flaky_test_fix` dan `provisioning_concurrency_test_hardening` tetap kandidat untuk fokus berikutnya.
+  - ~~ADR-0062: fokus berikutnya pasca ADR-0061~~ — **selesai 2026-11-07**: `ble_flaky_test_fix` (JEV 1,0, diterima tanpa eskalasi). `provisioning_concurrency_test_hardening` tetap kandidat untuk fokus berikutnya.
   - Tinjauan 22 gate JEV (20 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan, verifier App Attest, sisa Keychain instal ulang, observabilitas backend, uji beban API, pemindaian secret dan dependensi, tipe rahasia provisioning (`docs/adr/jev-log/*-gate.json`).
   - Perbarui `cryptography` ke 50.* di pyenv lokal: `python3 -m pip install -r scripts/anp1/requirements.txt`. Pemindai dengan interpreter bawaan exit 1 sampai itu dilakukan.
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.

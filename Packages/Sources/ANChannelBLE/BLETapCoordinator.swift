@@ -73,21 +73,29 @@ public actor BLETapCoordinator<C: Clock> where C.Duration == Duration {
     private func run(_ out: AsyncStream<PresentmentEvent>.Continuation) async {
         guard isForeground(), !Task.isCancelled else { return finish(out, with: .cancelled) }
         // ADR-0019: pemindaian berjalan bersamaan dengan autentikasi (Face ID) agar NFR-P04
-        // tercapai. Child task ini otomatis dibatalkan bila autentikasi gagal atau app ke
-        // background; connect tetap hanya setelah autentikasi berhasil.
-        async let scanned = central.scan(ScanWindow(threshold: rssiThreshold, settle: Self.scanSettle, maximum: Self.scanDuration))
+        // tercapai. Task eksplisit (bukan `async let`) agar pembatalannya bisa di-`await`
+        // sebelum `finish()` menutup stream — `async let` membatalkan & menunggu child task
+        // secara implisit di akhir scope, yaitu *setelah* `finish()` sudah berjalan, sehingga
+        // `scanWasCancelled` pemanggil belum tentu ter-set saat stream sudah ditutup (race).
+        let scanTask = Task { try await central.scan(ScanWindow(threshold: rssiThreshold, settle: Self.scanSettle, maximum: Self.scanDuration)) }
         guard let context = try? await authenticator.authenticate(reason: authenticationReason),
               isForeground(), !Task.isCancelled
-        else { return finish(out, with: .cancelled) }
+        else {
+            scanTask.cancel()
+            _ = await scanTask.result
+            return finish(out, with: .cancelled)
+        }
         await prepare(context)
         guard let provider = try? makeProvider(context), isForeground(), !Task.isCancelled else {
+            scanTask.cancel()
+            _ = await scanTask.result
             return finish(out, with: .cancelled)
         }
 
         out.yield(.waitingForReader)
         let advertisements: [BLEReaderAdvertisement]
         do {
-            advertisements = try await scanned
+            advertisements = try await scanTask.value
         } catch {
             return finish(out, with: Self.terminal(for: error))
         }
