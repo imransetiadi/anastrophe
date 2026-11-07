@@ -178,7 +178,7 @@ func withDeferredAudits[T any](ctx context.Context, t *Tx, fn func() (T, error))
 }
 
 // errUnflushedAudits: deferAudits() dipanggil tanpa flushAudits() sebelum transaksi commit, yang
-// akan membuat event audit tertahan hilang diam-diam (ADR-0051, ditemukan review, ditutup ADR-0062).
+// akan membuat event audit tertahan hilang diam-diam (ADR-0051, ditemukan review, ditutup ADR-0063).
 // Setiap pemanggil produksi saat ini memakai withDeferredAudits, yang selalu flush sendiri; guard ini
 // menjaga agar penyalahgunaan langsung (deferAudits tanpa flushAudits) gagal keras, bukan diam-diam.
 var errUnflushedAudits = errors.New("store: audit tertahan tidak pernah di-flush")

@@ -1,4 +1,4 @@
-# ADR-0062: Fokus berikutnya: presedensi galat `withDeferredAudits` dan guard audit tak di-flush
+# ADR-0063: Fokus berikutnya: presedensi galat `withDeferredAudits` dan guard audit tak di-flush
 
 - **Status:** Diterima
 - **Tanggal:** 2026-11-07
@@ -9,7 +9,7 @@
 
 Satu kandidat sisa dari ADR-0061 tetap ada (`provisioning_concurrency_test_hardening`). Sesi ini mencari kandidat kedua dari `docs/agentmemory/backlog.md` bagian "Deadlock enrolment–sapuan (minor review akhir, ADR-0051)" yang belum pernah dijadikan kandidat `jev_decide`: `withDeferredAudits` (`backend/internal/store/audit.go`) punya komentar "Galat fn didahulukan" tapi tidak ada test eksplisit yang mem-pin-nya; terkait, `deferAudits()` yang dipanggil tanpa `flushAudits()` tidak dijaga — event audit tertahan bisa hilang diam-diam saat transaksi commit.
 
-Catatan percabangan: unit `ble_flaky_test_fix` (kandidat lain dari ADR-0061) dikerjakan paralel di branch terpisah (`fix/ble-flaky-scan-cancel-test`, belum merge saat ADR ini ditulis) dengan nomor ADR-0062 di branch itu. Branch ini (`fix/audit-deferred-flush-precedence-test`) di-fork dari `main` yang baru sampai ADR-0061, sehingga penomoran berikutnya di sini tetap ADR-0062. Siapa pun yang merge kedua branch ke `main` perlu merenumber salah satunya agar tidak bentrok.
+Catatan percabangan: unit `ble_flaky_test_fix` (kandidat lain dari ADR-0061) dikerjakan paralel di branch terpisah (`fix/ble-flaky-scan-cancel-test`, belum merge saat ADR ini ditulis) dengan nomor ADR-0063 di branch itu. Branch ini (`fix/audit-deferred-flush-precedence-test`) di-fork dari `main` yang baru sampai ADR-0061, sehingga penomoran berikutnya di sini tetap ADR-0063. Siapa pun yang merge kedua branch ke `main` perlu merenumber salah satunya agar tidak bentrok.
 
 ## Hasil JEV
 

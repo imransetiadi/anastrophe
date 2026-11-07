@@ -11,9 +11,9 @@ Satu kandidat sisa dari [[ADR-0061]] tetap ada (`provisioning_concurrency_test_h
 
 ## Keputusan JEV
 
-`jev_decide` memilih `audit_deferred_flush_precedence_test` (confidence 0,85) atas `provisioning_concurrency_test_hardening` (0) — kandidat kedua butuh `pg_stat_activity` (PostgreSQL hidup), melanggar requirement "bisa diverifikasi tuntas tanpa database PostgreSQL hidup". Lihat [[ADR-0062]].
+`jev_decide` memilih `audit_deferred_flush_precedence_test` (confidence 0,85) atas `provisioning_concurrency_test_hardening` (0) — kandidat kedua butuh `pg_stat_activity` (PostgreSQL hidup), melanggar requirement "bisa diverifikasi tuntas tanpa database PostgreSQL hidup". Lihat [[ADR-0063]].
 
-Catatan percabangan: unit `ble_flaky_test_fix` (kandidat lain dari ADR-0061) dikerjakan paralel di branch `fix/ble-flaky-scan-cancel-test` (belum merge), juga bernomor ADR-0062 di branch itu. Branch sesi ini (`fix/audit-deferred-flush-precedence-test`) di-fork dari `main` yang baru sampai ADR-0061, jadi penomoran berikutnya di sini tetap ADR-0062 — perlu direnumber salah satu saat kedua branch digabung.
+Catatan percabangan: unit `ble_flaky_test_fix` (kandidat lain dari ADR-0061) dikerjakan paralel di branch `fix/ble-flaky-scan-cancel-test` (belum merge), juga bernomor ADR-0063 di branch itu. Branch sesi ini (`fix/audit-deferred-flush-precedence-test`) di-fork dari `main` yang baru sampai ADR-0061, jadi penomoran berikutnya di sini tetap ADR-0063 — perlu direnumber salah satu saat kedua branch digabung.
 
 ## Implementasi
 

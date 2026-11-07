@@ -11,7 +11,7 @@ import (
 )
 
 // fakeAuditTx implementasi minimal pgx.Tx untuk unit test murni (tanpa PostgreSQL hidup) atas
-// withDeferredAudits (ADR-0051, ADR-0062). Hanya Exec yang benar-benar dipakai jalur ini
+// withDeferredAudits (ADR-0051, ADR-0063). Hanya Exec yang benar-benar dipakai jalur ini
 // (pg_advisory_xact_lock); method lain tidak terjangkau dan memanggil t.Fatal bila dipanggil.
 type fakeAuditTx struct {
 	pgx.Tx
@@ -30,7 +30,7 @@ func (f *fakeAuditTx) QueryRow(ctx context.Context, sql string, args ...any) pgx
 
 // TestWithDeferredAuditsGalatFnMenangAtasGalatFlush mem-pin kontrak yang sudah dinyatakan di
 // komentar withDeferredAudits ("Galat fn didahulukan") tapi belum pernah diuji eksplisit
-// (ADR-0051 review, dicatat ADR-0062): bila fn dan flushAudits sama-sama gagal, galat fn yang
+// (ADR-0051 review, dicatat ADR-0063): bila fn dan flushAudits sama-sama gagal, galat fn yang
 // dikembalikan, bukan galat flush.
 func TestWithDeferredAuditsGalatFnMenangAtasGalatFlush(t *testing.T) {
 	flushErr := errors.New("flush gagal (DB turun)")
@@ -66,7 +66,7 @@ func TestWithDeferredAuditsFlushBerhasilMengembalikanHasilFn(t *testing.T) {
 	}
 }
 
-// TestInTxMenolakAuditTertahanYangTidakDiFlush: guard ADR-0062 — bila fn memanggil deferAudits()
+// TestInTxMenolakAuditTertahanYangTidakDiFlush: guard ADR-0063 — bila fn memanggil deferAudits()
 // langsung (bukan lewat withDeferredAudits) dan lupa flushAudits(), event tertahan tidak boleh
 // hilang diam-diam saat transaksi commit; InTx mengembalikan errUnflushedAudits.
 func TestInTxMenolakAuditTertahanYangTidakDiFlush(t *testing.T) {
