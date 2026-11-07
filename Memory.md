@@ -1,5 +1,15 @@
 # Memory — catatan perubahan Anastrophe
 
+## APP-2026-11-07-1700 - Fokus berikutnya pasca ADR-0062: presedensi galat withDeferredAudits + guard (ADR-0063; Selesai)
+
+`docs/agentmemory/backlog.md` bagian ADR-0051 mencatat `withDeferredAudits` (`backend/internal/store/audit.go`) punya komentar "Galat fn didahulukan" tanpa test eksplisit, dan `deferAudits()` tanpa `flushAudits()` tidak dijaga. `jev_decide` memilih `audit_deferred_flush_precedence_test` (confidence 0,85) atas `provisioning_concurrency_test_hardening` (0, butuh `pg_stat_activity`/PostgreSQL hidup) — Diterima tanpa eskalasi (ADR-0018).
+
+**Test regresi:** `fakeAuditTx` (implementasi minimal `pgx.Tx`, hanya `Exec` yang dipakai) membuktikan galat `fn` menang atas galat `flushAudits` saat keduanya gagal, tanpa PostgreSQL hidup. **Guard baru:** `errUnflushedAudits` dan `Tx.checkFlushed()` (`audit.go`); `Store.InTx` (`lifecycle.go`) memanggilnya setelah `fn` berhasil, sehingga `deferAudits()` yang lupa di-`flushAudits()` gagal keras, bukan diam-diam kehilangan event audit. Semua pemanggil produksi (`registry.go`, `invitation.go`) sudah benar lewat `withDeferredAudits`, jadi perilaku jalur produksi tidak berubah.
+
+Uji: `go build ./...`, `go vet ./...`, `go test ./... -race` (13 paket, PostgreSQL asli) lulus. Mutasi (`return t.checkFlushed()` → `return nil` di `InTx`) tertangkap `TestInTxMenegakkanGuardFlush`, lalu dikembalikan. `python3 scripts/docs/check_docs.py .` → 0 masalah. Log JEV: `docs/adr/jev-log/2026-11-07-fokus-berikutnya-audit-deferred-flush.output.json`. Catatan sesi: `docs/agentmemory/sessions/2026-11-07-audit-deferred-flush-precedence.md`.
+
+`provisioning_concurrency_test_hardening` tetap kandidat valid untuk fokus berikutnya.
+
 ## APP-2026-11-07-1630 - Fokus berikutnya pasca ADR-0061: race pembatalan pindai BLE (ADR-0062; Selesai)
 
 `docs/agentmemory/backlog.md` mencatat dua kandidat sisa dari ADR-0061: `ble_flaky_test_fix` dan `provisioning_concurrency_test_hardening`. Keduanya diverifikasi ulang langsung terhadap kode (masih valid persis seperti dicatat), lalu `jev_decide` memilih `ble_flaky_test_fix` (confidence 1,0, tanpa requirement *contradicted* untuk kandidat terpilih) — Diterima tanpa eskalasi (ADR-0018).
@@ -39,6 +49,7 @@ Log kronologis setiap perubahan di repo ini, entri terbaru di atas. Catatan per 
   - ~~ADR-0060: fokus kerja berikutnya, JEV 0,38 (eskalasi)~~ — **diselesaikan 2026-11-06**: pengguna menyetujui keempat kandidat (`app_attest_hardening`, `observability_hardening`, `error_catalog_alignment`, `security_scan_hardening`) untuk dikerjakan berurutan.
   - ~~ADR-0061: fokus berikutnya pasca ADR-0060~~ — **selesai 2026-11-06**: `provisioning_secret_hash_type_safety` (JEV 0,99, diterima tanpa eskalasi keputusan; `jev_gate` penutupannya tereskalasi tapi diterima berdasarkan bukti uji nyata, lihat APP-2026-11-06-1600). `ble_flaky_test_fix` dan `provisioning_concurrency_test_hardening` tetap kandidat untuk fokus berikutnya.
   - ~~ADR-0062: fokus berikutnya pasca ADR-0061~~ — **selesai 2026-11-07**: `ble_flaky_test_fix` (JEV 1,0, diterima tanpa eskalasi). `provisioning_concurrency_test_hardening` tetap kandidat untuk fokus berikutnya.
+  - ~~ADR-0063: fokus berikutnya pasca ADR-0062~~ — **selesai 2026-11-07**: `audit_deferred_flush_precedence_test` (JEV 0,85, diterima tanpa eskalasi). `provisioning_concurrency_test_hardening` tetap kandidat.
   - Tinjauan 22 gate JEV (20 tereskalasi, 2 review): lab, perpanjangan, audit, hapus kartu, riwayat tap, minor riwayat tap, registri kartu, undangan, siklus hidup kartu, provisioning aman, perbaikan minor, alur Tambah Kartu, layar Bantuan, kebijakan gedung, filter daftar kartu, deadlock enrolment–sapuan, verifier App Attest, sisa Keychain instal ulang, observabilitas backend, uji beban API, pemindaian secret dan dependensi, tipe rahasia provisioning (`docs/adr/jev-log/*-gate.json`).
   - Perbarui `cryptography` ke 50.* di pyenv lokal: `python3 -m pip install -r scripts/anp1/requirements.txt`. Pemindai dengan interpreter bawaan exit 1 sampai itu dilakukan.
   - `DEVELOPMENT_TEAM` di `Config/Local.xcconfig`, serta iPhone dan reader untuk uji bertipe H.
