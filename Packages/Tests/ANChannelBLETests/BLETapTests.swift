@@ -354,7 +354,7 @@ struct BLETapTests {
         var events = await h.coordinator().tap().makeAsyncIterator()
         #expect(await events.rest() == [.cancelled])
         #expect(h.central.connectedIDs.isEmpty)
-        #expect(h.central.scanCount == 0 || h.central.scanWasCancelled)
+        #expect(h.central.scanWasCancelled)
     }
 
     @Test func bluetoothMatiDiTengahTransaksi() async throws {

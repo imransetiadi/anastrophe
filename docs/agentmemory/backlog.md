@@ -39,7 +39,7 @@ Ledger rencana (`.superpowers/sdd/*/progress.md`) tidak ikut git dan sebagian ca
   - Sisa tertunda: pemeriksaan VoiceOver manual di iPhone fisik (sisi H TC-UX-01), TC-UX-05 dengan Reduce Motion aktif, dan CI untuk UI test.
   - Pesan galat belum dicocokkan butir per butir dengan katalog SDD §15 (lihat `error_catalog_alignment` di ADR-0060).
   - Audit Apple di riwayat AX5 halaman 2 (iPhone 17e) selalu habis waktu dan kini lulus lewat audit ulang sesudah isi digeser 48 pt. Bila pola ini muncul di posisi lain, selidiki penyebabnya, mis. jumlah baris riwayat demo.
-- **Test BLE flaky:** `autentikasiBatalMembatalkanPemindaian` sesekali gagal (`scanCount == 0 || scanWasCancelled`) saat mesin sangat sibuk, lalu lulus 6/6 saat diulang. Pembatalan pindai belum tercatat sebelum aliran selesai.
+- **Test BLE flaky — selesai (ADR-0062, 2026-11-07):** `autentikasiBatalMembatalkanPemindaian` memakai `scanCount == 0 || scanWasCancelled` karena race nyata: `async let scanned` di `BLETapCoordinator.run()` dibatalkan & di-`await` implisit Swift di akhir scope, yaitu *setelah* `finish()` menutup stream. Diganti `Task` eksplisit yang di-`cancel()`+`await .result` sebelum `finish()`; assertion diperketat ke `scanWasCancelled` tanpa toleransi OR. `ANChannelBLETests` lulus 25× berturut-turut (host) dan di simulator iPhone 17 Pro.
 
 - **Audit — waktu event mundur sudah diperbaiki:** `b2ed49c fix(audit): waktu event tidak mundur sepanjang seq (minor review audit 3)`. Sisa: peran DB runtime masih pemilik tabel (perlu pemisahan peran di infrastruktur produksi).
 - **Hapus kartu:** penghapusan lokal masih *best-effort*; penghapusan yang terputus setelah 204 pulih lewat `CARD-GONE`; `DELETE` membawa body (RFC 9110).
